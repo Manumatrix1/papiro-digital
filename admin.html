@@ -75,10 +75,15 @@
         // La lista real de usuarios se debe obtener desde un backend seguro (Cloud Functions).
 
         const firebaseConfig = {
-          // AQUI VA TU CONFIGURACION DE FIREBASE
+           apiKey: "AIzaSyDhcJyTriTBrEDftDx_lYAhFgd6Y8Us4dA",
+  authDomain: "papirodigital-1a6c5.firebaseapp.com",
+  projectId: "papirodigital-1a6c5",
+  storageBucket: "papirodigital-1a6c5.firebasestorage.app",
+  messagingSenderId: "274494841235",
+  appId: "1:274494841235:web:99112dde1c6dbd12240866",
+  measurementId: "G-0SKBCYEEF0"
         };
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
+        
 
         const signOutBtn = document.getElementById('sign-out-btn');
         const userEmailP = document.getElementById('user-email');
