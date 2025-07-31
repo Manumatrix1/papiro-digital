@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Papiro Digital - Dashboard</title>
+    <title>Papiro Digital - Panel</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -46,7 +46,6 @@
         </div>
     </div>
     
-    <!-- Modal de Confirmación para Eliminar (sin cambios) -->
     <div id="delete-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
         <div class="modal-backdrop fixed inset-0"></div>
         <div class="bg-[#1c1c1c] rounded-2xl shadow-xl p-6 sm:p-8 w-full max-w-md z-10 border border-[#333]">
@@ -78,17 +77,14 @@
         const appLoader = document.getElementById('app-loader');
         const appContent = document.getElementById('app-content');
 
-        // Proteger la ruta y cargar la app
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                // El usuario está logueado, mostrar la app
                 userId = user.uid;
                 userEmailP.textContent = `Sesión iniciada como: ${user.email}`;
                 appLoader.style.display = 'none';
                 appContent.style.opacity = '1';
                 loadProjects();
             } else {
-                // El usuario no está logueado, redirigir a la página de inicio
                 window.location.replace('index.html');
             }
         });
@@ -97,8 +93,6 @@
             signOut(auth).catch(error => console.error("Error al cerrar sesión:", error));
         });
 
-        // El resto del código del dashboard (loadProjects, delete, etc.) permanece igual
-        // ... (código de la UI, Firebase y eventos sin cambios)
         const projectsGrid = document.getElementById('projects-grid');
         const deleteModal = document.getElementById('delete-modal');
         const confirmDeleteBtn = document.getElementById('confirm-delete');
@@ -164,7 +158,7 @@
             const q = query(projectsRef);
 
             try {
-                const querySnapshot = await new Promise(resolve => setTimeout(() => resolve(getDocs(q)), 500)); // Simula una pequeña demora
+                const querySnapshot = await new Promise(resolve => setTimeout(() => resolve(getDocs(q)), 500));
                 
                 projectsGrid.innerHTML = '';
                 if (querySnapshot.empty) {
