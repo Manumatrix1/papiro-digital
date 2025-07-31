@@ -27,9 +27,12 @@
     <div id="app-content" class="min-h-screen bg-gradient-to-b from-[#1c1c1c] to-[#0f0f0f] px-4 sm:px-6 py-10 opacity-0 transition-opacity duration-500">
         <div class="max-w-7xl mx-auto">
             <header class="mb-12 flex justify-between items-center">
-                <div class="text-left">
-                    <h1 class="text-4xl font-bold text-white">Papiro Digital</h1>
-                    <p id="user-email" class="text-gray-400 text-sm"></p>
+                <div class="flex items-center gap-4">
+                    <img src="https://i.postimg.cc/g0HxbpQF/PAPIRO-1.png" alt="Logo de Papiro Digital" class="h-16 w-auto">
+                    <div>
+                        <h1 class="text-4xl font-bold text-white">Papiro Digital</h1>
+                        <p id="user-email" class="text-gray-400 text-sm"></p>
+                    </div>
                 </div>
                 <button id="sign-out-btn" class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700 transition">Cerrar Sesión</button>
             </header>
@@ -63,11 +66,13 @@
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, getDocs, query, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const firebaseConfig = {
+            // AQUI VA TU CONFIGURACION DE FIREBASE
+        };
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const appId = 'papiro-digital-app'; // Reemplazar si es necesario
 
         let userId = null;
         let projectToDelete = null;
