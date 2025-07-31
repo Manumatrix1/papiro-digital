@@ -13,14 +13,12 @@
         #pdf-container { position: relative; }
         .textLayer { position: absolute; left: 0; top: 0; right: 0; bottom: 0; opacity: 0.2; line-height: 1.0; }
         .textLayer > span { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
-        /* Estilo para la notificación de guardado */
         #save-notification {
             transition: opacity 0.5s ease, transform 0.5s ease;
         }
     </style>
 </head>
 <body class="bg-[#0f0f0f] text-white">
-    <!-- Notificación de Guardado -->
     <div id="save-notification" class="fixed top-5 right-5 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg opacity-0 translate-y-[-20px] z-50">
         ¡Proyecto guardado con éxito!
     </div>
@@ -30,7 +28,7 @@
             
             <header class="mb-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <a href="dashboard.html" class="text-[#88c999] hover:underline text-sm mb-2 block">&larr; Volver al Dashboard</a>
+                    <a href="panel.html" class="text-[#88c999] hover:underline text-sm mb-2 block">&larr; Volver al Panel</a>
                     <input type="text" id="project-title" placeholder="Título de tu Proyecto" class="text-4xl font-bold bg-transparent text-white focus:outline-none w-full border-b-2 border-transparent focus:border-[#88c999] transition-colors">
                 </div>
                 <button id="save-project" class="bg-[#88c999] text-[#1C1C1C] px-6 py-3 rounded-xl font-semibold hover:brightness-110 transition shadow-lg w-full sm:w-auto flex-shrink-0">
@@ -114,13 +112,11 @@
         const pdfNameSpan = document.getElementById('pdf-name');
         const removePdfBtn = document.getElementById('remove-pdf');
         
-        // --- LÓGICA DE PROYECTO Y AUTENTICACIÓN ---
-        
         const urlParams = new URLSearchParams(window.location.search);
         projectId = urlParams.get('id');
         if (!projectId) {
-            alert('ID de proyecto no encontrado. Volviendo al dashboard.');
-            window.location.href = 'dashboard.html';
+            alert('ID de proyecto no encontrado. Volviendo al panel.');
+            window.location.href = 'panel.html';
         }
 
         onAuthStateChanged(auth, user => {
@@ -153,7 +149,6 @@
             }
         }
 
-        // --- GUARDADO MANUAL ---
         document.getElementById('save-project').addEventListener('click', async () => {
             if (!userId || !projectId) return;
             
@@ -178,8 +173,6 @@
                 alert('Hubo un error al guardar. Intenta de nuevo.');
             }
         });
-
-        // --- LÓGICA DE PDF ---
         
         let pdfDoc = null;
         let currentPage = 1;
@@ -190,7 +183,6 @@
             const file = e.target.files[0];
             if (!file || !userId || !projectId) return;
 
-            // Eliminar PDF anterior si existe
             if (localData.pdfURL) {
                 await removePdf();
             }
@@ -276,8 +268,6 @@
         document.getElementById("prev-page").addEventListener("click", () => { if (currentPage > 1) renderPage(currentPage - 1); });
         document.getElementById("next-page").addEventListener("click", () => { if (currentPage < pdfDoc.numPages) renderPage(currentPage + 1); });
 
-
-        // --- SUBRAYADOS ---
         document.addEventListener("mouseup", () => {
              if (!pdfDoc) return;
              const selection = window.getSelection().toString().trim();
@@ -333,9 +323,8 @@
                 });
             });
         }
-        window.renderPage = renderPage; // Hacerla global para el onclick
+        window.renderPage = renderPage;
 
-        // --- VIDEO DE YOUTUBE ---
         youtubeLinkInput.addEventListener("input", updateYoutubePreview);
 
         function updateYoutubePreview() {
