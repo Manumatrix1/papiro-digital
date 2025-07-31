@@ -66,13 +66,22 @@
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, getDocs, query, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const firebaseConfig = {
-            // AQUI VA TU CONFIGURACION DE FIREBASE
-        };
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = 'papiro-digital-app'; // Reemplazar si es necesario
+    const firebaseConfig = {
+      apiKey: "AIzaSyDhcJyTriTBrEDftDx_lYAhFgd6Y8Us4dA",
+      authDomain: "papirodigital-1a6c5.firebaseapp.com",
+      projectId: "papirodigital-1a6c5",
+      storageBucket: "papirodigital-1a6c5.firebasestorage.app",
+      messagingSenderId: "274494841235",
+      appId: "1:274494841235:web:99112dde1c6dbd12240866",
+      measurementId: "G-0SKBCYEEF0"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const appId = 'papiro-digital-app';
+    // ... el resto de tu código
+</script>
 
         let userId = null;
         let projectToDelete = null;
