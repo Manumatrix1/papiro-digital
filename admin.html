@@ -43,43 +43,45 @@
         </div>
     </div>
 
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 
     <script>
-        // Configuración de Firebase (¡USA TUS PROPIAS CREDENCIALES!)
+        // Tu configuración de Firebase
         const firebaseConfig = {
-            apiKey: "TU_API_KEY",
-            authDomain: "TU_AUTH_DOMAIN",
+            apiKey: "AIzaSyDhcJyTriTBrEDftDx_lYAhFgd6Y8Us4dA",
+            authDomain: "papirodigital-1a6c5.firebaseapp.com",
             projectId: "papirodigital-1a6c5",
-            storageBucket: "TU_STORAGE_BUCKET",
-            messagingSenderId: "TU_MESSAGING_SENDER_ID",
-            appId: "TU_APP_ID"
+            storageBucket: "papirodigital-1a6c5.appspot.com",
+            messagingSenderId: "274494841235",
+            appId: "1:274494841235:web:99112dde1c6dbd12240866",
+            measurementId: "G-0SKBCYEEF0"
         };
 
         // Inicializar Firebase
         const app = firebase.initializeApp(firebaseConfig);
-        const auth = firebase.getAuth(app);
-        const db = firebase.getFirestore(app);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
 
         // Lógica de inicio de sesión
         const loginForm = document.getElementById('admin-login-form');
         const errorMessageDiv = document.getElementById('error-message');
 
-        loginForm.addEventListener('submit', async (e) => {
+        loginForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const email = document.getElementById('admin-email').value;
             const password = document.getElementById('admin-password').value;
 
-            try {
-                const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
-                // Si el login es exitoso, redirigir al panel
-                window.location.href = 'panel.html';
-            } catch (error) {
-                console.error("Error de inicio de sesión:", error);
-                errorMessageDiv.textContent = 'Error: ' + error.message;
-            }
+            auth.signInWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    // Si el login es exitoso, redirigir al panel
+                    window.location.href = 'panel.html';
+                })
+                .catch((error) => {
+                    console.error("Error de inicio de sesión:", error);
+                    errorMessageDiv.textContent = 'Correo o contraseña incorrectos.';
+                });
         });
     </script>
 </body>
