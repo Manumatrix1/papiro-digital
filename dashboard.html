@@ -34,7 +34,7 @@
             <h2 class="text-3xl font-semibold text-white">Mi Tablero</h2>
             <button id="new-project-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-4 rounded-lg hover:brightness-110 transition">Nuevo Proyecto</button>
         </div>
-        <div id="projects-grid" class="grid grid-cols-1 md-grid-cols-2 lg-grid-cols-3 xl-grid-cols-4 gap-6">
+        <div id="projects-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             </div>
     </main>
 
@@ -63,9 +63,10 @@
             if (user) {
                 currentUser = user;
                 
+                // ESTE SCRIPT BUSCA EL ELEMENTO "user-greeting"
+                const greetingElement = document.getElementById('user-greeting');
                 const userDocRef = doc(db, "users", user.uid);
                 const userDoc = await getDoc(userDocRef);
-                const greetingElement = document.getElementById('user-greeting');
 
                 if (userDoc.exists() && userDoc.data().name) {
                     const userName = userDoc.data().name;
