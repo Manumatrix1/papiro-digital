@@ -15,6 +15,22 @@
             background-color: #181818;
             border: 1px solid #2a2a2a;
         }
+        .tab-btn {
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .tab-btn.active {
+            background-color: #88c999;
+            color: #1C1C1C;
+        }
+        .tab-btn:not(.active) {
+            background-color: #2a2a2a;
+        }
+        .form-section {
+            display: none;
+        }
+        .form-section.active {
+            display: block;
+        }
     </style>
 </head>
 <body class="text-white">
@@ -22,168 +38,26 @@
         <header class="text-center mb-8">
             <img src="https://i.postimg.cc/g0HxbpQF/PAPIRO-1.png" alt="Logo de Papiro Digital" class="mx-auto h-28 w-auto mb-4">
             <h1 class="text-5xl font-bold text-white mb-3">Papiro Digital</h1>
-            <p class="text-gray-400 text-xl">Iniciá sesión para acceder a tu biblioteca.</p>
+            <p class="text-gray-400 text-xl">Iniciá sesión o registrate para continuar</p>
         </header>
-
-        <div class="w-full max-w-md p-8 rounded-2xl form-container">
-            <!-- Pestañas para Login / Registro -->
-            <div class="flex border-b border-gray-700 mb-6">
-                <button id="login-tab" class="flex-1 py-2 font-semibold text-lg border-b-2 border-[#88c999] text-white">Iniciar Sesión</button>
-                <button id="register-tab" class="flex-1 py-2 font-semibold text-lg border-b-2 border-transparent text-gray-500">Registrarse</button>
+        
+        <div class="w-full max-w-md p-8 form-container rounded-lg">
+            <div class="flex border border-[#3a3a3a] rounded-lg mb-6">
+                <button id="login-tab-btn" class="tab-btn w-1/2 py-2 rounded-l-lg active">Iniciar Sesión</button>
+                <button id="register-tab-btn" class="tab-btn w-1/2 py-2 rounded-r-lg">Crear Cuenta</button>
             </div>
 
-            <!-- Formularios -->
-            <form id="login-form">
-                <div class="mb-4">
-                    <label for="login-email" class="block text-gray-400 mb-2">Email</label>
-                    <input type="email" id="login-email" required class="w-full p-3 bg-[#2a2a2a] rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#88c999]">
-                </div>
-                <div class="mb-6 relative">
-                    <label for="login-password" class="block text-gray-400 mb-2">Contraseña</label>
-                    <input type="password" id="login-password" required class="w-full p-3 bg-[#2a2a2a] rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#88c999]">
-                    <button type="button" id="login-toggle-password" class="absolute right-3 top-10 text-gray-500">
-                        <!-- Ojo SVG -->
-                        <svg id="eye-open" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                        <svg id="eye-closed" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.05 10.05 0 01-4.563 5.971" /></svg>
-                    </button>
-                </div>
-                <button type="submit" class="w-full bg-[#88c999] text-[#1C1C1C] font-bold py-3 rounded-lg hover:brightness-110 transition">Iniciar Sesión</button>
-            </form>
-
-            <form id="register-form" class="hidden">
-                 <!-- Campos de Email y Contraseña (similares al de login) -->
-                 <div class="mb-4">
-                    <label for="register-email" class="block text-gray-400 mb-2">Email</label>
-                    <input type="email" id="register-email" required class="w-full p-3 bg-[#2a2a2a] rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#88c999]">
-                </div>
-                <div class="mb-6 relative">
-                    <label for="register-password" class="block text-gray-400 mb-2">Contraseña (mín. 6 caracteres)</label>
-                    <input type="password" id="register-password" required class="w-full p-3 bg-[#2a2a2a] rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#88c999]">
-                     <button type="button" id="register-toggle-password" class="absolute right-3 top-10 text-gray-500">
-                        <!-- Ojo SVG (igual que en login) -->
-                        <svg id="reg-eye-open" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                        <svg id="reg-eye-closed" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.05 10.05 0 01-4.563 5.971" /></svg>
-                    </button>
-                </div>
-                <button type="submit" class="w-full bg-[#88c999] text-[#1C1C1C] font-bold py-3 rounded-lg hover:brightness-110 transition">Crear Cuenta</button>
-            </form>
-            
-            <div id="error-message" class="text-red-500 text-center mt-4 font-semibold"></div>
-
-            <!-- Separador y Login con Google -->
-            <div class="flex items-center my-6">
-                <hr class="flex-grow border-gray-600">
-                <span class="px-4 text-gray-500">O</span>
-                <hr class="flex-grow border-gray-600">
-            </div>
-            <button id="google-signin" class="w-full flex items-center justify-center gap-3 bg-white text-black font-semibold py-3 rounded-lg hover:bg-gray-200 transition">
-                <svg class="w-6 h-6" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.42-4.55H24v8.51h12.8c-.57 2.84-2.3 5.24-4.83 6.92l7.98 6.19C45.27 39.2 48 32.45 48 24c0-.66-.07-1.31-.17-1.95z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.98-6.19c-2.11 1.45-4.82 2.3-7.91 2.3-6.27 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path><path fill="none" d="M0 0h48v48H0z"></path></svg>
-                Continuar con Google
-            </button>
-        </div>
-    </div>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-
-        const firebaseConfig = {
-          apiKey: "AIzaSyDhcJyTriTBrEDftDx_lYAhFgd6Y8Us4dA",
-          authDomain: "papirodigital-1a6c5.firebaseapp.com",
-          projectId: "papirodigital-1a6c5",
-          storageBucket: "papirodigital-1a6c5.firebasestorage.app",
-          messagingSenderId: "274494841235",
-          appId: "1:274494841235:web:99112dde1c6dbd12240866",
-          measurementId: "G-0SKBCYEEF0"
-        };
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                window.location.replace('panel.html');
-            }
-        });
-
-        const loginForm = document.getElementById('login-form');
-        const registerForm = document.getElementById('register-form');
-        const googleBtn = document.getElementById('google-signin');
-        const errorMessageDiv = document.getElementById('error-message');
-
-        const loginTab = document.getElementById('login-tab');
-        const registerTab = document.getElementById('register-tab');
-        loginTab.addEventListener('click', () => {
-            loginTab.classList.add('border-[#88c999]', 'text-white');
-            loginTab.classList.remove('border-transparent', 'text-gray-500');
-            registerTab.classList.add('border-transparent', 'text-gray-500');
-            registerTab.classList.remove('border-[#88c999]', 'text-white');
-            loginForm.classList.remove('hidden');
-            registerForm.classList.add('hidden');
-            errorMessageDiv.textContent = '';
-        });
-        registerTab.addEventListener('click', () => {
-            registerTab.classList.add('border-[#88c999]', 'text-white');
-            registerTab.classList.remove('border-transparent', 'text-gray-500');
-            loginTab.classList.add('border-transparent', 'text-gray-500');
-            loginTab.classList.remove('border-[#88c999]', 'text-white');
-            registerForm.classList.remove('hidden');
-            loginForm.classList.add('hidden');
-            errorMessageDiv.textContent = '';
-        });
-
-        registerForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('register-email').value;
-            const password = document.getElementById('register-password').value;
-            try {
-                await createUserWithEmailAndPassword(auth, email, password);
-            } catch (error) {
-                errorMessageDiv.textContent = "Error al registrar: " + error.message;
-            }
-        });
-
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-password').value;
-            try {
-                await signInWithEmailAndPassword(auth, email, password);
-            } catch (error) {
-                errorMessageDiv.textContent = "Error al iniciar sesión: " + error.message;
-            }
-        });
-
-        googleBtn.addEventListener('click', async () => {
-            const provider = new GoogleAuthProvider();
-            try {
-                await signInWithPopup(auth, provider);
-            } catch (error) {
-                errorMessageDiv.textContent = "Error con Google: " + error.message;
-            }
-        });
-        
-        function setupPasswordToggle(inputId, toggleBtnId, openEyeId, closedEyeId) {
-            const passwordInput = document.getElementById(inputId);
-            const toggleBtn = document.getElementById(toggleBtnId);
-            const eyeOpen = document.getElementById(openEyeId);
-            const eyeClosed = document.getElementById(closedEyeId);
-            
-            toggleBtn.addEventListener('click', () => {
-                if (passwordInput.type === 'password') {
-                    passwordInput.type = 'text';
-                    eyeOpen.classList.add('hidden');
-                    eyeClosed.classList.remove('hidden');
-                } else {
-                    passwordInput.type = 'password';
-                    eyeOpen.classList.remove('hidden');
-                    eyeClosed.classList.add('hidden');
-                }
-            });
-        }
-        
-        setupPasswordToggle('login-password', 'login-toggle-password', 'eye-open', 'eye-closed');
-        setupPasswordToggle('register-password', 'register-toggle-password', 'reg-eye-open', 'reg-eye-closed');
-
-    </script>
-</body>
-</html>
+            <div id="login-form-section" class="form-section active">
+                <form id="login-form">
+                    <div class="space-y-4">
+                        <div>
+                            <label for="login-email" class="text-sm font-medium text-gray-300">Correo Electrónico</label>
+                            <input type="email" id="login-email" required class="w-full px-4 py-2 mt-1 bg-[#2a2a2a] border border-[#3a3a3a] rounded-md focus:ring-[#88c999] focus:border-[#88c999]">
+                        </div>
+                        <div class="relative">
+                            <label for="login-password" class="text-sm font-medium text-gray-300">Contraseña</label>
+                            <input type="password" id="login-password" required class="w-full px-4 py-2 mt-1 bg-[#2a2a2a] border border-[#3a3a3a] rounded-md focus:ring-[#88c999] focus:border-[#88c999]">
+                        </div>
+                    </div>
+                    <div id="login-error-message" class="text-red-400 text-sm mt-4"></div>
+                    <button type="submit" class="w-full mt-6 bg-[#88c
