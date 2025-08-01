@@ -15,7 +15,7 @@
         .form-section { display: none; }
         .form-section.active { display: block; }
         .password-container { position: relative; }
-        .toggle-password { position: absolute; top: 50%; right: 1rem; transform: translateY(-50%); cursor: pointer; }
+        .toggle-password { position: absolute; top: 50%; right: 1rem; transform: translateY(-50%); cursor: pointer; color: #9ca3af; }
     </style>
 </head>
 <body class="text-white">
@@ -23,7 +23,7 @@
         <header class="text-center mb-8">
             <img src="https://i.postimg.cc/g0HxbpQF/PAPIRO-1.png" alt="Logo de Papiro Digital" class="mx-auto h-28 w-auto mb-4">
             <h1 class="text-5xl font-bold text-white mb-3">Papiro Digital</h1>
-            <p class="text-gray-400 text-xl">Iniciá sesión o registrate para continuar</p>
+            <p class="text-gray-400 text-xl">Inicia sesión o regístrate para continuar</p>
         </header>
         
         <div class="w-full max-w-md p-8 form-container rounded-lg">
@@ -48,7 +48,7 @@
                             </span>
                         </div>
                     </div>
-                    <div id="login-error-message" class="text-red-400 text-sm mt-4 text-center"></div>
+                    <div id="login-error-message" class="text-red-400 text-sm mt-4 text-center h-4"></div>
                     <button type="submit" class="w-full mt-6 bg-[#88c999] text-[#1C1C1C] font-bold py-3 rounded-lg hover:brightness-110 transition">Iniciar Sesión</button>
                 </form>
                  <div class="my-4 flex items-center">
@@ -80,7 +80,7 @@
                             </span>
                         </div>
                     </div>
-                    <div id="register-error-message" class="text-red-400 text-sm mt-4 text-center"></div>
+                    <div id="register-error-message" class="text-red-400 text-sm mt-4 text-center h-4"></div>
                     <button type="submit" class="w-full mt-6 bg-[#88c999] text-[#1C1C1C] font-bold py-3 rounded-lg hover:brightness-110 transition">Crear Cuenta</button>
                 </form>
             </div>
@@ -104,7 +104,6 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // --- Selectores de Elementos ---
         const loginTabBtn = document.getElementById('login-tab-btn'),
               registerTabBtn = document.getElementById('register-tab-btn'),
               loginFormSection = document.getElementById('login-form-section'),
@@ -115,7 +114,6 @@
               loginErrorMessage = document.getElementById('login-error-message'),
               registerErrorMessage = document.getElementById('register-error-message');
         
-        // --- Lógica de Pestañas ---
         loginTabBtn.addEventListener('click', () => {
             loginTabBtn.classList.add('active'); registerTabBtn.classList.remove('active');
             loginFormSection.classList.add('active'); registerFormSection.classList.remove('active');
@@ -125,7 +123,6 @@
             registerFormSection.classList.add('active'); loginFormSection.classList.remove('active');
         });
 
-        // --- Lógica de Registro ---
         registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const name = document.getElementById('register-name').value;
@@ -148,7 +145,6 @@
             }
         });
 
-        // --- Lógica de Inicio de Sesión ---
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('login-email').value;
@@ -162,7 +158,6 @@
             }
         });
 
-        // --- Lógica de Google ---
         googleBtn.addEventListener('click', async () => {
             const provider = new GoogleAuthProvider();
             try {
@@ -175,12 +170,12 @@
             }
         });
 
-        // --- Lógica del "Ojito" para ver Contraseña ---
         function setupPasswordToggle(inputId, toggleId, eyeOpenId, eyeClosedId) {
             const passwordInput = document.getElementById(inputId);
             const toggle = document.getElementById(toggleId);
             const eyeOpen = document.getElementById(eyeOpenId);
             const eyeClosed = document.getElementById(eyeClosedId);
+            if (!passwordInput || !toggle || !eyeOpen || !eyeClosed) return;
             toggle.addEventListener('click', () => {
                 if (passwordInput.type === 'password') {
                     passwordInput.type = 'text';
