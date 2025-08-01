@@ -10,8 +10,6 @@
         body { font-family: 'Inter', sans-serif; background-color: #0f0f0f; }
         .album-card { transition: transform 0.3s ease, box-shadow 0.3s ease; }
         .album-card:hover { transform: translateY(-8px); box-shadow: 0 12px 24px rgba(0,0,0,0.3); }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .fade-in-card { animation: fadeIn 0.5s ease-out forwards; }
     </style>
 </head>
 <body class="text-white">
@@ -19,26 +17,25 @@
     <header class="bg-[#181818] border-b border-[#2a2a2a] py-4 px-8 flex justify-between items-center">
         <div class="flex items-center gap-4">
             <img src="https://i.postimg.cc/g0HxbpQF/PAPIRO-1.png" alt="Logo" class="h-10">
-            <h1 class="text-2xl font-bold">Mis Proyectos</h1>
         </div>
         <button id="logout-btn" class="text-gray-300 hover:text-white transition">Cerrar Sesión</button>
     </header>
 
-    <main class="p-8">
-        <div class="flex justify-between items-center mb-6">
-            <h2 class="text-3xl font-semibold text-white">Mi Panel</h2>
-            <button id="new-project-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-4 rounded-lg hover:brightness-110 transition">Nuevo Proyecto</button>
-        </div>
+    <div class="p-8">
+        <h1 id="user-greeting" class="text-4xl font-bold text-white mb-6">Cargando...</h1>
         <div id="projects-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             </div>
-    </main>
+    </div>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js"></script>
 
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
+        import { getAuth } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
 
-    <script>
-        // Configuración de Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyDhcJyTriTBrEDftDx_lYAhFgd6Y8Us4dA",
             authDomain: "papirodigital-1a6c5.firebaseapp.com",
@@ -47,71 +44,55 @@
             messagingSenderId: "274494841235",
             appId: "1:274494841235:web:99112dde1c6dbd12240866"
         };
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
 
-        // Inicializar Firebase
-        const app = firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-
-        const projectsGrid = document.getElementById('projects-grid');
         let currentUser = null;
 
-        // Verificar estado de autenticación
-        auth.onAuthStateChanged(user => {
+        auth.onAuthStateChanged(async (user) => {
             if (user) {
                 currentUser = user;
+                // --- Lógica para obtener el perfil y saludar ---
+                const userDocRef = doc(db, "users", user.uid);
+                const userDoc = await getDoc(userDocRef);
+                const greetingElement = document.getElementById('user-greeting');
+                if (userDoc.exists() && userDoc.data().name) {
+                    greetingElement.textContent = `Hola ${userDoc.data().name}, ¿qué vamos a estudiar hoy?`;
+                } else {
+                    greetingElement.textContent = `Hola, ${user.email}`;
+                }
                 loadUserProjects();
             } else {
                 window.location.href = 'index.html';
             }
         });
 
-        // Función para cerrar sesión
         document.getElementById('logout-btn').addEventListener('click', () => {
-            auth.signOut().then(() => {
-                window.location.href = 'index.html';
-            });
+            auth.signOut().then(() => window.location.href = 'index.html');
         });
 
-        // Función para cargar SOLO los proyectos del usuario actual
         async function loadUserProjects() {
-            projectsGrid.innerHTML = `<p class="text-gray-400 col-span-full">Cargando mis proyectos...</p>`;
-            
+            const projectsGrid = document.getElementById('projects-grid');
+            projectsGrid.innerHTML = `<p class="text-gray-400 col-span-full">Cargando proyectos...</p>`;
             try {
-                // Consulta a la subcolección del usuario logueado
-                const projectsRef = db.collection('users').doc(currentUser.uid).collection('projects');
-                const querySnapshot = await projectsRef.get();
-
-                if (querySnapshot.empty) {
-                    projectsGrid.innerHTML = `<p class="text-gray-400 col-span-full">Aún no tienes proyectos. ¡Crea el primero!</p>`;
-                    return;
-                }
-
+                const projectsCollectionRef = collection(db, "users", currentUser.uid, "projects");
+                const querySnapshot = await getDocs(projectsCollectionRef);
                 projectsGrid.innerHTML = '';
-                querySnapshot.forEach(doc => {
+                if (querySnapshot.empty) {
+                    projectsGrid.innerHTML = `<p class="text-gray-400 col-span-full">Aún no tienes proyectos.</p>`;
+                }
+                querySnapshot.forEach((doc) => {
                     const project = doc.data();
                     const card = document.createElement('div');
-                    card.className = 'album-card bg-[#181818] rounded-lg p-4 flex flex-col justify-between border border-[#2a2a2a] fade-in-card';
-                    card.innerHTML = `
-                        <div>
-                            <h3 class="font-bold text-lg text-white">${project.name || 'Proyecto sin nombre'}</h3>
-                        </div>
-                        <div class="mt-4">
-                            <a href="espacio.html?id=${doc.id}" class="text-sm bg-[#88c999] text-[#1C1C1C] px-3 py-1 rounded hover:brightness-110">Abrir</a>
-                        </div>
-                    `;
+                    card.className = 'album-card bg-[#181818] rounded-lg p-4';
+                    card.innerHTML = `<h3 class="font-bold text-lg text-white">${project.name || 'Proyecto sin nombre'}</h3>`;
                     projectsGrid.appendChild(card);
                 });
             } catch (error) {
-                console.error("Error al cargar los proyectos: ", error);
+                console.error("Error al cargar proyectos: ", error);
             }
         }
-        
-        document.getElementById('new-project-btn').addEventListener('click', () => {
-             const newProjectId = 'proj_' + Date.now();
-             window.location.href = `espacio.html?id=${newProjectId}`;
-        });
-
     </script>
 </body>
 </html>
