@@ -41,7 +41,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, collection, getDocs, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDhcJyTriTBrEDftDx_lYAhFgd6Y8Us4dA",
@@ -63,10 +63,9 @@
             if (user) {
                 currentUser = user;
                 
-                // ESTE SCRIPT BUSCA EL ELEMENTO "user-greeting"
-                const greetingElement = document.getElementById('user-greeting');
                 const userDocRef = doc(db, "users", user.uid);
                 const userDoc = await getDoc(userDocRef);
+                const greetingElement = document.getElementById('user-greeting');
 
                 if (userDoc.exists() && userDoc.data().name) {
                     const userName = userDoc.data().name;
@@ -114,9 +113,28 @@
             }
         }
         
-        document.getElementById('new-project-btn').addEventListener('click', () => {
-             const newProjectId = 'proj_' + Date.now();
-             window.location.href = `espacio.html?id=${newProjectId}`;
+        // --- LÓGICA CORREGIDA PARA EL BOTÓN "NUEVO PROYECTO" ---
+        document.getElementById('new-project-btn').addEventListener('click', async () => {
+            if (!currentUser) return; // No hacer nada si no hay un usuario
+
+            // 1. Crear un nuevo documento de proyecto en Firestore
+            const projectsCollectionRef = collection(db, "users", currentUser.uid, "projects");
+            const newProjectRef = doc(projectsCollectionRef); // Firestore genera un ID automático
+            
+            try {
+                await setDoc(newProjectRef, {
+                    name: "Proyecto sin título",
+                    createdAt: serverTimestamp(),
+                    content: "" // Campo de contenido inicial
+                });
+
+                // 2. Redirigir al usuario a la página de edición con el ID del nuevo proyecto
+                window.location.href = `espacio.html?id=${newProjectRef.id}`;
+
+            } catch (error) {
+                console.error("Error al crear un nuevo proyecto:", error);
+                alert("Hubo un error al crear tu proyecto. Inténtalo de nuevo.");
+            }
         });
     </script>
 </body>
