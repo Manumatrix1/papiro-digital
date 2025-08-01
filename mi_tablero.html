@@ -95,6 +95,7 @@
                     const project = doc.data();
                     const card = document.createElement('div');
                     card.className = 'album-card bg-[#181818] rounded-lg p-4 flex flex-col justify-between border border-[#2a2a2a] fade-in-card';
+                    // ESTA LÍNEA ES LA CLAVE: ASEGURA QUE EL ENLACE SEA A "espacio.html"
                     card.innerHTML = `
                         <div><h3 class="font-bold text-lg text-white">${project.name || 'Proyecto sin nombre'}</h3></div>
                         <div class="mt-4"><a href="espacio.html?id=${doc.id}" class="text-sm bg-[#88c999] text-[#1C1C1C] px-3 py-1 rounded hover:brightness-110">Abrir</a></div>
