@@ -66,22 +66,19 @@
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, getDocs, query, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyDhcJyTriTBrEDftDx_lYAhFgd6Y8Us4dA",
-      authDomain: "papirodigital-1a6c5.firebaseapp.com",
-      projectId: "papirodigital-1a6c5",
-      storageBucket: "papirodigital-1a6c5.firebasestorage.app",
-      messagingSenderId: "274494841235",
-      appId: "1:274494841235:web:99112dde1c6dbd12240866",
-      measurementId: "G-0SKBCYEEF0"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    const appId = 'papiro-digital-app';
-    // ... el resto de tu código
-</script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDhcJyTriTBrEDftDx_lYAhFgd6Y8Us4dA",
+            authDomain: "papirodigital-1a6c5.firebaseapp.com",
+            projectId: "papirodigital-1a6c5",
+            storageBucket: "papirodigital-1a6c5.firebasestorage.app",
+            messagingSenderId: "274494841235",
+            appId: "1:274494841235:web:99112dde1c6dbd12240866",
+            measurementId: "G-0SKBCYEEF0"
+        };
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = 'papiro-digital-app'; // Reemplazar si es necesario
 
         let userId = null;
         let projectToDelete = null;
@@ -99,6 +96,7 @@
                 appContent.style.opacity = '1';
                 loadProjects();
             } else {
+                // Si no hay usuario autenticado, redirigir a la página de inicio
                 window.location.replace('index.html');
             }
         });
@@ -141,11 +139,11 @@
             projectsGrid.innerHTML = '';
             for (let i = 0; i < 5; i++) {
                 const skeleton = document.createElement('div');
-                skeleton.className = 'fade-in-card';
+                skeleton.className = 'album-card bg-gray-700 p-4 rounded-lg flex flex-col skeleton';
                 skeleton.innerHTML = `
-                    <div class="w-full h-40 bg-gray-700 rounded-lg mb-4 skeleton"></div>
-                    <div class="h-5 w-3/4 bg-gray-700 rounded mb-2 skeleton"></div>
-                    <div class="h-4 w-1/2 bg-gray-700 rounded skeleton"></div>
+                    <div class="w-full h-40 bg-gray-600 rounded-md mb-4 skeleton"></div>
+                    <div class="h-5 w-3/4 bg-gray-600 rounded mb-2 skeleton"></div>
+                    <div class="h-4 w-1/2 bg-gray-600 rounded skeleton"></div>
                 `;
                 projectsGrid.appendChild(skeleton);
             }
@@ -165,7 +163,11 @@
             document.getElementById('empty-new-project-btn').addEventListener('click', handleNewProjectClick);
         };
         async function loadProjects() {
-            if (!userId) return;
+            if (!userId) {
+                // Si el usuario no está autenticado, no cargamos proyectos y redirigimos
+                window.location.replace('index.html');
+                return;
+            }
             showLoadingSkeletons();
             
             const projectsRef = collection(db, `artifacts/${appId}/users/${userId}/projects`);
