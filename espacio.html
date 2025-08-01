@@ -61,7 +61,6 @@
         const storage = getStorage(app);
 
         const projectTitleEl = document.getElementById('project-title'), uploadContainer = document.getElementById('upload-container'), pdfInput = document.getElementById('pdf-input'), uploadBtn = document.getElementById('upload-btn'), pdfLoaderContainer = document.getElementById('pdf-loader-container'), progressBar = document.getElementById('progress-bar'), progressText = document.getElementById('progress-text'), viewerContainer = document.getElementById('viewer-container');
-        
         let currentProjectRef = null, currentUser = null;
 
         const { pdfjsLib } = window;
@@ -85,12 +84,13 @@
         }
 
         function queueRenderPage(num) { if (pageRendering) { pageNumPending = num; } else { renderPage(num); } }
-        function onPrevPage() { if (pageNum <= 1) return; pageNum--; queueRenderPage(pageNum); }
-        function onNextPage() { if (pageNum >= pdfDoc.numPages) return; pageNum++; queueRenderPage(pageNum); }
+        const onPrevPage = () => { if (pageNum <= 1) return; pageNum--; queueRenderPage(pageNum); };
+        const onNextPage = () => { if (pageNum >= pdfDoc.numPages) return; pageNum++; queueRenderPage(pageNum); };
 
         async function loadPdf(url) {
             try {
-                const pdf = await pdfjsLib.getDocument(url).promise;
+                const loadingTask = pdfjsLib.getDocument(url);
+                const pdf = await loadingTask.promise;
                 pdfDoc = pdf;
                 document.getElementById('page-count').textContent = pdfDoc.numPages;
                 renderPage(pageNum);
@@ -98,7 +98,7 @@
                 viewerContainer.style.display = 'block';
             } catch (error) {
                 console.error("Error al cargar el PDF:", error);
-                uploadMessage.textContent = "No se pudo cargar el PDF. Intenta subirlo de nuevo.";
+                document.getElementById('upload-message').textContent = "No se pudo cargar el PDF. Intenta subirlo de nuevo.";
             }
         }
 
