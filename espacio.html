@@ -33,7 +33,6 @@
                 <p id="progress-text" class="text-white mt-2">Cargando... 0%</p>
             </div>
         </div>
-
         <div id="viewer-container" class="hidden">
             <div class="flex items-center justify-center gap-4 mb-4">
                 <button id="prev-page" class="bg-gray-700 hover:bg-gray-600 font-bold py-2 px-4 rounded-lg transition">Anterior</button>
@@ -54,114 +53,121 @@
         import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
 
-        const firebaseConfig = { apiKey: "AIzaSyDhcJyTriTBrEDftDx_lYAhFgd6Y8Us4dA", authDomain: "papirodigital-1a6c5.firebaseapp.com", projectId: "papirodigital-1a6c5", storageBucket: "papirodigital-1a6c5.appspot.com", messagingSenderId: "27449484125", appId: "1:27449484125:web:99112dde1c6dbd12240866" };
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const storage = getStorage(app);
+        // Esperamos a que todo el HTML esté listo antes de ejecutar el código
+        document.addEventListener('DOMContentLoaded', () => {
+            const firebaseConfig = { apiKey: "AIzaSyDhcJyTriTBrEDftDx_lYAhFgd6Y8Us4dA", authDomain: "papirodigital-1a6c5.firebaseapp.com", projectId: "papirodigital-1a6c5", storageBucket: "papirodigital-1a6c5.appspot.com", messagingSenderId: "27449484125", appId: "1:27449484125:web:99112dde1c6dbd12240866" };
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app);
+            const storage = getStorage(app);
 
-        const projectTitleEl = document.getElementById('project-title'), uploadContainer = document.getElementById('upload-container'), pdfInput = document.getElementById('pdf-input'), uploadBtn = document.getElementById('upload-btn'), pdfLoaderContainer = document.getElementById('pdf-loader-container'), progressBar = document.getElementById('progress-bar'), progressText = document.getElementById('progress-text'), viewerContainer = document.getElementById('viewer-container'), saveBtn = document.getElementById('save-btn'), prevPageBtn = document.getElementById('prev-page'), nextPageBtn = document.getElementById('next-page');
-        let currentProjectRef = null, currentUser = null;
+            const projectTitleEl = document.getElementById('project-title'), uploadContainer = document.getElementById('upload-container'), pdfInput = document.getElementById('pdf-input'), uploadBtn = document.getElementById('upload-btn'), pdfLoaderContainer = document.getElementById('pdf-loader-container'), progressBar = document.getElementById('progress-bar'), progressText = document.getElementById('progress-text'), viewerContainer = document.getElementById('viewer-container'), saveBtn = document.getElementById('save-btn'), prevPageBtn = document.getElementById('prev-page'), nextPageBtn = document.getElementById('next-page');
+            let currentProjectRef = null, currentUser = null;
 
-        const { pdfjsLib } = window;
-        if (pdfjsLib) {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://mozilla.github.io/pdf.js/build/pdf.worker.js';
-        }
-        let pdfDoc = null, pageNum = 1, pageRendering = false, pageNumPending = null;
-        const scale = 1.5, canvas = document.getElementById('pdf-render'), ctx = canvas.getContext('2d');
-
-        function renderPage(num) {
-            pageRendering = true;
-            pdfDoc.getPage(num).then(page => {
-                const viewport = page.getViewport({ scale });
-                canvas.height = viewport.height;
-                canvas.width = viewport.width;
-                const renderContext = { canvasContext: ctx, viewport: viewport };
-                page.render(renderContext).promise.then(() => {
-                    pageRendering = false;
-                    if (pageNumPending !== null) { renderPage(pageNumPending); pageNumPending = null; }
-                });
-            });
-            document.getElementById('page-num').textContent = num;
-        }
-
-        function queueRenderPage(num) { if (pageRendering) { pageNumPending = num; } else { renderPage(num); } }
-        const onPrevPage = () => { if (pageNum <= 1) return; pageNum--; queueRenderPage(pageNum); };
-        const onNextPage = () => { if (pageNum >= pdfDoc.numPages) return; pageNum++; queueRenderPage(pageNum); };
-
-        async function loadPdf(url) {
-            try {
-                const loadingTask = pdfjsLib.getDocument(url);
-                const pdf = await loadingTask.promise;
-                pdfDoc = pdf;
-                document.getElementById('page-count').textContent = pdfDoc.numPages;
-                renderPage(pageNum);
-                uploadContainer.style.display = 'none';
-                viewerContainer.style.display = 'flex';
-                viewerContainer.classList.remove('hidden');
-            } catch (error) {
-                console.error("Error al cargar el PDF:", error);
-                document.getElementById('upload-message').textContent = "No se pudo cargar el PDF. Intenta subirlo de nuevo.";
+            if (typeof pdfjsLib === 'undefined') {
+                console.error("PDF.js no se cargó correctamente.");
+                alert("Hubo un error al cargar el visor de PDF. Por favor, recarga la página.");
+                return;
             }
-        }
+            
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://mozilla.github.io/pdf.js/build/pdf.worker.js';
+            let pdfDoc = null, pageNum = 1, pageRendering = false, pageNumPending = null;
+            const scale = 1.5, canvas = document.getElementById('pdf-render'), ctx = canvas.getContext('2d');
 
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                currentUser = user;
-                const projectId = new URLSearchParams(window.location.search).get('id');
-                if (!projectId) { window.location.href = 'mi_tablero.html'; return; }
-                
-                currentProjectRef = doc(db, "users", user.uid, "projects", projectId);
-                const projectDoc = await getDoc(currentProjectRef);
+            function renderPage(num) {
+                pageRendering = true;
+                if (!pdfDoc) return;
+                pdfDoc.getPage(num).then(page => {
+                    const viewport = page.getViewport({ scale });
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    const renderContext = { canvasContext: ctx, viewport: viewport };
+                    page.render(renderContext).promise.then(() => {
+                        pageRendering = false;
+                        if (pageNumPending !== null) { renderPage(pageNumPending); pageNumPending = null; }
+                    });
+                });
+                document.getElementById('page-num').textContent = num;
+            }
 
-                if (projectDoc.exists()) {
-                    const projectData = projectDoc.data();
-                    projectTitleEl.value = projectData.name;
-                    if (projectData.pdfUrl) {
-                        loadPdf(projectData.pdfUrl);
-                    } else {
-                        uploadContainer.style.display = 'block';
-                        viewerContainer.style.display = 'none';
-                    }
-                } else { window.location.href = 'mi_tablero.html'; }
-            } else { window.location.href = 'index.html'; }
-        });
-        
-        uploadBtn.addEventListener('click', () => pdfInput.click());
-        
-        pdfInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file || file.type !== 'application/pdf') { alert("Por favor, selecciona un archivo PDF."); return; }
+            function queueRenderPage(num) { if (pageRendering) { pageNumPending = num; } else { renderPage(num); } }
+            const onPrevPage = () => { if (pageNum <= 1) return; pageNum--; queueRenderPage(pageNum); };
+            const onNextPage = () => { if (!pdfDoc || pageNum >= pdfDoc.numPages) return; pageNum++; queueRenderPage(pageNum); };
 
-            const storageRef = ref(storage, `pdfs/${currentUser.uid}/${currentProjectRef.id}/${file.name}`);
-            const uploadTask = uploadBytesResumable(storageRef, file);
-
-            uploadTask.on('state_changed', 
-                (snapshot) => {
-                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    pdfLoaderContainer.style.display = 'block';
-                    progressBar.style.width = progress + '%';
-                    progressText.textContent = `Cargando... ${Math.round(progress)}%`;
-                }, 
-                (error) => { console.error("Error al subir:", error); alert("Hubo un error al subir el PDF."); pdfLoaderContainer.style.display = 'none'; }, 
-                async () => {
-                    const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                    await updateDoc(currentProjectRef, { pdfUrl: downloadURL });
-                    location.reload();
+            async function loadPdf(url) {
+                try {
+                    const loadingTask = pdfjsLib.getDocument(url);
+                    const pdf = await loadingTask.promise;
+                    pdfDoc = pdf;
+                    document.getElementById('page-count').textContent = pdfDoc.numPages;
+                    renderPage(pageNum);
+                    uploadContainer.style.display = 'none';
+                    viewerContainer.style.display = 'block';
+                    viewerContainer.classList.remove('hidden');
+                } catch (error) {
+                    console.error("Error al cargar el PDF:", error);
+                    document.getElementById('upload-message').textContent = "No se pudo cargar el PDF. Intenta subirlo de nuevo.";
                 }
-            );
-        });
+            }
 
-        saveBtn.addEventListener('click', async () => {
-            if (!currentProjectRef) return;
-            try {
-                await updateDoc(currentProjectRef, { name: projectTitleEl.value });
-                saveBtn.textContent = "¡Guardado!";
-                setTimeout(() => { saveBtn.textContent = "Guardar Título"; }, 2000);
-            } catch (error) { console.error("Error al guardar:", error); alert("No se pudo guardar el título."); }
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    currentUser = user;
+                    const projectId = new URLSearchParams(window.location.search).get('id');
+                    if (!projectId) { window.location.href = 'mi_tablero.html'; return; }
+                    
+                    currentProjectRef = doc(db, "users", user.uid, "projects", projectId);
+                    const projectDoc = await getDoc(currentProjectRef);
+
+                    if (projectDoc.exists()) {
+                        const projectData = projectDoc.data();
+                        projectTitleEl.value = projectData.name;
+                        if (projectData.pdfUrl) {
+                            loadPdf(projectData.pdfUrl);
+                        } else {
+                            uploadContainer.style.display = 'block';
+                            viewerContainer.style.display = 'none';
+                        }
+                    } else { window.location.href = 'mi_tablero.html'; }
+                } else { window.location.href = 'index.html'; }
+            });
+            
+            uploadBtn.addEventListener('click', () => pdfInput.click());
+            
+            pdfInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file || file.type !== 'application/pdf') { alert("Por favor, selecciona un archivo PDF."); return; }
+
+                const storageRef = ref(storage, `pdfs/${currentUser.uid}/${currentProjectRef.id}/${file.name}`);
+                const uploadTask = uploadBytesResumable(storageRef, file);
+
+                uploadTask.on('state_changed', 
+                    (snapshot) => {
+                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        pdfLoaderContainer.style.display = 'block';
+                        progressBar.style.width = progress + '%';
+                        progressText.textContent = `Cargando... ${Math.round(progress)}%`;
+                    }, 
+                    (error) => { console.error("Error al subir:", error); alert("Hubo un error al subir el PDF."); pdfLoaderContainer.style.display = 'none'; }, 
+                    async () => {
+                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                        await updateDoc(currentProjectRef, { pdfUrl: downloadURL });
+                        location.reload();
+                    }
+                );
+            });
+
+            saveBtn.addEventListener('click', async () => {
+                if (!currentProjectRef) return;
+                try {
+                    await updateDoc(currentProjectRef, { name: projectTitleEl.value });
+                    saveBtn.textContent = "¡Guardado!";
+                    setTimeout(() => { saveBtn.textContent = "Guardar Título"; }, 2000);
+                } catch (error) { console.error("Error al guardar:", error); alert("No se pudo guardar el título."); }
+            });
+            prevPageBtn.addEventListener('click', onPrevPage);
+            nextPageBtn.addEventListener('click', onNextPage);
         });
-        prevPageBtn.addEventListener('click', onPrevPage);
-        nextPageBtn.addEventListener('click', onNextPage);
     </script>
 </body>
 </html>
