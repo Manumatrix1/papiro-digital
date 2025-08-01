@@ -8,25 +8,32 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #0f0f0f; }
+        #pdf-render { box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
     </style>
 </head>
 <body class="text-white">
-    <header class="bg-[#181818] border-b border-[#2a2a2a] py-4 px-8 flex justify-between items-center">
-        <input id="project-title" type="text" class="bg-transparent text-2xl font-bold text-white focus:outline-none" value="Cargando...">
+    <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-8 flex justify-between items-center sticky top-0 z-10">
         <div>
-            <button id="save-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-4 rounded-lg hover:brightness-110 transition">Guardar</button>
-            <a href="mi_tablero.html" class="ml-4 text-gray-300 hover:text-white transition">Volver al Tablero</a>
+            <a href="mi_tablero.html" class="text-gray-300 hover:text-white transition">← Volver al Tablero</a>
+            <span id="project-title" class="ml-4 text-xl font-bold text-white">Cargando Proyecto...</span>
+        </div>
+        <div class="flex items-center gap-4">
+            <button id="prev-page" class="bg-gray-700 hover:bg-gray-600 font-bold py-2 px-4 rounded-lg transition">Anterior</button>
+            <span id="page-num" class="text-lg"></span> / <span id="page-count" class="text-lg"></span>
+            <button id="next-page" class="bg-gray-700 hover:bg-gray-600 font-bold py-2 px-4 rounded-lg transition">Siguiente</button>
         </div>
     </header>
 
-    <main class="p-8">
-        <textarea id="project-content" class="w-full h-screen bg-[#181818] text-gray-300 p-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#88c999]" placeholder="Escribe tus notas aquí..."></textarea>
+    <main class="p-8 flex justify-center">
+        <canvas id="pdf-render"></canvas>
     </main>
+    
+    <script src="https://mozilla.github.io/pdf.js/build/pdf.js"></script>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDhcJyTriTBrEDftDx_lYAhFgd6Y8Us4dA",
@@ -41,12 +48,72 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        const projectTitleEl = document.getElementById('project-title');
-        const projectContentEl = document.getElementById('project-content');
-        const saveBtn = document.getElementById('save-btn');
+        // --- Lógica del Lector de PDF ---
+        
+        // URL de un PDF de ejemplo. Más adelante lo cambiaremos por tus archivos.
+        const url = 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf';
 
-        let currentProjectRef = null;
+        // Configuración de PDF.js
+        const { pdfjsLib } = window;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://mozilla.github.io/pdf.js/build/pdf.worker.js';
 
+        let pdfDoc = null,
+            pageNum = 1,
+            pageRendering = false,
+            pageNumPending = null;
+            
+        const scale = 1.5,
+              canvas = document.getElementById('pdf-render'),
+              ctx = canvas.getContext('2d'),
+              projectTitleEl = document.getElementById('project-title');
+
+        function renderPage(num) {
+            pageRendering = true;
+            pdfDoc.getPage(num).then((page) => {
+                const viewport = page.getViewport({ scale: scale });
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                const renderContext = {
+                    canvasContext: ctx,
+                    viewport: viewport
+                };
+                const renderTask = page.render(renderContext);
+
+                renderTask.promise.then(() => {
+                    pageRendering = false;
+                    if (pageNumPending !== null) {
+                        renderPage(pageNumPending);
+                        pageNumPending = null;
+                    }
+                });
+            });
+            document.getElementById('page-num').textContent = num;
+        }
+
+        function queueRenderPage(num) {
+            if (pageRendering) {
+                pageNumPending = num;
+            } else {
+                renderPage(num);
+            }
+        }
+
+        function onPrevPage() {
+            if (pageNum <= 1) { return; }
+            pageNum--;
+            queueRenderPage(pageNum);
+        }
+        document.getElementById('prev-page').addEventListener('click', onPrevPage);
+
+        function onNextPage() {
+            if (pageNum >= pdfDoc.numPages) { return; }
+            pageNum++;
+            queueRenderPage(pageNum);
+        }
+        document.getElementById('next-page').addEventListener('click', onNextPage);
+        
+        // --- Lógica de Autenticación y Carga de Proyecto ---
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 const urlParams = new URLSearchParams(window.location.search);
@@ -57,36 +124,23 @@
                     window.location.href = 'mi_tablero.html';
                     return;
                 }
-
-                currentProjectRef = doc(db, "users", user.uid, "projects", projectId);
-                const projectDoc = await getDoc(currentProjectRef);
-
+                
+                // Cargar el título del proyecto desde Firestore
+                const projectDocRef = doc(db, "users", user.uid, "projects", projectId);
+                const projectDoc = await getDoc(projectDocRef);
                 if (projectDoc.exists()) {
-                    const projectData = projectDoc.data();
-                    projectTitleEl.value = projectData.name;
-                    projectContentEl.value = projectData.content || '';
-                } else {
-                    alert("Proyecto no encontrado o no tienes permiso para verlo.");
-                    window.location.href = 'mi_tablero.html';
+                    projectTitleEl.textContent = projectDoc.data().name;
                 }
+                
+                // Cargar el documento PDF
+                pdfjsLib.getDocument(url).promise.then((pdfDoc_) => {
+                    pdfDoc = pdfDoc_;
+                    document.getElementById('page-count').textContent = pdfDoc.numPages;
+                    renderPage(pageNum);
+                });
+
             } else {
                 window.location.href = 'index.html';
-            }
-        });
-
-        saveBtn.addEventListener('click', async () => {
-            if (!currentProjectRef) return;
-            
-            try {
-                await updateDoc(currentProjectRef, {
-                    name: projectTitleEl.value,
-                    content: projectContentEl.value
-                });
-                saveBtn.textContent = "¡Guardado!";
-                setTimeout(() => { saveBtn.textContent = "Guardar"; }, 2000);
-            } catch (error) {
-                console.error("Error al guardar el proyecto:", error);
-                alert("No se pudo guardar el proyecto.");
             }
         });
     </script>
