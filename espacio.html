@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Espacio de Trabajo - Papiro Digital</title>
+    <title id="page-title">Cargando...</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -37,22 +37,32 @@
                 <svg class="h-6 w-6 text-gray-400 group-hover:text-white transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
-                <span class="ml-2 font-medium hidden sm:inline">Mi Tablero</span>
+                <span class="ml-2 font-medium hidden sm:inline">Mis Tableros</span>
             </a>
-            <input id="project-title" type="text" class="bg-transparent text-xl sm:text-2xl font-bold text-white focus:outline-none w-auto sm:w-64 truncate" value="Cargando...">
+            <input id="pdf-title" type="text" class="bg-transparent text-xl sm:text-2xl font-bold text-white focus:outline-none w-full truncate" value="Cargando...">
         </div>
         
         <div class="flex items-center gap-2 sm:gap-4">
-            <button id="save-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-3 sm:px-4 rounded-lg hover:brightness-110 transition text-sm sm:text-base">Guardar</button>
-            <button id="upload-pdf-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-3 sm:px-4 rounded-lg hover:brightness-110 transition text-sm sm:text-base">Subir PDF</button>
-            <input type="file" id="pdf-file-input" class="hidden" accept="application/pdf">
+            <button id="save-pdf-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-3 sm:px-4 rounded-lg hover:brightness-110 transition text-sm sm:text-base">Guardar Título</button>
+            <button id="show-sidebar-btn" class="bg-[#2a2a2a] text-white font-bold py-2 px-3 sm:px-4 rounded-lg hover:brightness-110 transition text-sm sm:text-base">
+                <span class="hidden sm:inline">Mis PDFs</span>
+                <svg class="h-5 w-5 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
             <button id="logout-btn" class="text-gray-400 hover:text-white transition text-sm sm:text-base">Cerrar Sesión</button>
         </div>
     </header>
 
     <main class="flex flex-1 overflow-hidden p-4 sm:p-8">
-        <aside class="w-full sm:w-64 bg-[#181818] border border-[#2a2a2a] rounded-lg p-4 mr-4 sm:mr-8 overflow-y-auto">
-            <h2 class="text-lg font-semibold mb-4">Mis PDFs</h2>
+        <aside id="sidebar" class="hidden sm:block w-full sm:w-64 bg-[#181818] border border-[#2a2a2a] rounded-lg p-4 mr-4 sm:mr-8 overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold">Mis PDFs</h2>
+                <button id="upload-pdf-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-1 px-2 rounded-lg hover:brightness-110 transition text-sm">
+                    Subir PDF
+                </button>
+            </div>
+            <input type="file" id="pdf-file-input" class="hidden" accept="application/pdf">
             <div id="pdf-list" class="space-y-2">
                 </div>
             <div id="no-pdfs-message" class="text-gray-500 text-sm mt-4" style="display: none;">
@@ -64,13 +74,13 @@
             <div id="pdf-loader-container" class="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
                 <div class="text-center">
                     <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#88c999]"></div>
-                    <p id="pdf-loader-text" class="mt-4 text-xl">Subiendo PDF...</p>
+                    <p id="pdf-loader-text" class="mt-4 text-xl">Cargando PDF...</p>
                 </div>
             </div>
 
             <div id="pdf-viewer-container" class="mt-4 sm:mt-8 relative max-w-full w-full">
                 <div id="no-pdf-message" class="text-center text-gray-500 text-lg p-10 border border-dashed border-gray-700 rounded-lg" style="display: none;">
-                    <p>Selecciona un PDF del panel lateral para empezar a trabajar.</p>
+                    <p>No hay PDFs en este tablero. Usa el botón "Mis PDFs" para subir uno.</p>
                 </div>
                 
                 <canvas id="pdf-render" class="bg-[#181818] rounded-md"></canvas>
@@ -87,7 +97,7 @@
     <script type="module">
         import { auth, db, storage } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { doc, updateDoc, onSnapshot, collection, addDoc, query, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { doc, updateDoc, onSnapshot, collection, addDoc, query, orderBy, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
         import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
 
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
@@ -96,12 +106,16 @@
         let currentUser = null;
         let pdfDoc = null;
         let pageNum = 1;
-        const projectTitleEl = document.getElementById('project-title');
+        let currentPdfId = null;
+        let currentPdfRef = null;
+
+        const pageTitleEl = document.getElementById('page-title');
+        const pdfTitleEl = document.getElementById('pdf-title');
         const uploadPdfBtn = document.getElementById('upload-pdf-btn');
         const pdfFileInput = document.getElementById('pdf-file-input');
         const pdfLoaderContainer = document.getElementById('pdf-loader-container');
         const pdfLoaderText = document.getElementById('pdf-loader-text');
-        const saveBtn = document.getElementById('save-btn');
+        const savePdfBtn = document.getElementById('save-pdf-btn');
         const logoutBtn = document.getElementById('logout-btn');
         const pdfRenderCanvas = document.getElementById('pdf-render');
         const noPdfMessage = document.getElementById('no-pdf-message');
@@ -111,6 +125,8 @@
         const nextPageBtn = document.getElementById('next-page-btn');
         const pageInfoSpan = document.getElementById('page-info');
         const pdfListContainer = document.getElementById('pdf-list');
+        const sidebar = document.getElementById('sidebar');
+        const showSidebarBtn = document.getElementById('show-sidebar-btn');
 
         onAuthStateChanged(auth, async (user) => {
             currentUser = user;
@@ -127,16 +143,6 @@
             }
 
             currentProjectRef = doc(db, "users", currentUser.uid, "projects", projectId);
-            
-            onSnapshot(currentProjectRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    const projectData = docSnap.data();
-                    projectTitleEl.value = projectData.name;
-                } else {
-                    alert("Este proyecto ya no existe.");
-                    window.location.href = 'mi_tablero.html';
-                }
-            });
 
             const pdfsCollectionRef = collection(currentProjectRef, "pdfs");
             const q = query(pdfsCollectionRef, orderBy("createdAt", "desc"));
@@ -155,14 +161,30 @@
                             displayPdfItem(doc.id, pdfData);
                         }
                     });
+
+                    // Si no hay un PDF seleccionado, cargamos el primero por defecto
+                    if (!currentPdfId) {
+                        const firstPdf = querySnapshot.docs[0];
+                        if (firstPdf) {
+                            renderPdf(firstPdf.id, firstPdf.data());
+                        }
+                    } else {
+                        // Si ya hay uno seleccionado, nos aseguramos de que el listener
+                        // no lo vuelva a cargar, pero actualice el estado activo
+                        document.querySelectorAll('.pdf-list-item').forEach(el => el.classList.remove('active'));
+                        const currentActivePdf = document.querySelector(`.pdf-list-item[data-pdf-id='${currentPdfId}']`);
+                        if (currentActivePdf) {
+                            currentActivePdf.classList.add('active');
+                        }
+                    }
                 }
             });
         });
-        
+
         const displayPdfItem = (pdfId, pdfData) => {
             const pdfItemDiv = document.createElement('div');
             pdfItemDiv.className = 'pdf-list-item flex items-center justify-between p-2 rounded-md';
-            pdfItemDiv.setAttribute('data-url', pdfData.url);
+            pdfItemDiv.setAttribute('data-pdf-id', pdfId);
 
             const pdfNameSpan = document.createElement('span');
             pdfNameSpan.className = 'text-sm font-medium truncate flex-1';
@@ -181,7 +203,7 @@
                     deletePdf(pdfId, pdfData.storagePath);
                 }
             });
-            
+
             pdfItemDiv.appendChild(pdfNameSpan);
             pdfItemDiv.appendChild(deleteBtn);
             pdfListContainer.appendChild(pdfItemDiv);
@@ -189,7 +211,7 @@
             pdfItemDiv.addEventListener('click', () => {
                 document.querySelectorAll('.pdf-list-item').forEach(el => el.classList.remove('active'));
                 pdfItemDiv.classList.add('active');
-                renderPdf(pdfData.url);
+                renderPdf(pdfId, pdfData);
             });
         };
 
@@ -200,19 +222,37 @@
 
                 const pdfDocRef = doc(currentProjectRef, "pdfs", pdfId);
                 await deleteDoc(pdfDocRef);
+
+                // Si se borra el PDF actual, limpiar el visor
+                if (pdfId === currentPdfId) {
+                    pdfRenderCanvas.style.display = 'none';
+                    pdfControls.style.display = 'none';
+                    noPdfMessage.style.display = 'block';
+                    pdfTitleEl.value = 'Sin PDF seleccionado';
+                    pageTitleEl.textContent = 'Sin PDF seleccionado';
+                    currentPdfId = null;
+                    currentPdfRef = null;
+                }
             } catch (error) {
                 console.error("Error al borrar el PDF:", error);
                 alert("No se pudo borrar el PDF.");
             }
         };
 
-        const renderPdf = (url) => {
+        const renderPdf = (pdfId, pdfData) => {
+            currentPdfId = pdfId;
+            currentPdfRef = doc(currentProjectRef, "pdfs", pdfId);
+
+            // Actualizar el título de la página y el input
+            pageTitleEl.textContent = pdfData.name;
+            pdfTitleEl.value = pdfData.name;
+            
             noPdfMessage.style.display = 'none';
             pdfRenderCanvas.style.display = 'block';
             pdfLoaderText.textContent = "Cargando PDF...";
             pdfLoaderContainer.style.display = 'flex';
 
-            const loadingTask = pdfjsLib.getDocument(url);
+            const loadingTask = pdfjsLib.getDocument(pdfData.url);
             loadingTask.promise.then(function(pdf) {
                 pdfDoc = pdf;
                 pageNum = 1;
@@ -265,6 +305,15 @@
             renderPage(pageNum);
         };
 
+        // Escuchamos el evento de click del botón "Mis PDFs"
+        showSidebarBtn.addEventListener('click', () => {
+            if (sidebar.classList.contains('hidden')) {
+                sidebar.classList.remove('hidden');
+            } else {
+                sidebar.classList.add('hidden');
+            }
+        });
+
         uploadPdfBtn.addEventListener('click', () => {
             if (currentProjectRef) {
                 pdfFileInput.click();
@@ -278,7 +327,6 @@
             pdfLoaderText.textContent = "Subiendo PDF...";
             pdfLoaderContainer.style.display = 'flex';
 
-            // CORRECCIÓN: La ruta de Storage ahora incluye el ID del proyecto
             const filePath = `${currentUser.uid}/${currentProjectRef.id}/${file.name}`;
             const storageRef = ref(storage, filePath);
             const uploadTask = uploadBytesResumable(storageRef, file);
@@ -296,33 +344,34 @@
                 async () => {
                     const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
                     const pdfsCollectionRef = collection(currentProjectRef, "pdfs");
-                    await addDoc(pdfsCollectionRef, { 
+                    const newPdfRef = await addDoc(pdfsCollectionRef, { 
                         name: file.name,
                         url: downloadURL,
                         storagePath: filePath,
                         createdAt: new Date()
                     });
                     pdfLoaderContainer.style.display = 'none';
+                    renderPdf(newPdfRef.id, { name: file.name, url: downloadURL });
                 }
             );
         });
 
-        saveBtn.addEventListener('click', async () => {
-            if (!currentProjectRef) return;
-            saveBtn.textContent = "Guardando...";
-            saveBtn.disabled = true;
+        savePdfBtn.addEventListener('click', async () => {
+            if (!currentPdfRef) return;
+            savePdfBtn.textContent = "Guardando...";
+            savePdfBtn.disabled = true;
             try {
-                await updateDoc(currentProjectRef, { name: projectTitleEl.value });
-                saveBtn.textContent = "¡Guardado!";
+                await updateDoc(currentPdfRef, { name: pdfTitleEl.value });
+                savePdfBtn.textContent = "¡Guardado!";
                 setTimeout(() => { 
-                    saveBtn.textContent = "Guardar"; 
-                    saveBtn.disabled = false;
+                    savePdfBtn.textContent = "Guardar Título"; 
+                    savePdfBtn.disabled = false;
                 }, 2000);
             } catch (error) { 
                 console.error("Error al guardar:", error); 
-                alert("No se pudo guardar el título."); 
-                saveBtn.textContent = "Guardar";
-                saveBtn.disabled = false;
+                alert("No se pudo guardar el título del PDF."); 
+                savePdfBtn.textContent = "Guardar Título";
+                savePdfBtn.disabled = false;
             }
         });
 
