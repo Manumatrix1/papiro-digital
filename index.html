@@ -78,22 +78,13 @@
     </div>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        // Importa los servicios de Firebase desde el archivo central
+        import { auth, db } from './firebase-config.js';
         
-        const firebaseConfig = {
-            apiKey: "AIzaSyDhcJyTriTBrEDftDx_lYAhFgd6Y8Us4dA",
-            authDomain: "papirodigital-1a6c5.firebaseapp.com",
-            projectId: "papirodigital-1a6c5",
-            storageBucket: "papirodigital-1a6c5.appspot.com",
-            messagingSenderId: "274494841235",
-            appId: "1:274494841235:web:99112dde1c6dbd12240866"
-        };
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
+        // Importa las funciones que necesitas para esta página
+        import { createUserWithEmailAndPassword, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        import { doc, setDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        
         const loginTabBtn = document.getElementById('login-tab-btn'), registerTabBtn = document.getElementById('register-tab-btn'), loginFormSection = document.getElementById('login-form-section'), registerFormSection = document.getElementById('register-form-section'), loginForm = document.getElementById('login-form'), registerForm = document.getElementById('register-form'), googleBtn = document.getElementById('google-signin-btn'), quickLoginBtn = document.getElementById('quick-login-btn'), loginErrorMessage = document.getElementById('login-error-message'), registerErrorMessage = document.getElementById('register-error-message');
         
         loginTabBtn.addEventListener('click', () => { loginTabBtn.classList.add('active'); registerTabBtn.classList.remove('active'); loginFormSection.classList.add('active'); registerFormSection.classList.remove('active'); });
@@ -126,6 +117,7 @@
             const provider = new GoogleAuthProvider();
             try {
                 const result = await signInWithPopup(auth, provider);
+                // Usar merge:true para no sobreescribir datos si el usuario ya existía
                 await setDoc(doc(db, "users", result.user.uid), { name: result.user.displayName, email: result.user.email }, { merge: true });
                 window.location.href = 'mi_tablero.html';
             } catch (error) { loginErrorMessage.textContent = "Error con Google: " + error.message; }
