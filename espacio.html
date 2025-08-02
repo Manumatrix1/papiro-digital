@@ -30,7 +30,7 @@
         }
         #cover-container {
             width: 100%;
-            height: 150px; /* Altura más baja para móviles */
+            height: 150px;
             background-color: #2a2a2a;
             position: relative;
             overflow: hidden;
@@ -40,7 +40,7 @@
         }
         @media (min-width: 640px) {
             #cover-container {
-                height: 250px; /* Altura para escritorio */
+                height: 250px;
             }
         }
         #pdf-viewer-container {
@@ -203,9 +203,8 @@
 
                 if (querySnapshot.empty) {
                     noPdfsMessage.style.display = 'block';
-                    // Al no haber PDFs, solo mostramos la portada y la lista vacía
                     pdfViewerContainer.style.display = 'none';
-                    coverSection.style.display = 'flex';
+                    pdfsSection.style.display = 'block';
                 } else {
                     noPdfsMessage.style.display = 'none';
                     querySnapshot.forEach((doc) => {
@@ -214,6 +213,7 @@
                             displayPdfItem(doc.id, pdfData);
                         }
                     });
+                    pdfsSection.style.display = 'block';
                 }
             });
         });
