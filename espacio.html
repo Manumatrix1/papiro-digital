@@ -28,7 +28,6 @@
         #pdf-loader-container {
             display: none;
         }
-        /* Estilos del modal para móvil y escritorio */
         #mobile-sidebar-modal {
             display: none;
         }
@@ -42,6 +41,19 @@
             #sidebar {
                 display: block !important;
             }
+        }
+        #cover-container {
+            width: 100%;
+            height: 250px;
+            background-color: #2a2a2a;
+            position: relative;
+            overflow: hidden;
+            border-radius: 8px;
+            background-size: cover;
+            background-position: center;
+        }
+        #pdf-viewer-container {
+            display: none; /* Oculto por defecto */
         }
     </style>
 </head>
@@ -111,9 +123,9 @@
             </div>
         </div>
 
-        <div class="flex-1 flex flex-col items-center overflow-auto">
+        <div id="main-content-area" class="flex-1 flex flex-col items-center overflow-auto">
             <div id="cover-section" class="w-full flex justify-center items-center p-4 sm:p-0">
-                <div id="cover-container" class="relative group w-full max-w-4xl h-64 sm:h-96 bg-[#2a2a2a] flex items-center justify-center rounded-lg">
+                <div id="cover-container" class="relative group w-full max-w-4xl h-64 sm:h-96 flex items-center justify-center rounded-lg">
                     <div class="absolute inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center text-center p-4 opacity-100 transition-opacity">
                         <span id="cover-placeholder" class="text-xl font-bold text-gray-300 mb-2">Añadir Portada</span>
                         <p class="text-sm text-gray-400 mb-4">Haz clic o arrastra una imagen aquí.<br>(Recomendado: 1200x400 px)</p>
@@ -124,21 +136,21 @@
                     </div>
                 </div>
             </div>
-            
+
             <div id="pdf-loader-container" class="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
                 <div class="text-center">
                     <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#88c999]"></div>
                     <p id="pdf-loader-text" class="mt-4 text-xl">Cargando PDF...</p>
                 </div>
             </div>
-
+            
             <div id="pdf-viewer-container" class="mt-4 sm:mt-8 relative max-w-full w-full">
                 <div id="no-pdf-message" class="text-center text-gray-500 text-lg p-10 border border-dashed border-gray-700 rounded-lg" style="display: none;">
                     <p>No hay PDFs en este tablero. Usa el botón "Mis PDFs" para subir uno.</p>
                 </div>
-
+                
                 <canvas id="pdf-render" class="bg-[#181818] rounded-md"></canvas>
-
+                
                 <div id="pdf-controls" class="mt-4 flex justify-center gap-4" style="display: none;">
                     <button id="prev-page-btn" class="bg-[#2a2a2a] text-white px-4 py-2 rounded-lg hover:bg-[#3a3a3a]">Página Anterior</button>
                     <span id="page-info" class="self-center"></span>
@@ -147,22 +159,22 @@
             </div>
         </div>
     </main>
-
+    
     <script type="module">
         import { auth, db, storage } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
         import { doc, updateDoc, onSnapshot, collection, addDoc, query, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
         import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
-
+        
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-
+        
         let currentProjectRef = null;
         let currentUser = null;
         let pdfDoc = null;
         let pageNum = 1;
         let currentPdfId = null;
         let currentPdfRef = null;
-
+        
         const pageTitleEl = document.getElementById('page-title');
         const projectTitleEl = document.getElementById('project-title');
         const pdfLoaderContainer = document.getElementById('pdf-loader-container');
@@ -180,7 +192,7 @@
         const noPdfsMessageDesktop = document.getElementById('no-pdfs-message-desktop');
         const visualUploadBtnDesktop = document.getElementById('visual-upload-btn-desktop');
         const pdfFileInputDesktop = document.getElementById('pdf-file-input-desktop');
-
+        
         const showSidebarBtn = document.getElementById('show-sidebar-btn');
         const mobileSidebarModal = document.getElementById('mobile-sidebar-modal');
         const closeModalBtn = document.getElementById('close-modal-btn');
@@ -190,13 +202,12 @@
         const noPdfsMessageMobile = document.getElementById('no-pdfs-message-mobile');
         const mainContent = document.querySelector('main');
         
-        // Elementos para la portada
+        const coverSection = document.getElementById('cover-section');
         const coverContainer = document.getElementById('cover-container');
-        const coverImage = document.getElementById('cover-image');
         const coverPlaceholder = document.getElementById('cover-placeholder');
         const uploadCoverBtn = document.getElementById('upload-cover-btn');
         const coverFileInput = document.getElementById('cover-file-input');
-        const coverSection = document.getElementById('cover-section');
+        const pdfViewerContainer = document.getElementById('pdf-viewer-container');
 
         onAuthStateChanged(auth, async (user) => {
             currentUser = user;
@@ -204,14 +215,14 @@
                 window.location.href = 'index.html';
                 return;
             }
-
+        
             const urlParams = new URLSearchParams(window.location.search);
             const projectId = urlParams.get('id');
             if (!projectId) {
                 window.location.href = 'mi_tablero.html';
                 return;
             }
-
+        
             currentProjectRef = doc(db, "users", currentUser.uid, "projects", projectId);
             
             onSnapshot(currentProjectRef, (docSnap) => {
@@ -220,11 +231,8 @@
                     projectTitleEl.value = projectData.name;
                     pageTitleEl.textContent = projectData.name;
                     
-                    // Lógica para mostrar la portada
                     if (projectData.coverUrl) {
                         coverContainer.style.backgroundImage = `url('${projectData.coverUrl}')`;
-                        coverContainer.style.backgroundSize = 'cover';
-                        coverContainer.style.backgroundPosition = 'center';
                         coverContainer.classList.remove('bg-[#2a2a2a]');
                         coverPlaceholder.parentElement.classList.add('opacity-0');
                         coverPlaceholder.textContent = 'Cambiar Portada';
@@ -234,34 +242,32 @@
                         coverPlaceholder.parentElement.classList.remove('opacity-0');
                         coverPlaceholder.textContent = 'Añadir Portada';
                     }
-
+        
                 } else {
                     alert("Este proyecto ya no existe.");
                     window.location.href = 'mi_tablero.html';
                 }
             });
-
+        
             const pdfsCollectionRef = collection(currentProjectRef, "pdfs");
             const q = query(pdfsCollectionRef, orderBy("createdAt", "desc"));
             onSnapshot(q, (querySnapshot) => {
                 pdfListDesktop.innerHTML = '';
                 pdfListMobile.innerHTML = '';
-
+        
                 pdfListDesktop.appendChild(visualUploadBtnDesktop);
                 pdfListMobile.appendChild(visualUploadBtnMobile);
-
+        
                 if (querySnapshot.empty) {
                     noPdfsMessageDesktop.style.display = 'block';
                     noPdfsMessageMobile.style.display = 'block';
                     noPdfMessage.style.display = 'block';
-                    pdfRenderCanvas.style.display = 'none';
-                    pdfControls.style.display = 'none';
-                    coverSection.style.display = 'flex'; // Mostrar la portada si no hay PDFs
+                    // Nuevo: Ocultar el visor y mostrar la portada
+                    pdfViewerContainer.style.display = 'none';
+                    coverSection.style.display = 'flex';
                 } else {
                     noPdfsMessageDesktop.style.display = 'none';
                     noPdfsMessageMobile.style.display = 'none';
-                    noPdfMessage.style.display = 'none';
-                    coverSection.style.display = 'none'; // Ocultar la portada si hay PDFs
                     querySnapshot.forEach((doc) => {
                         const pdfData = doc.data();
                         if (pdfData && pdfData.name && pdfData.url) {
@@ -269,18 +275,12 @@
                             displayPdfItem(doc.id, pdfData, 'mobile');
                         }
                     });
-
+        
+                    // Si ya hay un PDF seleccionado, el visor debe seguir visible
+                    // Si no, se muestra la portada
                     if (!currentPdfId) {
-                        const firstPdf = querySnapshot.docs[0];
-                        if (firstPdf) {
-                            renderPdf(firstPdf.id, firstPdf.data());
-                            document.querySelector(`.pdf-list-item[data-pdf-id='${firstPdf.id}']`)?.classList.add('active');
-                        } else {
-                            noPdfMessage.style.display = 'block';
-                            pdfRenderCanvas.style.display = 'none';
-                            pdfControls.style.display = 'none';
-                            pageTitleEl.textContent = projectTitleEl.value;
-                        }
+                        pdfViewerContainer.style.display = 'none';
+                        coverSection.style.display = 'flex';
                     } else {
                         document.querySelectorAll('.pdf-list-item').forEach(el => el.classList.remove('active'));
                         const currentActivePdf = document.querySelector(`.pdf-list-item[data-pdf-id='${currentPdfId}']`);
@@ -291,16 +291,16 @@
                 }
             });
         });
-
+        
         const displayPdfItem = (pdfId, pdfData, target) => {
             const pdfItemDiv = document.createElement('div');
             pdfItemDiv.className = 'pdf-list-item flex items-center justify-between p-2 rounded-md';
             pdfItemDiv.setAttribute('data-pdf-id', pdfId);
-
+        
             const pdfNameSpan = document.createElement('span');
             pdfNameSpan.className = 'text-sm font-medium truncate flex-1';
             pdfNameSpan.textContent = pdfData.name;
-
+        
             const deleteBtn = document.createElement('button');
             deleteBtn.innerHTML = `
                 <svg class="h-4 w-4 text-gray-400 hover:text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -314,16 +314,16 @@
                     deletePdf(pdfId, pdfData.storagePath);
                 }
             });
-
+        
             pdfItemDiv.appendChild(pdfNameSpan);
             pdfItemDiv.appendChild(deleteBtn);
-
+        
             if (target === 'desktop') {
                 pdfListDesktop.appendChild(pdfItemDiv);
             } else {
                 pdfListMobile.appendChild(pdfItemDiv);
             }
-
+        
             pdfItemDiv.addEventListener('click', () => {
                 document.querySelectorAll('.pdf-list-item').forEach(el => el.classList.remove('active'));
                 document.querySelectorAll(`.pdf-list-item[data-pdf-id='${pdfId}']`).forEach(el => el.classList.add('active'));
@@ -331,15 +331,15 @@
                 closeModal();
             });
         };
-
+        
         const deletePdf = async (pdfId, storagePath) => {
             try {
                 const fileRef = ref(storage, storagePath);
                 await deleteObject(fileRef);
-
+        
                 const pdfDocRef = doc(currentProjectRef, "pdfs", pdfId);
                 await deleteDoc(pdfDocRef);
-
+        
                 if (pdfId === currentPdfId) {
                     pdfRenderCanvas.style.display = 'none';
                     pdfControls.style.display = 'none';
@@ -347,23 +347,30 @@
                     pageTitleEl.textContent = projectTitleEl.value;
                     currentPdfId = null;
                     currentPdfRef = null;
+                    // Nuevo: Mostrar la portada si no hay PDF cargado
+                    coverSection.style.display = 'flex';
+                    pdfViewerContainer.style.display = 'none';
                 }
             } catch (error) {
                 console.error("Error al borrar el PDF:", error);
                 alert("No se pudo borrar el PDF.");
             }
         };
-
+        
         const renderPdf = (pdfId, pdfData) => {
             currentPdfId = pdfId;
             currentPdfRef = doc(currentProjectRef, "pdfs", pdfId);
-
+        
+            // Nuevo: Ocultar la portada y mostrar el visor
+            coverSection.style.display = 'none';
+            pdfViewerContainer.style.display = 'block';
+            
             pageTitleEl.textContent = pdfData.name;
             noPdfMessage.style.display = 'none';
             pdfRenderCanvas.style.display = 'block';
             pdfLoaderText.textContent = "Cargando PDF...";
             pdfLoaderContainer.style.display = 'flex';
-
+        
             const loadingTask = pdfjsLib.getDocument(pdfData.url);
             loadingTask.promise.then(function(pdf) {
                 pdfDoc = pdf;
@@ -380,7 +387,7 @@
                 pdfLoaderContainer.style.display = 'none';
             });
         };
-
+        
         const renderPage = (num) => {
             if (!pdfDoc) return;
             pdfDoc.getPage(num).then(function(page) {
@@ -391,50 +398,50 @@
                 const devicePixelRatio = window.devicePixelRatio || 1;
                 const scale = (containerWidth / viewport.width) * devicePixelRatio;
                 const scaledViewport = page.getViewport({ scale });
-
+        
                 const context = pdfRenderCanvas.getContext('2d');
                 pdfRenderCanvas.height = scaledViewport.height;
                 pdfRenderCanvas.width = scaledViewport.width;
                 
                 pdfRenderCanvas.style.width = `${containerWidth}px`;
                 pdfRenderCanvas.style.height = `${scaledViewport.height / devicePixelRatio}px`;
-
+        
                 const renderContext = {
                     canvasContext: context,
                     viewport: scaledViewport
                 };
                 page.render(renderContext);
                 pageInfoSpan.textContent = `Página ${num} de ${pdfDoc.numPages}`;
-
+        
                 prevPageBtn.disabled = pageNum <= 1;
                 nextPageBtn.disabled = pageNum >= pdfDoc.numPages;
             });
         };
-
+        
         const onPrevPage = () => {
             if (pageNum <= 1) return;
             pageNum--;
             renderPage(pageNum);
         };
-
+        
         const onNextPage = () => {
             if (pageNum >= pdfDoc.numPages) return;
             pageNum++;
             renderPage(pageNum);
         };
-
+        
         const openModal = () => {
             mobileSidebarModal.classList.add('open');
         };
-
+        
         const closeModal = () => {
             mobileSidebarModal.classList.remove('open');
         };
-
+        
         showSidebarBtn.addEventListener('click', () => {
             openModal();
         });
-
+        
         closeModalBtn.addEventListener('click', closeModal);
         mobileSidebarModal.addEventListener('click', (e) => {
             if (e.target.id === 'mobile-sidebar-modal') {
@@ -445,7 +452,7 @@
         uploadCoverBtn.addEventListener('click', () => {
             coverFileInput.click();
         });
-
+        
         coverFileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -453,7 +460,7 @@
             const coverPath = `${currentUser.uid}/${currentProjectRef.id}/cover/${file.name}`;
             const storageRef = ref(storage, coverPath);
             const uploadTask = uploadBytesResumable(storageRef, file);
-
+        
             uploadTask.on('state_changed',
                 (snapshot) => {
                     // Opcional: mostrar un loader
@@ -469,33 +476,33 @@
                 }
             );
         });
-
+        
         visualUploadBtnDesktop.addEventListener('click', () => {
             if (currentProjectRef) {
                 pdfFileInputDesktop.click();
             }
         });
-
+        
         visualUploadBtnMobile.addEventListener('click', () => {
             if (currentProjectRef) {
                 pdfFileInputMobile.click();
             }
         });
-
+        
         pdfFileInputDesktop.addEventListener('change', (e) => handleFileUpload(e, 'desktop'));
         pdfFileInputMobile.addEventListener('change', (e) => handleFileUpload(e, 'mobile'));
-
+        
         const handleFileUpload = (e, source) => {
             const file = e.target.files[0];
             if (!file) return;
-
+        
             pdfLoaderText.textContent = "Subiendo PDF...";
             pdfLoaderContainer.style.display = 'flex';
-
+        
             const filePath = `${currentUser.uid}/${currentProjectRef.id}/${file.name}`;
             const storageRef = ref(storage, filePath);
             const uploadTask = uploadBytesResumable(storageRef, file);
-
+        
             uploadTask.on('state_changed',
                 (snapshot) => {
                     const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
@@ -521,7 +528,7 @@
                 }
             );
         };
-
+        
         saveBtn.addEventListener('click', async () => {
             if (!currentProjectRef) return;
             saveBtn.textContent = "Guardando...";
@@ -540,12 +547,12 @@
                 saveBtn.disabled = false;
             }
         });
-
+        
         logoutBtn.addEventListener('click', async () => {
             await signOut(auth);
             window.location.href = 'index.html';
         });
-
+        
         prevPageBtn.addEventListener('click', onPrevPage);
         nextPageBtn.addEventListener('click', onNextPage);
         
