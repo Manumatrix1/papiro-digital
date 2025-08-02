@@ -7,14 +7,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0f0f0f;
-        }
-        .form-container {
-            background-color: #181818;
-            border: 1px solid #2a2a2a;
-        }
+        body { font-family: 'Inter', sans-serif; background-color: #0f0f0f; }
+        .form-container { background-color: #181818; border: 1px solid #2a2a2a; }
     </style>
 </head>
 <body class="text-white">
@@ -43,28 +37,10 @@
         </div>
     </div>
 
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script type="module">
+        import { auth } from './firebase-config.js';
+        import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
 
-    <script>
-        // Tu configuración de Firebase
-        const firebaseConfig = {
-            apiKey: "AIzaSyDhcJyTriTBrEDftDx_lYAhFgd6Y8Us4dA",
-            authDomain: "papirodigital-1a6c5.firebaseapp.com",
-            projectId: "papirodigital-1a6c5",
-            storageBucket: "papirodigital-1a6c5.appspot.com",
-            messagingSenderId: "274494841235",
-            appId: "1:274494841235:web:99112dde1c6dbd12240866",
-            measurementId: "G-0SKBCYEEF0"
-        };
-
-        // Inicializar Firebase
-        const app = firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-
-        // Lógica de inicio de sesión
         const loginForm = document.getElementById('admin-login-form');
         const errorMessageDiv = document.getElementById('error-message');
 
@@ -72,15 +48,15 @@
             e.preventDefault();
             const email = document.getElementById('admin-email').value;
             const password = document.getElementById('admin-password').value;
+            errorMessageDiv.textContent = '';
 
-            auth.signInWithEmailAndPassword(email, password)
+            signInWithEmailAndPassword(auth, email, password)
                 .then((userCredential) => {
-                    // Si el login es exitoso, redirigir al panel
                     window.location.href = 'panel.html';
                 })
                 .catch((error) => {
-                    console.error("Error de inicio de sesión:", error);
-                    errorMessageDiv.textContent = 'Correo o contraseña incorrectos.';
+                    console.error("Error de inicio de sesión de admin:", error);
+                    errorMessageDiv.textContent = 'Correo o contraseña de administrador incorrectos.';
                 });
         });
     </script>
