@@ -49,7 +49,7 @@
     <script type="module">
         import { auth, db, storage } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { collection, addDoc, onSnapshot, query, orderBy, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { collection, addDoc, onSnapshot, query, orderBy, doc, deleteDoc, updateDoc, getDocs } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
         import { ref, listAll, deleteObject } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
 
         const projectsContainer = document.getElementById('projects-container');
@@ -149,13 +149,20 @@
             }
         };
 
+        // Función de borrado actualizada
         const deleteProject = async (projectId) => {
             try {
+                // 1. Borrar todos los archivos del Storage asociados al proyecto
                 const projectStorageRef = ref(storage, `${currentUser.uid}/${projectId}`);
                 const filesList = await listAll(projectStorageRef);
-                
                 await Promise.all(filesList.items.map(fileRef => deleteObject(fileRef)));
 
+                // 2. Borrar todos los documentos de la subcolección 'pdfs' en Firestore
+                const pdfsCollectionRef = collection(db, "users", currentUser.uid, "projects", projectId, "pdfs");
+                const pdfDocsSnapshot = await getDocs(pdfsCollectionRef);
+                await Promise.all(pdfDocsSnapshot.docs.map(pdfDoc => deleteDoc(pdfDoc.ref)));
+
+                // 3. Finalmente, borrar el documento principal del proyecto
                 const projectDocRef = doc(db, "users", currentUser.uid, "projects", projectId);
                 await deleteDoc(projectDocRef);
 
