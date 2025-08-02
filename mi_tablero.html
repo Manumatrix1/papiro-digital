@@ -10,14 +10,14 @@
         body { font-family: 'Inter', sans-serif; background-color: #0f0f0f; }
         .project-card {
             transition: transform 0.2s ease-in-out;
-            aspect-ratio: 1 / 1; /* Esto hace que las tarjetas sean cuadradas */
+            aspect-ratio: 1 / 1;
         }
         .project-card:hover {
             transform: translateY(-5px);
         }
         .project-actions {
             display: none;
-            gap: 0.5rem; /* Separación de 0.5rem entre los botones */
+            gap: 0.5rem;
         }
         .project-card:hover .project-actions {
             display: flex;
@@ -28,18 +28,33 @@
             padding: 4px;
             border-radius: 4px;
         }
+        /* Estilos para el feed horizontal */
+        #projects-container {
+            display: flex;
+            gap: 1.5rem; /* Separación entre las tarjetas */
+            overflow-x: auto;
+            padding-bottom: 1rem;
+            -ms-overflow-style: none; /* Ocultar barra de scroll en IE y Edge */
+            scrollbar-width: none; /* Ocultar barra de scroll en Firefox */
+        }
+        #projects-container::-webkit-scrollbar {
+            display: none; /* Ocultar barra de scroll en Chrome, Safari y Opera */
+        }
+        .project-card, #create-project-card {
+            min-width: 250px; /* Tamaño mínimo de las tarjetas */
+        }
     </style>
 </head>
 <body class="text-white">
-    <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-4 sm:px-8 flex justify-between items-center sticky top-0 z-10">
-        <h1 class="text-2xl sm:text-3xl font-bold">Mis Tableros</h1>
-        <div class="relative flex items-center w-full max-w-sm ml-4 sm:ml-8">
+    <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-4 sm:px-8 flex flex-col sm:flex-row justify-between items-center sticky top-0 z-10">
+        <h1 class="text-2xl sm:text-3xl font-bold mb-2 sm:mb-0">Mis Tableros</h1>
+        <div class="relative flex items-center w-full max-w-sm ml-0 sm:ml-8">
             <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input id="search-input" type="text" placeholder="Buscar tableros..." class="w-full bg-[#2a2a2a] text-white rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#88c999] transition">
         </div>
-        <div class="flex items-center gap-2 sm:gap-4 ml-auto">
+        <div class="flex items-center gap-2 sm:gap-4 mt-2 sm:mt-0 ml-auto">
             <button id="logout-btn" class="text-gray-400 hover:text-white transition text-sm sm:text-base">
                 Cerrar Sesión
             </button>
@@ -47,7 +62,7 @@
     </header>
 
     <main class="p-4 sm:p-8">
-        <div id="projects-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div id="projects-container" class="flex overflow-x-auto">
             </div>
     </main>
 
@@ -87,7 +102,6 @@
         const displayProjects = () => {
             projectsContainer.innerHTML = '';
             
-            // Añadir el botón de crear tablero
             const createProjectCard = document.createElement('div');
             createProjectCard.id = 'create-project-card';
             createProjectCard.className = 'flex flex-col items-center justify-center bg-[#181818] rounded-lg p-4 sm:p-6 shadow-lg border border-dashed border-gray-600 transition hover:bg-[#2a2a2a] cursor-pointer aspect-square';
