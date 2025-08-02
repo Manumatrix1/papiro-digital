@@ -30,10 +30,10 @@
 </head>
 <body class="text-white">
     <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-4 sm:px-8 flex justify-between items-center sticky top-0 z-10">
-        <h1 class="text-2xl sm:text-3xl font-bold">Mi Tablero</h1>
+        <h1 class="text-2xl sm:text-3xl font-bold">Mis Tableros</h1>
         <div class="flex items-center gap-2 sm:gap-4">
             <button id="create-project-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-3 sm:px-4 rounded-lg hover:brightness-110 transition text-sm sm:text-base">
-                Crear Proyecto
+                Crear Tablero
             </button>
             <button id="logout-btn" class="text-gray-400 hover:text-white transition text-sm sm:text-base">
                 Cerrar Sesión
@@ -107,7 +107,7 @@
             `;
             renameBtn.addEventListener('click', (e) => {
                 e.preventDefault();
-                const newName = prompt("Introduce el nuevo nombre para el proyecto:", projectData.name);
+                const newName = prompt("Introduce el nuevo nombre para el tablero:", projectData.name);
                 if (newName && newName.trim() !== '' && newName !== projectData.name) {
                     updateProjectName(projectId, newName);
                 }
@@ -121,7 +121,7 @@
             `;
             deleteBtn.addEventListener('click', (e) => {
                 e.preventDefault();
-                if (confirm(`¿Estás seguro de que quieres borrar el proyecto "${projectData.name}"? Esta acción no se puede deshacer.`)) {
+                if (confirm(`¿Estás seguro de que quieres borrar el tablero "${projectData.name}"? Esta acción no se puede deshacer.`)) {
                     deleteProject(projectId);
                 }
             });
@@ -145,30 +145,26 @@
                 });
             } catch (error) {
                 console.error("Error al actualizar el nombre:", error);
-                alert("No se pudo actualizar el nombre del proyecto.");
+                alert("No se pudo actualizar el nombre del tablero.");
             }
         };
 
-        // Función de borrado actualizada
         const deleteProject = async (projectId) => {
             try {
-                // 1. Borrar todos los archivos del Storage asociados al proyecto
                 const projectStorageRef = ref(storage, `${currentUser.uid}/${projectId}`);
                 const filesList = await listAll(projectStorageRef);
                 await Promise.all(filesList.items.map(fileRef => deleteObject(fileRef)));
 
-                // 2. Borrar todos los documentos de la subcolección 'pdfs' en Firestore
                 const pdfsCollectionRef = collection(db, "users", currentUser.uid, "projects", projectId, "pdfs");
                 const pdfDocsSnapshot = await getDocs(pdfsCollectionRef);
                 await Promise.all(pdfDocsSnapshot.docs.map(pdfDoc => deleteDoc(pdfDoc.ref)));
 
-                // 3. Finalmente, borrar el documento principal del proyecto
                 const projectDocRef = doc(db, "users", currentUser.uid, "projects", projectId);
                 await deleteDoc(projectDocRef);
 
             } catch (error) {
-                console.error("Error al borrar el proyecto:", error);
-                alert("No se pudo borrar el proyecto.");
+                console.error("Error al borrar el tablero:", error);
+                alert("No se pudo borrar el tablero.");
             }
         };
 
@@ -176,12 +172,12 @@
             if (!currentUser) return;
             try {
                 await addDoc(projectsCollectionRef, {
-                    name: "Nuevo Proyecto",
+                    name: "Nuevo Tablero",
                     createdAt: new Date()
                 });
             } catch (error) {
-                console.error("Error al crear el proyecto:", error);
-                alert("No se pudo crear un nuevo proyecto.");
+                console.error("Error al crear el tablero:", error);
+                alert("No se pudo crear un nuevo tablero.");
             }
         });
 
