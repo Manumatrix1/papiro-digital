@@ -28,7 +28,6 @@
         #pdf-loader-container {
             display: none;
         }
-        /* Estilos del modal para móvil y escritorio */
         #mobile-sidebar-modal {
             display: none;
         }
@@ -56,7 +55,7 @@
             </a>
             <input id="project-title" type="text" class="bg-transparent text-xl sm:text-2xl font-bold text-white focus:outline-none w-full truncate" value="Cargando...">
         </div>
-
+        
         <div class="flex items-center gap-2 sm:gap-4">
             <button id="save-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-3 sm:px-4 rounded-lg hover:brightness-110 transition text-sm sm:text-base">Guardar Título</button>
             <button id="show-sidebar-btn" class="bg-[#2a2a2a] text-white font-bold py-2 px-3 sm:px-4 rounded-lg hover:brightness-110 transition text-sm sm:text-base">
@@ -197,6 +196,7 @@
                 if (docSnap.exists()) {
                     const projectData = docSnap.data();
                     projectTitleEl.value = projectData.name;
+                    // El título de la página y el título del tablero ahora son el mismo
                     pageTitleEl.textContent = projectData.name;
                 } else {
                     alert("Este proyecto ya no existe.");
@@ -230,8 +230,9 @@
                         }
                     });
 
+                    // Si no hay un PDF seleccionado, cargar el primer PDF de la lista
                     if (!currentPdfId) {
-                        const firstPdf = querySnapshot.docs.shift();
+                        const firstPdf = querySnapshot.docs[0]; // Usamos el índice [0] para no modificar el array
                         if (firstPdf) {
                             renderPdf(firstPdf.id, firstPdf.data());
                             document.querySelector(`.pdf-list-item[data-pdf-id='${firstPdf.id}']`)?.classList.add('active');
@@ -239,9 +240,9 @@
                             noPdfMessage.style.display = 'block';
                             pdfRenderCanvas.style.display = 'none';
                             pdfControls.style.display = 'none';
-                            pageTitleEl.textContent = projectTitleEl.value;
                         }
                     } else {
+                        // Si ya hay un PDF seleccionado, asegurarnos de que la lista se actualice correctamente
                         document.querySelectorAll('.pdf-list-item').forEach(el => el.classList.remove('active'));
                         const currentActivePdf = document.querySelector(`.pdf-list-item[data-pdf-id='${currentPdfId}']`);
                         if (currentActivePdf) {
@@ -386,12 +387,10 @@
             mobileSidebarModal.classList.remove('open');
         };
 
-        // Escucha del botón "Mis PDFs" para abrir el modal en móvil
         showSidebarBtn.addEventListener('click', () => {
             openModal();
         });
 
-        // Evento para cerrar el modal
         closeModalBtn.addEventListener('click', closeModal);
         mobileSidebarModal.addEventListener('click', (e) => {
             if (e.target.id === 'mobile-sidebar-modal') {
@@ -399,7 +398,6 @@
             }
         });
 
-        // Manejo de eventos de click para los botones de subir PDF
         visualUploadBtnDesktop.addEventListener('click', () => {
             if (currentProjectRef) {
                 pdfFileInputDesktop.click();
@@ -447,7 +445,7 @@
                     });
                     pdfLoaderContainer.style.display = 'none';
                     renderPdf(newPdfRef.id, { name: file.name, url: downloadURL });
-                    closeModal(); // Asegurarse de que el modal se cierre
+                    closeModal();
                 }
             );
         };
@@ -479,7 +477,6 @@
         prevPageBtn.addEventListener('click', onPrevPage);
         nextPageBtn.addEventListener('click', onNextPage);
         
-        // Listener para redimensionar el PDF si el tamaño de la ventana cambia
         window.addEventListener('resize', () => {
             if (pdfDoc && currentPdfId) {
                 renderPage(pageNum);
