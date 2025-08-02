@@ -28,20 +28,11 @@
             padding: 4px;
             border-radius: 4px;
         }
-        /* Estilos para el feed horizontal */
+        /* Estilos de cuadrícula para que se ajusten a la pantalla */
         #projects-container {
-            display: flex;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
             gap: 1.5rem; /* Separación entre las tarjetas */
-            overflow-x: auto;
-            padding-bottom: 1rem;
-            -ms-overflow-style: none; /* Ocultar barra de scroll en IE y Edge */
-            scrollbar-width: none; /* Ocultar barra de scroll en Firefox */
-        }
-        #projects-container::-webkit-scrollbar {
-            display: none; /* Ocultar barra de scroll en Chrome, Safari y Opera */
-        }
-        .project-card, #create-project-card {
-            min-width: 250px; /* Tamaño mínimo de las tarjetas */
         }
     </style>
 </head>
@@ -62,7 +53,7 @@
     </header>
 
     <main class="p-4 sm:p-8">
-        <div id="projects-container" class="flex overflow-x-auto">
+        <div id="projects-container">
             </div>
     </main>
 
