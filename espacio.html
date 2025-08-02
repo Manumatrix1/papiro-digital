@@ -58,13 +58,16 @@
         <aside id="sidebar" class="hidden sm:block w-full sm:w-64 bg-[#181818] border border-[#2a2a2a] rounded-lg p-4 mr-4 sm:mr-8 overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-lg font-semibold">Mis PDFs</h2>
-                <button id="upload-pdf-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-1 px-2 rounded-lg hover:brightness-110 transition text-sm">
-                    Subir PDF
-                </button>
             </div>
-            <input type="file" id="pdf-file-input" class="hidden" accept="application/pdf">
             <div id="pdf-list" class="space-y-2">
+                <div class="flex flex-col items-center p-4 border border-dashed border-gray-600 rounded-lg text-gray-400 hover:bg-[#2a2a2a] transition cursor-pointer" id="visual-upload-btn">
+                    <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    <span class="text-sm mt-2">Nuevo PDF</span>
                 </div>
+                </div>
+            <input type="file" id="pdf-file-input" class="hidden" accept="application/pdf">
             <div id="no-pdfs-message" class="text-gray-500 text-sm mt-4" style="display: none;">
                 No hay PDFs en este tablero.
             </div>
@@ -80,7 +83,7 @@
 
             <div id="pdf-viewer-container" class="mt-4 sm:mt-8 relative max-w-full w-full">
                 <div id="no-pdf-message" class="text-center text-gray-500 text-lg p-10 border border-dashed border-gray-700 rounded-lg" style="display: none;">
-                    <p>No hay PDFs en este tablero. Usa el botón "Mis PDFs" para subir uno.</p>
+                    <p>No hay PDFs en este tablero. Usa el botón "Nuevo PDF" para subir uno.</p>
                 </div>
                 
                 <canvas id="pdf-render" class="bg-[#181818] rounded-md"></canvas>
@@ -97,7 +100,7 @@
     <script type="module">
         import { auth, db, storage } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { doc, updateDoc, onSnapshot, collection, addDoc, query, orderBy, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { doc, updateDoc, onSnapshot, collection, addDoc, query, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
         import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
 
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
@@ -111,7 +114,6 @@
 
         const pageTitleEl = document.getElementById('page-title');
         const pdfTitleEl = document.getElementById('pdf-title');
-        const uploadPdfBtn = document.getElementById('upload-pdf-btn');
         const pdfFileInput = document.getElementById('pdf-file-input');
         const pdfLoaderContainer = document.getElementById('pdf-loader-container');
         const pdfLoaderText = document.getElementById('pdf-loader-text');
@@ -127,6 +129,7 @@
         const pdfListContainer = document.getElementById('pdf-list');
         const sidebar = document.getElementById('sidebar');
         const showSidebarBtn = document.getElementById('show-sidebar-btn');
+        const visualUploadBtn = document.getElementById('visual-upload-btn');
 
         onAuthStateChanged(auth, async (user) => {
             currentUser = user;
@@ -148,11 +151,16 @@
             const q = query(pdfsCollectionRef, orderBy("createdAt", "desc"));
             onSnapshot(q, (querySnapshot) => {
                 pdfListContainer.innerHTML = '';
+                // Añadimos el botón visual de nuevo cada vez que recargamos la lista
+                pdfListContainer.appendChild(visualUploadBtn);
+
                 if (querySnapshot.empty) {
                     noPdfsMessageAside.style.display = 'block';
                     noPdfMessage.style.display = 'block';
                     pdfRenderCanvas.style.display = 'none';
                     pdfControls.style.display = 'none';
+                    pdfTitleEl.value = '';
+                    pageTitleEl.textContent = 'Sin PDF';
                 } else {
                     noPdfsMessageAside.style.display = 'none';
                     querySnapshot.forEach((doc) => {
@@ -162,15 +170,12 @@
                         }
                     });
 
-                    // Si no hay un PDF seleccionado, cargamos el primero por defecto
                     if (!currentPdfId) {
                         const firstPdf = querySnapshot.docs[0];
                         if (firstPdf) {
                             renderPdf(firstPdf.id, firstPdf.data());
                         }
                     } else {
-                        // Si ya hay uno seleccionado, nos aseguramos de que el listener
-                        // no lo vuelva a cargar, pero actualice el estado activo
                         document.querySelectorAll('.pdf-list-item').forEach(el => el.classList.remove('active'));
                         const currentActivePdf = document.querySelector(`.pdf-list-item[data-pdf-id='${currentPdfId}']`);
                         if (currentActivePdf) {
@@ -223,7 +228,6 @@
                 const pdfDocRef = doc(currentProjectRef, "pdfs", pdfId);
                 await deleteDoc(pdfDocRef);
 
-                // Si se borra el PDF actual, limpiar el visor
                 if (pdfId === currentPdfId) {
                     pdfRenderCanvas.style.display = 'none';
                     pdfControls.style.display = 'none';
@@ -243,7 +247,6 @@
             currentPdfId = pdfId;
             currentPdfRef = doc(currentProjectRef, "pdfs", pdfId);
 
-            // Actualizar el título de la página y el input
             pageTitleEl.textContent = pdfData.name;
             pdfTitleEl.value = pdfData.name;
             
@@ -305,16 +308,11 @@
             renderPage(pageNum);
         };
 
-        // Escuchamos el evento de click del botón "Mis PDFs"
         showSidebarBtn.addEventListener('click', () => {
-            if (sidebar.classList.contains('hidden')) {
-                sidebar.classList.remove('hidden');
-            } else {
-                sidebar.classList.add('hidden');
-            }
+            sidebar.classList.toggle('hidden');
         });
 
-        uploadPdfBtn.addEventListener('click', () => {
+        visualUploadBtn.addEventListener('click', () => {
             if (currentProjectRef) {
                 pdfFileInput.click();
             }
