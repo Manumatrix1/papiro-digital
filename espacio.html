@@ -20,13 +20,48 @@
             border-left: 4px solid #88c999;
             background-color: #2a2a2a;
         }
-        #pdf-render { 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5); 
+        #pdf-render {
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
             max-width: 100%;
             height: auto;
         }
-        #pdf-loader-container { 
-            display: none; 
+        #pdf-loader-container {
+            display: none;
+        }
+        /* Estilos para el sidebar en móvil */
+        @media (max-width: 767px) {
+            #sidebar {
+                position: fixed;
+                top: 56px; /* Altura del header */
+                left: 0;
+                bottom: 0;
+                width: 80%;
+                background-color: #181818;
+                z-index: 50;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease-in-out;
+            }
+            #sidebar.open {
+                transform: translateX(0);
+            }
+            #main-content {
+                flex: 1;
+                transition: margin-left 0.3s ease-in-out;
+                margin-left: 0;
+            }
+            #main-content.sidebar-open {
+                margin-left: 80%;
+            }
+        }
+        /* Ajustes para el header en móvil */
+        @media (max-width: 767px) {
+            header {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                z-index: 60;
+            }
         }
     </style>
 </head>
@@ -44,12 +79,18 @@
         
         <div class="flex items-center gap-2 sm:gap-4">
             <button id="save-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-3 sm:px-4 rounded-lg hover:brightness-110 transition text-sm sm:text-base">Guardar Título</button>
+            <button id="show-sidebar-btn" class="bg-[#2a2a2a] text-white font-bold py-2 px-3 sm:px-4 rounded-lg hover:brightness-110 transition text-sm sm:text-base">
+                <span class="hidden sm:inline">Mis PDFs</span>
+                <svg class="h-5 w-5 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
             <button id="logout-btn" class="text-gray-400 hover:text-white transition text-sm sm:text-base">Cerrar Sesión</button>
         </div>
     </header>
 
-    <main class="flex flex-1 overflow-hidden p-4 sm:p-8">
-        <aside id="sidebar" class="hidden sm:block w-full sm:w-64 bg-[#181818] border border-[#2a2a2a] rounded-lg p-4 mr-4 sm:mr-8 overflow-y-auto">
+    <main class="flex flex-1 overflow-hidden p-4 sm:p-8" id="main-content">
+        <aside id="sidebar" class="hidden w-full sm:w-64 bg-[#181818] border border-[#2a2a2a] rounded-lg p-4 mr-4 sm:mr-8 overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-lg font-semibold">Mis PDFs</h2>
             </div>
@@ -77,9 +118,9 @@
 
             <div id="pdf-viewer-container" class="mt-4 sm:mt-8 relative max-w-full w-full">
                 <div id="no-pdf-message" class="text-center text-gray-500 text-lg p-10 border border-dashed border-gray-700 rounded-lg" style="display: none;">
-                    <p>No hay PDFs en este tablero. Usa el botón "Nuevo PDF" para subir uno.</p>
+                    <p>No hay PDFs en este tablero. Usa el botón "Mis PDFs" para subir uno.</p>
                 </div>
-                
+
                 <canvas id="pdf-render" class="bg-[#181818] rounded-md"></canvas>
 
                 <div id="pdf-controls" class="mt-4 flex justify-center gap-4" style="display: none;">
@@ -105,6 +146,7 @@
         let pageNum = 1;
         let currentPdfId = null;
         let currentPdfRef = null;
+        let isSidebarOpen = false;
 
         const pageTitleEl = document.getElementById('page-title');
         const projectTitleEl = document.getElementById('project-title');
@@ -122,7 +164,9 @@
         const pageInfoSpan = document.getElementById('page-info');
         const pdfListContainer = document.getElementById('pdf-list');
         const sidebar = document.getElementById('sidebar');
+        const showSidebarBtn = document.getElementById('show-sidebar-btn');
         const visualUploadBtn = document.getElementById('visual-upload-btn');
+        const mainContent = document.querySelector('main');
 
         onAuthStateChanged(auth, async (user) => {
             currentUser = user;
@@ -173,9 +217,14 @@
                     });
 
                     if (!currentPdfId) {
-                        const firstPdf = querySnapshot.docs[0];
+                        const firstPdf = querySnapshot.docs.shift();
                         if (firstPdf) {
                             renderPdf(firstPdf.id, firstPdf.data());
+                        } else {
+                            noPdfMessage.style.display = 'block';
+                            pdfRenderCanvas.style.display = 'none';
+                            pdfControls.style.display = 'none';
+                            pageTitleEl.textContent = projectTitleEl.value;
                         }
                     } else {
                         document.querySelectorAll('.pdf-list-item').forEach(el => el.classList.remove('active'));
@@ -219,6 +268,9 @@
                 document.querySelectorAll('.pdf-list-item').forEach(el => el.classList.remove('active'));
                 pdfItemDiv.classList.add('active');
                 renderPdf(pdfId, pdfData);
+                if (window.innerWidth <= 767) {
+                    toggleSidebar();
+                }
             });
         };
 
@@ -234,8 +286,7 @@
                     pdfRenderCanvas.style.display = 'none';
                     pdfControls.style.display = 'none';
                     noPdfMessage.style.display = 'block';
-                    // Al borrar el PDF activo, el título de la página vuelve al del tablero
-                    // (el listener del proyecto se encarga de esto)
+                    pageTitleEl.textContent = projectTitleEl.value;
                     currentPdfId = null;
                     currentPdfRef = null;
                 }
@@ -248,7 +299,6 @@
         const renderPdf = (pdfId, pdfData) => {
             currentPdfId = pdfId;
             currentPdfRef = doc(currentProjectRef, "pdfs", pdfId);
-
             pageTitleEl.textContent = pdfData.name;
             noPdfMessage.style.display = 'none';
             pdfRenderCanvas.style.display = 'block';
@@ -279,7 +329,7 @@
                 const viewport = page.getViewport({ scale: 1 });
                 const scale = containerWidth / viewport.width;
                 const scaledViewport = page.getViewport({ scale });
-                
+
                 const context = pdfRenderCanvas.getContext('2d');
                 pdfRenderCanvas.height = scaledViewport.height;
                 pdfRenderCanvas.width = scaledViewport.width;
@@ -290,12 +340,12 @@
                 };
                 page.render(renderContext);
                 pageInfoSpan.textContent = `Página ${num} de ${pdfDoc.numPages}`;
-                
+
                 prevPageBtn.disabled = pageNum <= 1;
                 nextPageBtn.disabled = pageNum >= pdfDoc.numPages;
             });
         };
-        
+
         const onPrevPage = () => {
             if (pageNum <= 1) return;
             pageNum--;
@@ -307,6 +357,14 @@
             pageNum++;
             renderPage(pageNum);
         };
+
+        const toggleSidebar = () => {
+            isSidebarOpen = !isSidebarOpen;
+            sidebar.classList.toggle('open');
+            mainContent.classList.toggle('sidebar-open');
+        };
+
+        showSidebarBtn.addEventListener('click', toggleSidebar);
 
         visualUploadBtn.addEventListener('click', () => {
             if (currentProjectRef) {
@@ -325,20 +383,20 @@
             const storageRef = ref(storage, filePath);
             const uploadTask = uploadBytesResumable(storageRef, file);
 
-            uploadTask.on('state_changed', 
+            uploadTask.on('state_changed',
                 (snapshot) => {
                     const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
                     pdfLoaderText.textContent = `Subiendo PDF: ${Math.round(progress)}%`;
-                }, 
-                (error) => { 
-                    console.error("Error al subir:", error); 
-                    alert(`Hubo un error al subir el PDF. Si el archivo ya existe en este tablero, debes borrarlo primero. Error: ${error.message}`); 
-                    pdfLoaderContainer.style.display = 'none'; 
-                }, 
+                },
+                (error) => {
+                    console.error("Error al subir:", error);
+                    alert(`Hubo un error al subir el PDF. Si el archivo ya existe en este tablero, debes borrarlo primero. Error: ${error.message}`);
+                    pdfLoaderContainer.style.display = 'none';
+                },
                 async () => {
                     const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
                     const pdfsCollectionRef = collection(currentProjectRef, "pdfs");
-                    const newPdfRef = await addDoc(pdfsCollectionRef, { 
+                    const newPdfRef = await addDoc(pdfsCollectionRef, {
                         name: file.name,
                         url: downloadURL,
                         storagePath: filePath,
@@ -346,6 +404,9 @@
                     });
                     pdfLoaderContainer.style.display = 'none';
                     renderPdf(newPdfRef.id, { name: file.name, url: downloadURL });
+                    if (window.innerWidth <= 767) {
+                        toggleSidebar();
+                    }
                 }
             );
         });
@@ -357,13 +418,13 @@
             try {
                 await updateDoc(currentProjectRef, { name: projectTitleEl.value });
                 saveBtn.textContent = "¡Guardado!";
-                setTimeout(() => { 
-                    saveBtn.textContent = "Guardar Título"; 
+                setTimeout(() => {
+                    saveBtn.textContent = "Guardar Título";
                     saveBtn.disabled = false;
                 }, 2000);
-            } catch (error) { 
-                console.error("Error al guardar:", error); 
-                alert("No se pudo guardar el título del tablero."); 
+            } catch (error) {
+                console.error("Error al guardar:", error);
+                alert("No se pudo guardar el título del tablero.");
                 saveBtn.textContent = "Guardar Título";
                 saveBtn.disabled = false;
             }
