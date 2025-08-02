@@ -153,11 +153,11 @@
                     noPdfsMessageAside.style.display = 'none';
                     querySnapshot.forEach((doc) => {
                         const pdfData = doc.data();
-                        displayPdfItem(doc.id, pdfData);
+                        // CORRECCIÓN: Verificamos si los datos del PDF existen antes de mostrar
+                        if (pdfData && pdfData.name && pdfData.url) {
+                            displayPdfItem(doc.id, pdfData);
+                        }
                     });
-                    // Opcional: Cargar el primer PDF de la lista automáticamente
-                    // const firstPdf = querySnapshot.docs[0].data();
-                    // renderPdf(firstPdf.url);
                 }
             });
         });
@@ -179,7 +179,7 @@
             `;
             deleteBtn.className = 'ml-2';
             deleteBtn.addEventListener('click', (e) => {
-                e.stopPropagation(); // Evita que se active el evento de click del padre
+                e.stopPropagation();
                 if (confirm(`¿Estás seguro de que quieres borrar el PDF "${pdfData.name}"?`)) {
                     deletePdf(pdfId, pdfData.storagePath);
                 }
@@ -190,9 +190,7 @@
             pdfListContainer.appendChild(pdfItemDiv);
 
             pdfItemDiv.addEventListener('click', () => {
-                // Eliminar la clase 'active' de todos los elementos
                 document.querySelectorAll('.pdf-list-item').forEach(el => el.classList.remove('active'));
-                // Añadir la clase 'active' al elemento clicado
                 pdfItemDiv.classList.add('active');
                 renderPdf(pdfData.url);
             });
@@ -200,11 +198,9 @@
 
         const deletePdf = async (pdfId, storagePath) => {
             try {
-                // 1. Borrar el archivo de Firebase Storage
                 const fileRef = ref(storage, storagePath);
                 await deleteObject(fileRef);
 
-                // 2. Borrar el documento de la subcolección de Firestore
                 const pdfDocRef = doc(currentProjectRef, "pdfs", pdfId);
                 await deleteDoc(pdfDocRef);
             } catch (error) {
@@ -308,7 +304,6 @@
                         storagePath: filePath,
                         createdAt: new Date()
                     });
-                    // El listener onSnapshot se encargará de refrescar la lista.
                     pdfLoaderContainer.style.display = 'none';
                 }
             );
@@ -338,4 +333,8 @@
             window.location.href = 'index.html';
         });
 
-        prevPageBtn.addEventListener('click
+        prevPageBtn.addEventListener('click', onPrevPage);
+        nextPageBtn.addEventListener('click', onNextPage);
+    </script>
+</body>
+</html>
