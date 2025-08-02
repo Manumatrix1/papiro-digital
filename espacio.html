@@ -39,18 +39,20 @@
             <div class="flex justify-center"><canvas id="pdf-render"></canvas></div>
         </div>
     </main>
-    <script src="https://mozilla.github.io/pdf.js/build/pdf.js"></script>
     <script type="module">
         import { auth, db, storage } from './firebase-config.js';
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
         import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
         import { ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
+        
+        // Importación de pdf.js
+        import * as pdfjsLib from 'https://mozilla.github.io/pdf.js/build/pdf.js';
 
         const projectTitleEl = document.getElementById('project-title'), uploadContainer = document.getElementById('upload-container'), pdfInput = document.getElementById('pdf-input'), uploadBtn = document.getElementById('upload-btn'), pdfLoaderContainer = document.getElementById('pdf-loader-container'), progressBar = document.getElementById('progress-bar'), progressText = document.getElementById('progress-text'), viewerContainer = document.getElementById('viewer-container'), saveBtn = document.getElementById('save-btn'), prevPageBtn = document.getElementById('prev-page'), nextPageBtn = document.getElementById('next-page');
         let currentProjectRef = null, currentUser = null;
         
-        const { pdfjsLib } = window;
-        if (pdfjsLib) { pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://mozilla.github.io/pdf.js/build/pdf.worker.js'; }
+        // Configura el worker de pdf.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://mozilla.github.io/pdf.js/build/pdf.worker.js';
         
         let pdfDoc = null, pageNum = 1, pageRendering = false, pageNumPending = null;
         const scale = 1.5, canvas = document.getElementById('pdf-render'), ctx = canvas.getContext('2d');
@@ -76,13 +78,6 @@
         const onNextPage = () => { if (!pdfDoc || pageNum >= pdfDoc.numPages) return; pageNum++; queueRenderPage(pageNum); };
         
         async function loadPdf(url) {
-            if (!pdfjsLib) {
-                console.error("PDF.js no está cargado.");
-                document.getElementById('upload-message').textContent = "Error: La librería de PDF no está disponible.";
-                document.getElementById('upload-container').style.display = 'block';
-                return;
-            }
-            
             try {
                 const loadingTask = pdfjsLib.getDocument(url);
                 pdfDoc = await loadingTask.promise;
