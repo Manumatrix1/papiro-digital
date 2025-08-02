@@ -20,17 +20,26 @@
     </style>
 </head>
 <body class="text-white">
-    <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-8 flex justify-between items-center sticky top-0 z-10">
-        <input id="project-title" type="text" class="bg-transparent text-2xl font-bold text-white focus:outline-none" value="Cargando...">
+    <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-4 sm:px-8 flex justify-between items-center sticky top-0 z-10">
         <div class="flex items-center gap-4">
-            <button id="save-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-4 rounded-lg hover:brightness-110 transition">Guardar Título</button>
-            <button id="upload-pdf-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-4 rounded-lg hover:brightness-110 transition">Subir PDF</button>
+            <a href="mi_tablero.html" class="flex items-center text-gray-400 hover:text-white transition group">
+                <svg class="h-6 w-6 text-gray-400 group-hover:text-white transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                <span class="ml-2 font-medium hidden sm:inline">Mi Tablero</span>
+            </a>
+            <input id="project-title" type="text" class="bg-transparent text-xl sm:text-2xl font-bold text-white focus:outline-none w-auto sm:w-64 truncate" value="Cargando...">
+        </div>
+        
+        <div class="flex items-center gap-2 sm:gap-4">
+            <button id="save-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-3 sm:px-4 rounded-lg hover:brightness-110 transition text-sm sm:text-base">Guardar</button>
+            <button id="upload-pdf-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-3 sm:px-4 rounded-lg hover:brightness-110 transition text-sm sm:text-base">Subir PDF</button>
             <input type="file" id="pdf-file-input" class="hidden" accept="application/pdf">
-            <button id="logout-btn" class="text-gray-400 hover:text-white transition">Cerrar Sesión</button>
+            <button id="logout-btn" class="text-gray-400 hover:text-white transition text-sm sm:text-base">Cerrar Sesión</button>
         </div>
     </header>
 
-    <main class="flex flex-col items-center p-8 min-h-[calc(100vh-64px)]">
+    <main class="flex flex-col items-center p-4 sm:p-8 min-h-[calc(100vh-64px)]">
         
         <div id="pdf-loader-container" class="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
             <div class="text-center">
@@ -39,11 +48,11 @@
             </div>
         </div>
 
-        <div id="pdf-viewer-container" class="mt-8 relative max-w-4xl w-full">
+        <div id="pdf-viewer-container" class="mt-4 sm:mt-8 relative max-w-full w-full">
             <div id="no-pdf-message" class="text-center text-gray-500 text-lg p-10 border border-dashed border-gray-700 rounded-lg" style="display: none;">
                 <p>No hay un PDF cargado para este proyecto. Sube uno para empezar a trabajar.</p>
             </div>
-
+            
             <canvas id="pdf-render" class="bg-[#181818] rounded-md"></canvas>
 
             <div id="pdf-controls" class="mt-4 flex justify-center gap-4" style="display: none;">
@@ -60,14 +69,12 @@
         import { doc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
         import { ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
 
-        // CONFIGURACIÓN CLAVE PARA PDF.JS
-        // El experto en JavaScript nos dice que esto es crucial.
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
         let currentProjectRef = null;
         let currentUser = null;
-        let pdfDoc = null; // Objeto del PDF
-        let pageNum = 1; // Página actual
+        let pdfDoc = null;
+        let pageNum = 1;
         const projectTitleEl = document.getElementById('project-title');
         const uploadPdfBtn = document.getElementById('upload-pdf-btn');
         const pdfFileInput = document.getElementById('pdf-file-input');
@@ -98,16 +105,13 @@
 
             currentProjectRef = doc(db, "users", currentUser.uid, "projects", projectId);
             
-            // Usamos un listener en tiempo real para ver los cambios en el proyecto
             onSnapshot(currentProjectRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const projectData = docSnap.data();
                     projectTitleEl.value = projectData.name;
-                    // El experto en UX nos dice que rendericemos el PDF aquí
                     if (projectData.pdfUrl) {
                         renderPdf(projectData.pdfUrl);
                     } else {
-                        // Si no hay PDF, mostramos el mensaje
                         noPdfMessage.style.display = 'block';
                         pdfRenderCanvas.style.display = 'none';
                         pdfControls.style.display = 'none';
@@ -119,7 +123,7 @@
             });
         });
 
-        // Lógica de renderizado del PDF - ¡La parte que faltaba!
+        // Esta función se ha optimizado para que el PDF se adapte a la pantalla
         const renderPdf = (url) => {
             noPdfMessage.style.display = 'none';
             pdfRenderCanvas.style.display = 'block';
@@ -146,23 +150,29 @@
         const renderPage = (num) => {
             if (!pdfDoc) return;
             pdfDoc.getPage(num).then(function(page) {
-                const viewport = page.getViewport({ scale: 1.5 });
+                // Obtenemos el ancho del contenedor para calcular el 'viewport'
+                const containerWidth = document.getElementById('pdf-viewer-container').offsetWidth;
+                const viewport = page.getViewport({ scale: 1 });
+                const scale = containerWidth / viewport.width;
+                const scaledViewport = page.getViewport({ scale });
+                
                 const context = pdfRenderCanvas.getContext('2d');
-                pdfRenderCanvas.height = viewport.height;
-                pdfRenderCanvas.width = viewport.width;
+                pdfRenderCanvas.height = scaledViewport.height;
+                pdfRenderCanvas.width = scaledViewport.width;
 
                 const renderContext = {
                     canvasContext: context,
-                    viewport: viewport
+                    viewport: scaledViewport
                 };
                 page.render(renderContext);
                 pageInfoSpan.textContent = `Página ${num} de ${pdfDoc.numPages}`;
-                // Actualizar el estado de los botones de navegación
+                
                 prevPageBtn.disabled = pageNum <= 1;
                 nextPageBtn.disabled = pageNum >= pdfDoc.numPages;
             });
         };
-
+        
+        // El resto de tus funciones
         const onPrevPage = () => {
             if (pageNum <= 1) return;
             pageNum--;
@@ -203,11 +213,9 @@
                     pdfLoaderContainer.style.display = 'none'; 
                 }, 
                 async () => {
-                    // El experto en UX nos recomendó no recargar la página.
                     const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
                     await updateDoc(currentProjectRef, { pdfUrl: downloadURL });
-                    // No hace falta recargar la página, el listener onSnapshot lo hará por nosotros.
-                    // location.reload(); // Código eliminado
+                    // No hace falta recargar, el listener onSnapshot lo maneja.
                 }
             );
         });
@@ -220,13 +228,13 @@
                 await updateDoc(currentProjectRef, { name: projectTitleEl.value });
                 saveBtn.textContent = "¡Guardado!";
                 setTimeout(() => { 
-                    saveBtn.textContent = "Guardar Título"; 
+                    saveBtn.textContent = "Guardar"; 
                     saveBtn.disabled = false;
                 }, 2000);
             } catch (error) { 
                 console.error("Error al guardar:", error); 
                 alert("No se pudo guardar el título."); 
-                saveBtn.textContent = "Guardar Título";
+                saveBtn.textContent = "Guardar";
                 saveBtn.disabled = false;
             }
         });
