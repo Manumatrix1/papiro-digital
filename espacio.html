@@ -76,7 +76,6 @@
         const onNextPage = () => { if (!pdfDoc || pageNum >= pdfDoc.numPages) return; pageNum++; queueRenderPage(pageNum); };
         
         async function loadPdf(url) {
-            // Se asegura de que la librería PDF.js esté disponible
             if (!pdfjsLib) {
                 console.error("PDF.js no está cargado.");
                 document.getElementById('upload-message').textContent = "Error: La librería de PDF no está disponible.";
