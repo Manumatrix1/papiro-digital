@@ -70,7 +70,7 @@
     </header>
 
     <main class="flex flex-1 overflow-hidden p-4 sm:p-8" id="main-content">
-        <aside id="sidebar" class="hidden sm:block w-full sm:w-64 bg-[#181818] border border-[#2a2a2a] rounded-lg p-4 mr-4 sm:mr-8 overflow-y-auto">
+        <aside id="sidebar" class="hidden w-full sm:w-64 bg-[#181818] border border-[#2a2a2a] rounded-lg p-4 mr-4 sm:mr-8 overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-lg font-semibold">Mis PDFs</h2>
             </div>
@@ -210,7 +210,6 @@
                 pdfListDesktop.innerHTML = '';
                 pdfListMobile.innerHTML = '';
 
-                // Añadimos los botones de subir PDF a sus respectivos contenedores
                 pdfListDesktop.appendChild(visualUploadBtnDesktop);
                 pdfListMobile.appendChild(visualUploadBtnMobile);
 
@@ -297,6 +296,7 @@
             try {
                 const fileRef = ref(storage, storagePath);
                 await deleteObject(fileRef);
+
                 const pdfDocRef = doc(currentProjectRef, "pdfs", pdfId);
                 await deleteDoc(pdfDocRef);
 
@@ -344,7 +344,8 @@
         const renderPage = (num) => {
             if (!pdfDoc) return;
             pdfDoc.getPage(num).then(function(page) {
-                const containerWidth = document.getElementById('pdf-viewer-container').offsetWidth;
+                const viewerContainer = document.getElementById('pdf-viewer-container');
+                const containerWidth = viewerContainer.offsetWidth;
                 const viewport = page.getViewport({ scale: 1 });
                 const scale = containerWidth / viewport.width;
                 const scaledViewport = page.getViewport({ scale });
@@ -385,14 +386,12 @@
             mobileSidebarModal.classList.remove('open');
         };
 
+        // Escucha del botón "Mis PDFs" para abrir el modal en móvil
         showSidebarBtn.addEventListener('click', () => {
-            if (window.innerWidth <= 767) {
-                openModal();
-            } else {
-                sidebarDesktop.classList.toggle('hidden');
-            }
+            openModal();
         });
 
+        // Evento para cerrar el modal
         closeModalBtn.addEventListener('click', closeModal);
         mobileSidebarModal.addEventListener('click', (e) => {
             if (e.target.id === 'mobile-sidebar-modal') {
@@ -400,6 +399,7 @@
             }
         });
 
+        // Manejo de eventos de click para los botones de subir PDF
         visualUploadBtnDesktop.addEventListener('click', () => {
             if (currentProjectRef) {
                 pdfFileInputDesktop.click();
@@ -478,6 +478,13 @@
 
         prevPageBtn.addEventListener('click', onPrevPage);
         nextPageBtn.addEventListener('click', onNextPage);
+        
+        // Listener para redimensionar el PDF si el tamaño de la ventana cambia
+        window.addEventListener('resize', () => {
+            if (pdfDoc && currentPdfId) {
+                renderPage(pageNum);
+            }
+        });
     </script>
 </body>
 </html>
