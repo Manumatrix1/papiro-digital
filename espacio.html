@@ -28,23 +28,9 @@
         #pdf-loader-container {
             display: none;
         }
-        #mobile-sidebar-modal {
-            display: none;
-        }
-        #mobile-sidebar-modal.open {
-            display: flex;
-        }
-        @media (min-width: 768px) {
-            #mobile-sidebar-modal {
-                display: none !important;
-            }
-            #sidebar {
-                display: block !important;
-            }
-        }
         #cover-container {
             width: 100%;
-            height: 250px;
+            height: 150px; /* Altura más baja para móviles */
             background-color: #2a2a2a;
             position: relative;
             overflow: hidden;
@@ -52,12 +38,17 @@
             background-size: cover;
             background-position: center;
         }
+        @media (min-width: 640px) {
+            #cover-container {
+                height: 250px; /* Altura para escritorio */
+            }
+        }
         #pdf-viewer-container {
             display: none;
         }
     </style>
 </head>
-<body class="text-white flex flex-col h-screen">
+<body class="text-white flex flex-col min-h-screen">
     <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-4 sm:px-8 flex justify-between items-center sticky top-0 z-10">
         <div class="flex items-center gap-4">
             <a href="mi_tablero.html" class="flex items-center text-gray-400 hover:text-white transition group">
@@ -71,110 +62,74 @@
         
         <div class="flex items-center gap-2 sm:gap-4">
             <button id="save-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-3 sm:px-4 rounded-lg hover:brightness-110 transition text-sm sm:text-base">Guardar Título</button>
-            <button id="show-sidebar-btn" class="bg-[#2a2a2a] text-white font-bold py-2 px-3 sm:px-4 rounded-lg hover:brightness-110 transition text-sm sm:text-base">
-                <span class="hidden sm:inline">Mis PDFs</span>
-                <svg class="h-5 w-5 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-            </button>
             <button id="logout-btn" class="text-gray-400 hover:text-white transition text-sm sm:text-base">Cerrar Sesión</button>
         </div>
     </header>
 
-    <main class="flex flex-1 overflow-hidden p-4 sm:p-8" id="main-content">
-        <aside id="sidebar" class="hidden w-full sm:w-64 bg-[#181818] border border-[#2a2a2a] rounded-lg p-4 mr-4 sm:mr-8 overflow-y-auto">
+    <main class="flex-1 flex flex-col items-center overflow-auto p-4 sm:p-8" id="main-content">
+        <div id="cover-section" class="w-full max-w-4xl flex justify-center items-center">
+            <div id="cover-container" class="relative group w-full flex items-center justify-center rounded-lg">
+                <div class="absolute inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center text-center p-4 transition-opacity">
+                    <span id="cover-placeholder" class="text-xl font-bold text-gray-300 mb-2">Añadir Portada</span>
+                    <p class="text-sm text-gray-400 mb-4">Haz clic para añadir o cambiar la portada.<br>(Recomendado: 1200x400 px)</p>
+                    <button id="upload-cover-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-4 rounded-lg hover:brightness-110 transition text-sm">
+                        Subir Imagen
+                    </button>
+                    <input type="file" id="cover-file-input" class="hidden" accept="image/*">
+                </div>
+            </div>
+        </div>
+
+        <div id="pdfs-section" class="w-full max-w-4xl mt-8">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-lg font-semibold">Mis PDFs</h2>
             </div>
-            <div id="pdf-list-desktop" class="space-y-2">
-                <div class="flex flex-col items-center p-4 border border-dashed border-gray-600 rounded-lg text-gray-400 hover:bg-[#2a2a2a] transition cursor-pointer" id="visual-upload-btn-desktop">
+            <div id="pdf-list" class="space-y-2">
+                <div class="flex flex-col items-center p-4 border border-dashed border-gray-600 rounded-lg text-gray-400 hover:bg-[#2a2a2a] transition cursor-pointer" id="visual-upload-btn">
                     <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
                     <span class="text-sm mt-2">Nuevo PDF</span>
                 </div>
             </div>
-            <input type="file" id="pdf-file-input-desktop" class="hidden" accept="application/pdf">
-            <div id="no-pdfs-message-desktop" class="text-gray-500 text-sm mt-4" style="display: none;">
+            <input type="file" id="pdf-file-input" class="hidden" accept="application/pdf">
+            <div id="no-pdfs-message" class="text-gray-500 text-sm mt-4" style="display: none;">
                 No hay PDFs en este tablero.
-            </div>
-        </aside>
-
-        <div id="mobile-sidebar-modal" class="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
-            <div class="bg-[#181818] w-11/12 max-w-sm rounded-lg p-6 relative">
-                <button id="close-modal-btn" class="absolute top-4 right-4 text-gray-400 hover:text-white">
-                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-                <h2 class="text-lg font-semibold mb-4">Mis PDFs</h2>
-                <div id="pdf-list-mobile" class="space-y-2 max-h-96 overflow-y-auto">
-                    <div class="flex flex-col items-center p-4 border border-dashed border-gray-600 rounded-lg text-gray-400 hover:bg-[#2a2a2a] transition cursor-pointer" id="visual-upload-btn-mobile">
-                        <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
-                        <span class="text-sm mt-2">Nuevo PDF</span>
-                    </div>
-                </div>
-                <input type="file" id="pdf-file-input-mobile" class="hidden" accept="application/pdf">
-                <div id="no-pdfs-message-mobile" class="text-gray-500 text-sm mt-4" style="display: none;">
-                    No hay PDFs en este tablero.
-                </div>
             </div>
         </div>
 
-        <div id="main-content-area" class="flex-1 flex flex-col items-center overflow-auto">
-            <div id="cover-section" class="w-full flex justify-center items-center p-4 sm:p-0">
-                <div id="cover-container" class="relative group w-full max-w-4xl h-64 sm:h-96 flex items-center justify-center rounded-lg">
-                    <div class="absolute inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center text-center p-4 opacity-100 transition-opacity">
-                        <span id="cover-placeholder" class="text-xl font-bold text-gray-300 mb-2">Añadir Portada</span>
-                        <p class="text-sm text-gray-400 mb-4">Haz clic o arrastra una imagen aquí.<br>(Recomendado: 1200x400 px)</p>
-                        <button id="upload-cover-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-4 rounded-lg hover:brightness-110 transition text-sm">
-                            Subir Imagen
-                        </button>
-                        <input type="file" id="cover-file-input" class="hidden" accept="image/*">
-                    </div>
-                </div>
+        <div id="pdf-loader-container" class="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
+            <div class="text-center">
+                <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#88c999]"></div>
+                <p id="pdf-loader-text" class="mt-4 text-xl">Cargando PDF...</p>
             </div>
+        </div>
 
-            <div id="pdf-loader-container" class="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
-                <div class="text-center">
-                    <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#88c999]"></div>
-                    <p id="pdf-loader-text" class="mt-4 text-xl">Cargando PDF...</p>
-                </div>
-            </div>
-            
-            <div id="pdf-viewer-container" class="mt-4 sm:mt-8 relative max-w-full w-full">
-                <div id="no-pdf-message" class="text-center text-gray-500 text-lg p-10 border border-dashed border-gray-700 rounded-lg" style="display: none;">
-                    <p>No hay PDFs en este tablero. Usa el botón "Mis PDFs" para subir uno.</p>
-                </div>
-                
-                <canvas id="pdf-render" class="bg-[#181818] rounded-md"></canvas>
-                
-                <div id="pdf-controls" class="mt-4 flex justify-center gap-4" style="display: none;">
-                    <button id="prev-page-btn" class="bg-[#2a2a2a] text-white px-4 py-2 rounded-lg hover:bg-[#3a3a3a]">Página Anterior</button>
-                    <span id="page-info" class="self-center"></span>
-                    <button id="next-page-btn" class="bg-[#2a2a3a] text-white px-4 py-2 rounded-lg hover:bg-[#3a3a3a]">Página Siguiente</button>
-                </div>
+        <div id="pdf-viewer-container" class="mt-4 sm:mt-8 relative w-full">
+            <canvas id="pdf-render" class="bg-[#181818] rounded-md"></canvas>
+            <div id="pdf-controls" class="mt-4 flex justify-center gap-4" style="display: none;">
+                <button id="prev-page-btn" class="bg-[#2a2a2a] text-white px-4 py-2 rounded-lg hover:bg-[#3a3a3a]">Página Anterior</button>
+                <span id="page-info" class="self-center"></span>
+                <button id="next-page-btn" class="bg-[#2a2a3a] text-white px-4 py-2 rounded-lg hover:bg-[#3a3a3a]">Página Siguiente</button>
             </div>
         </div>
     </main>
-    
+
     <script type="module">
         import { auth, db, storage } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
         import { doc, updateDoc, onSnapshot, collection, addDoc, query, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
         import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
-        
+
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-        
+
         let currentProjectRef = null;
         let currentUser = null;
         let pdfDoc = null;
         let pageNum = 1;
         let currentPdfId = null;
         let currentPdfRef = null;
-        
+
         const pageTitleEl = document.getElementById('page-title');
         const projectTitleEl = document.getElementById('project-title');
         const pdfLoaderContainer = document.getElementById('pdf-loader-container');
@@ -182,7 +137,6 @@
         const saveBtn = document.getElementById('save-btn');
         const logoutBtn = document.getElementById('logout-btn');
         const pdfRenderCanvas = document.getElementById('pdf-render');
-        const noPdfMessage = document.getElementById('no-pdf-message');
         const pdfControls = document.getElementById('pdf-controls');
         const prevPageBtn = document.getElementById('prev-page-btn');
         const nextPageBtn = document.getElementById('next-page-btn');
@@ -193,7 +147,7 @@
         const coverPlaceholder = document.getElementById('cover-placeholder');
         const uploadCoverBtn = document.getElementById('upload-cover-btn');
         const coverFileInput = document.getElementById('cover-file-input');
-        
+
         const pdfsSection = document.getElementById('pdfs-section');
         const pdfList = document.getElementById('pdf-list');
         const visualUploadBtn = document.getElementById('visual-upload-btn');
@@ -208,14 +162,14 @@
                 window.location.href = 'index.html';
                 return;
             }
-        
+
             const urlParams = new URLSearchParams(window.location.search);
             const projectId = urlParams.get('id');
             if (!projectId) {
                 window.location.href = 'mi_tablero.html';
                 return;
             }
-        
+
             currentProjectRef = doc(db, "users", currentUser.uid, "projects", projectId);
             
             onSnapshot(currentProjectRef, (docSnap) => {
@@ -240,7 +194,7 @@
                     window.location.href = 'mi_tablero.html';
                 }
             });
-        
+
             const pdfsCollectionRef = collection(currentProjectRef, "pdfs");
             const q = query(pdfsCollectionRef, orderBy("createdAt", "desc"));
             onSnapshot(q, (querySnapshot) => {
@@ -249,14 +203,11 @@
 
                 if (querySnapshot.empty) {
                     noPdfsMessage.style.display = 'block';
-                    pdfsSection.style.display = 'block';
+                    // Al no haber PDFs, solo mostramos la portada y la lista vacía
                     pdfViewerContainer.style.display = 'none';
                     coverSection.style.display = 'flex';
                 } else {
                     noPdfsMessage.style.display = 'none';
-                    pdfsSection.style.display = 'block';
-                    coverSection.style.display = 'flex';
-                    pdfViewerContainer.style.display = 'none';
                     querySnapshot.forEach((doc) => {
                         const pdfData = doc.data();
                         if (pdfData && pdfData.name && pdfData.url) {
