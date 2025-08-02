@@ -128,7 +128,6 @@
 
             currentProjectRef = doc(db, "users", currentUser.uid, "projects", projectId);
             
-            // Listener para el nombre del proyecto
             onSnapshot(currentProjectRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const projectData = docSnap.data();
@@ -139,7 +138,6 @@
                 }
             });
 
-            // Listener para la lista de PDFs del proyecto
             const pdfsCollectionRef = collection(currentProjectRef, "pdfs");
             const q = query(pdfsCollectionRef, orderBy("createdAt", "desc"));
             onSnapshot(q, (querySnapshot) => {
@@ -153,7 +151,6 @@
                     noPdfsMessageAside.style.display = 'none';
                     querySnapshot.forEach((doc) => {
                         const pdfData = doc.data();
-                        // CORRECCIÓN: Verificamos si los datos del PDF existen antes de mostrar
                         if (pdfData && pdfData.name && pdfData.url) {
                             displayPdfItem(doc.id, pdfData);
                         }
@@ -281,6 +278,7 @@
             pdfLoaderText.textContent = "Subiendo PDF...";
             pdfLoaderContainer.style.display = 'flex';
 
+            // CORRECCIÓN: La ruta de Storage ahora incluye el ID del proyecto
             const filePath = `${currentUser.uid}/${currentProjectRef.id}/${file.name}`;
             const storageRef = ref(storage, filePath);
             const uploadTask = uploadBytesResumable(storageRef, file);
@@ -292,7 +290,7 @@
                 }, 
                 (error) => { 
                     console.error("Error al subir:", error); 
-                    alert("Hubo un error al subir el PDF."); 
+                    alert(`Hubo un error al subir el PDF. Si el archivo ya existe en este tablero, debes borrarlo primero. Error: ${error.message}`); 
                     pdfLoaderContainer.style.display = 'none'; 
                 }, 
                 async () => {
