@@ -83,12 +83,21 @@
             projectLink.className = 'project-card flex flex-col bg-[#181818] rounded-lg p-4 sm:p-6 shadow-lg hover:bg-[#2a2a2a] relative';
 
             const coverDiv = document.createElement('div');
-            coverDiv.className = 'w-full h-24 sm:h-32 bg-[#2a2a2a] rounded-md mb-4 flex items-center justify-center';
-            const placeholder = document.createElement('span');
-            placeholder.className = 'text-gray-500 text-sm sm:text-base';
-            placeholder.textContent = 'Portada';
-            coverDiv.appendChild(placeholder);
+            coverDiv.className = 'w-full h-24 sm:h-32 bg-[#2a2a2a] rounded-md mb-4 flex items-center justify-center relative overflow-hidden';
             
+            // Lógica para mostrar la imagen de portada
+            if (projectData.coverUrl) {
+                const coverImage = document.createElement('img');
+                coverImage.src = projectData.coverUrl;
+                coverImage.className = 'w-full h-full object-cover absolute inset-0';
+                coverDiv.appendChild(coverImage);
+            } else {
+                const placeholder = document.createElement('span');
+                placeholder.className = 'text-gray-500 text-sm sm:text-base';
+                placeholder.textContent = 'Portada';
+                coverDiv.appendChild(placeholder);
+            }
+
             const projectHeaderDiv = document.createElement('div');
             projectHeaderDiv.className = 'flex justify-between items-start w-full';
 
@@ -122,7 +131,7 @@
             deleteBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 if (confirm(`¿Estás seguro de que quieres borrar el tablero "${projectData.name}"? Esta acción no se puede deshacer.`)) {
-                    deleteProject(projectId);
+                    deleteProject(projectId, projectData.coverUrl);
                 }
             });
             
@@ -149,16 +158,26 @@
             }
         };
 
-        const deleteProject = async (projectId) => {
+        // Función de borrado actualizada para borrar la portada también
+        const deleteProject = async (projectId, coverUrl) => {
             try {
+                // 1. Borrar la portada si existe
+                if (coverUrl) {
+                    const coverRef = ref(storage, coverUrl);
+                    await deleteObject(coverRef);
+                }
+
+                // 2. Borrar todos los archivos del Storage asociados al proyecto
                 const projectStorageRef = ref(storage, `${currentUser.uid}/${projectId}`);
                 const filesList = await listAll(projectStorageRef);
                 await Promise.all(filesList.items.map(fileRef => deleteObject(fileRef)));
 
+                // 3. Borrar todos los documentos de la subcolección 'pdfs' en Firestore
                 const pdfsCollectionRef = collection(db, "users", currentUser.uid, "projects", projectId, "pdfs");
                 const pdfDocsSnapshot = await getDocs(pdfsCollectionRef);
                 await Promise.all(pdfDocsSnapshot.docs.map(pdfDoc => deleteDoc(pdfDoc.ref)));
 
+                // 4. Finalmente, borrar el documento principal del proyecto
                 const projectDocRef = doc(db, "users", currentUser.uid, "projects", projectId);
                 await deleteDoc(projectDocRef);
 
