@@ -43,21 +43,6 @@
                 display: block !important;
             }
         }
-        /* Estilos para el contenedor de la portada */
-        #cover-container {
-            width: 100%;
-            height: 250px;
-            background-color: #2a2a2a;
-            position: relative;
-            overflow: hidden;
-            border-radius: 8px;
-        }
-        #cover-image {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: none; /* Oculto por defecto */
-        }
     </style>
 </head>
 <body class="text-white flex flex-col h-screen">
@@ -128,11 +113,10 @@
 
         <div class="flex-1 flex flex-col items-center overflow-auto">
             <div id="cover-section" class="w-full flex justify-center items-center p-4 sm:p-0">
-                <div id="cover-container" class="relative group">
-                    <img id="cover-image" class="w-full h-full object-cover">
-                    <div id="cover-overlay" class="absolute inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center text-center p-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <span id="cover-placeholder" class="text-lg font-bold text-gray-300 mb-2">Añadir Portada</span>
-                        <p class="text-sm text-gray-400 mb-4">Haz clic o arrastra una imagen aquí.</p>
+                <div id="cover-container" class="relative group w-full max-w-4xl h-64 sm:h-96 bg-[#2a2a2a] flex items-center justify-center rounded-lg">
+                    <div class="absolute inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center text-center p-4 opacity-100 transition-opacity">
+                        <span id="cover-placeholder" class="text-xl font-bold text-gray-300 mb-2">Añadir Portada</span>
+                        <p class="text-sm text-gray-400 mb-4">Haz clic o arrastra una imagen aquí.<br>(Recomendado: 1200x400 px)</p>
                         <button id="upload-cover-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-4 rounded-lg hover:brightness-110 transition text-sm">
                             Subir Imagen
                         </button>
@@ -140,7 +124,7 @@
                     </div>
                 </div>
             </div>
-
+            
             <div id="pdf-loader-container" class="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
                 <div class="text-center">
                     <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#88c999]"></div>
@@ -212,6 +196,7 @@
         const coverPlaceholder = document.getElementById('cover-placeholder');
         const uploadCoverBtn = document.getElementById('upload-cover-btn');
         const coverFileInput = document.getElementById('cover-file-input');
+        const coverSection = document.getElementById('cover-section');
 
         onAuthStateChanged(auth, async (user) => {
             currentUser = user;
@@ -237,12 +222,17 @@
                     
                     // Lógica para mostrar la portada
                     if (projectData.coverUrl) {
-                        coverImage.src = projectData.coverUrl;
-                        coverImage.style.display = 'block';
-                        coverPlaceholder.style.display = 'none';
+                        coverContainer.style.backgroundImage = `url('${projectData.coverUrl}')`;
+                        coverContainer.style.backgroundSize = 'cover';
+                        coverContainer.style.backgroundPosition = 'center';
+                        coverContainer.classList.remove('bg-[#2a2a2a]');
+                        coverPlaceholder.parentElement.classList.add('opacity-0');
+                        coverPlaceholder.textContent = 'Cambiar Portada';
                     } else {
-                        coverImage.style.display = 'none';
-                        coverPlaceholder.style.display = 'block';
+                        coverContainer.style.backgroundImage = 'none';
+                        coverContainer.classList.add('bg-[#2a2a2a]');
+                        coverPlaceholder.parentElement.classList.remove('opacity-0');
+                        coverPlaceholder.textContent = 'Añadir Portada';
                     }
 
                 } else {
@@ -266,9 +256,12 @@
                     noPdfMessage.style.display = 'block';
                     pdfRenderCanvas.style.display = 'none';
                     pdfControls.style.display = 'none';
+                    coverSection.style.display = 'flex'; // Mostrar la portada si no hay PDFs
                 } else {
                     noPdfsMessageDesktop.style.display = 'none';
                     noPdfsMessageMobile.style.display = 'none';
+                    noPdfMessage.style.display = 'none';
+                    coverSection.style.display = 'none'; // Ocultar la portada si hay PDFs
                     querySnapshot.forEach((doc) => {
                         const pdfData = doc.data();
                         if (pdfData && pdfData.name && pdfData.url) {
@@ -449,7 +442,6 @@
             }
         });
         
-        // Manejo de la subida de portada
         uploadCoverBtn.addEventListener('click', () => {
             coverFileInput.click();
         });
