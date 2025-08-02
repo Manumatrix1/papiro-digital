@@ -28,39 +28,19 @@
         #pdf-loader-container {
             display: none;
         }
-        /* Estilos para el sidebar en móvil */
-        @media (max-width: 767px) {
-            #sidebar {
-                position: fixed;
-                top: 56px; /* Altura del header */
-                left: 0;
-                bottom: 0;
-                width: 80%;
-                background-color: #181818;
-                z-index: 50;
-                transform: translateX(-100%);
-                transition: transform 0.3s ease-in-out;
-            }
-            #sidebar.open {
-                transform: translateX(0);
-            }
-            #main-content {
-                flex: 1;
-                transition: margin-left 0.3s ease-in-out;
-                margin-left: 0;
-            }
-            #main-content.sidebar-open {
-                margin-left: 80%;
-            }
+        /* Estilos del modal para móvil y escritorio */
+        #mobile-sidebar-modal {
+            display: none;
         }
-        /* Ajustes para el header en móvil */
-        @media (max-width: 767px) {
-            header {
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                z-index: 60;
+        #mobile-sidebar-modal.open {
+            display: flex;
+        }
+        @media (min-width: 768px) {
+            #mobile-sidebar-modal {
+                display: none !important;
+            }
+            #sidebar {
+                display: block !important;
             }
         }
     </style>
@@ -76,7 +56,7 @@
             </a>
             <input id="project-title" type="text" class="bg-transparent text-xl sm:text-2xl font-bold text-white focus:outline-none w-full truncate" value="Cargando...">
         </div>
-        
+
         <div class="flex items-center gap-2 sm:gap-4">
             <button id="save-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-3 sm:px-4 rounded-lg hover:brightness-110 transition text-sm sm:text-base">Guardar Título</button>
             <button id="show-sidebar-btn" class="bg-[#2a2a2a] text-white font-bold py-2 px-3 sm:px-4 rounded-lg hover:brightness-110 transition text-sm sm:text-base">
@@ -90,23 +70,46 @@
     </header>
 
     <main class="flex flex-1 overflow-hidden p-4 sm:p-8" id="main-content">
-        <aside id="sidebar" class="hidden w-full sm:w-64 bg-[#181818] border border-[#2a2a2a] rounded-lg p-4 mr-4 sm:mr-8 overflow-y-auto">
+        <aside id="sidebar" class="hidden sm:block w-full sm:w-64 bg-[#181818] border border-[#2a2a2a] rounded-lg p-4 mr-4 sm:mr-8 overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-lg font-semibold">Mis PDFs</h2>
             </div>
-            <div id="pdf-list" class="space-y-2">
-                <div class="flex flex-col items-center p-4 border border-dashed border-gray-600 rounded-lg text-gray-400 hover:bg-[#2a2a2a] transition cursor-pointer" id="visual-upload-btn">
+            <div id="pdf-list-desktop" class="space-y-2">
+                <div class="flex flex-col items-center p-4 border border-dashed border-gray-600 rounded-lg text-gray-400 hover:bg-[#2a2a2a] transition cursor-pointer" id="visual-upload-btn-desktop">
                     <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
                     <span class="text-sm mt-2">Nuevo PDF</span>
                 </div>
             </div>
-            <input type="file" id="pdf-file-input" class="hidden" accept="application/pdf">
-            <div id="no-pdfs-message" class="text-gray-500 text-sm mt-4" style="display: none;">
+            <input type="file" id="pdf-file-input-desktop" class="hidden" accept="application/pdf">
+            <div id="no-pdfs-message-desktop" class="text-gray-500 text-sm mt-4" style="display: none;">
                 No hay PDFs en este tablero.
             </div>
         </aside>
+
+        <div id="mobile-sidebar-modal" class="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
+            <div class="bg-[#181818] w-11/12 max-w-sm rounded-lg p-6 relative">
+                <button id="close-modal-btn" class="absolute top-4 right-4 text-gray-400 hover:text-white">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+                <h2 class="text-lg font-semibold mb-4">Mis PDFs</h2>
+                <div id="pdf-list-mobile" class="space-y-2 max-h-96 overflow-y-auto">
+                    <div class="flex flex-col items-center p-4 border border-dashed border-gray-600 rounded-lg text-gray-400 hover:bg-[#2a2a2a] transition cursor-pointer" id="visual-upload-btn-mobile">
+                        <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        <span class="text-sm mt-2">Nuevo PDF</span>
+                    </div>
+                </div>
+                <input type="file" id="pdf-file-input-mobile" class="hidden" accept="application/pdf">
+                <div id="no-pdfs-message-mobile" class="text-gray-500 text-sm mt-4" style="display: none;">
+                    No hay PDFs en este tablero.
+                </div>
+            </div>
+        </div>
 
         <div class="flex-1 flex flex-col items-center overflow-auto">
             <div id="pdf-loader-container" class="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
@@ -146,26 +149,32 @@
         let pageNum = 1;
         let currentPdfId = null;
         let currentPdfRef = null;
-        let isSidebarOpen = false;
 
         const pageTitleEl = document.getElementById('page-title');
         const projectTitleEl = document.getElementById('project-title');
-        const pdfFileInput = document.getElementById('pdf-file-input');
         const pdfLoaderContainer = document.getElementById('pdf-loader-container');
         const pdfLoaderText = document.getElementById('pdf-loader-text');
         const saveBtn = document.getElementById('save-btn');
         const logoutBtn = document.getElementById('logout-btn');
         const pdfRenderCanvas = document.getElementById('pdf-render');
         const noPdfMessage = document.getElementById('no-pdf-message');
-        const noPdfsMessageAside = document.getElementById('no-pdfs-message');
         const pdfControls = document.getElementById('pdf-controls');
         const prevPageBtn = document.getElementById('prev-page-btn');
         const nextPageBtn = document.getElementById('next-page-btn');
         const pageInfoSpan = document.getElementById('page-info');
-        const pdfListContainer = document.getElementById('pdf-list');
-        const sidebar = document.getElementById('sidebar');
+        const sidebarDesktop = document.getElementById('sidebar');
+        const pdfListDesktop = document.getElementById('pdf-list-desktop');
+        const noPdfsMessageDesktop = document.getElementById('no-pdfs-message-desktop');
+        const visualUploadBtnDesktop = document.getElementById('visual-upload-btn-desktop');
+        const pdfFileInputDesktop = document.getElementById('pdf-file-input-desktop');
+
         const showSidebarBtn = document.getElementById('show-sidebar-btn');
-        const visualUploadBtn = document.getElementById('visual-upload-btn');
+        const mobileSidebarModal = document.getElementById('mobile-sidebar-modal');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const pdfListMobile = document.getElementById('pdf-list-mobile');
+        const visualUploadBtnMobile = document.getElementById('visual-upload-btn-mobile');
+        const pdfFileInputMobile = document.getElementById('pdf-file-input-mobile');
+        const noPdfsMessageMobile = document.getElementById('no-pdfs-message-mobile');
         const mainContent = document.querySelector('main');
 
         onAuthStateChanged(auth, async (user) => {
@@ -184,7 +193,6 @@
 
             currentProjectRef = doc(db, "users", currentUser.uid, "projects", projectId);
             
-            // Listener para el nombre del proyecto y el título de la página
             onSnapshot(currentProjectRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const projectData = docSnap.data();
@@ -199,20 +207,27 @@
             const pdfsCollectionRef = collection(currentProjectRef, "pdfs");
             const q = query(pdfsCollectionRef, orderBy("createdAt", "desc"));
             onSnapshot(q, (querySnapshot) => {
-                pdfListContainer.innerHTML = '';
-                pdfListContainer.appendChild(visualUploadBtn);
+                pdfListDesktop.innerHTML = '';
+                pdfListMobile.innerHTML = '';
+
+                // Añadimos los botones de subir PDF a sus respectivos contenedores
+                pdfListDesktop.appendChild(visualUploadBtnDesktop);
+                pdfListMobile.appendChild(visualUploadBtnMobile);
 
                 if (querySnapshot.empty) {
-                    noPdfsMessageAside.style.display = 'block';
+                    noPdfsMessageDesktop.style.display = 'block';
+                    noPdfsMessageMobile.style.display = 'block';
                     noPdfMessage.style.display = 'block';
                     pdfRenderCanvas.style.display = 'none';
                     pdfControls.style.display = 'none';
                 } else {
-                    noPdfsMessageAside.style.display = 'none';
+                    noPdfsMessageDesktop.style.display = 'none';
+                    noPdfsMessageMobile.style.display = 'none';
                     querySnapshot.forEach((doc) => {
                         const pdfData = doc.data();
                         if (pdfData && pdfData.name && pdfData.url) {
-                            displayPdfItem(doc.id, pdfData);
+                            displayPdfItem(doc.id, pdfData, 'desktop');
+                            displayPdfItem(doc.id, pdfData, 'mobile');
                         }
                     });
 
@@ -220,6 +235,7 @@
                         const firstPdf = querySnapshot.docs.shift();
                         if (firstPdf) {
                             renderPdf(firstPdf.id, firstPdf.data());
+                            document.querySelector(`.pdf-list-item[data-pdf-id='${firstPdf.id}']`)?.classList.add('active');
                         } else {
                             noPdfMessage.style.display = 'block';
                             pdfRenderCanvas.style.display = 'none';
@@ -237,7 +253,7 @@
             });
         });
 
-        const displayPdfItem = (pdfId, pdfData) => {
+        const displayPdfItem = (pdfId, pdfData, target) => {
             const pdfItemDiv = document.createElement('div');
             pdfItemDiv.className = 'pdf-list-item flex items-center justify-between p-2 rounded-md';
             pdfItemDiv.setAttribute('data-pdf-id', pdfId);
@@ -262,15 +278,18 @@
 
             pdfItemDiv.appendChild(pdfNameSpan);
             pdfItemDiv.appendChild(deleteBtn);
-            pdfListContainer.appendChild(pdfItemDiv);
+
+            if (target === 'desktop') {
+                pdfListDesktop.appendChild(pdfItemDiv);
+            } else {
+                pdfListMobile.appendChild(pdfItemDiv);
+            }
 
             pdfItemDiv.addEventListener('click', () => {
                 document.querySelectorAll('.pdf-list-item').forEach(el => el.classList.remove('active'));
-                pdfItemDiv.classList.add('active');
+                document.querySelectorAll(`.pdf-list-item[data-pdf-id='${pdfId}']`).forEach(el => el.classList.add('active'));
                 renderPdf(pdfId, pdfData);
-                if (window.innerWidth <= 767) {
-                    toggleSidebar();
-                }
+                closeModal();
             });
         };
 
@@ -278,7 +297,6 @@
             try {
                 const fileRef = ref(storage, storagePath);
                 await deleteObject(fileRef);
-
                 const pdfDocRef = doc(currentProjectRef, "pdfs", pdfId);
                 await deleteDoc(pdfDocRef);
 
@@ -299,6 +317,7 @@
         const renderPdf = (pdfId, pdfData) => {
             currentPdfId = pdfId;
             currentPdfRef = doc(currentProjectRef, "pdfs", pdfId);
+
             pageTitleEl.textContent = pdfData.name;
             noPdfMessage.style.display = 'none';
             pdfRenderCanvas.style.display = 'block';
@@ -358,21 +377,45 @@
             renderPage(pageNum);
         };
 
-        const toggleSidebar = () => {
-            isSidebarOpen = !isSidebarOpen;
-            sidebar.classList.toggle('open');
-            mainContent.classList.toggle('sidebar-open');
+        const openModal = () => {
+            mobileSidebarModal.classList.add('open');
         };
 
-        showSidebarBtn.addEventListener('click', toggleSidebar);
+        const closeModal = () => {
+            mobileSidebarModal.classList.remove('open');
+        };
 
-        visualUploadBtn.addEventListener('click', () => {
-            if (currentProjectRef) {
-                pdfFileInput.click();
+        showSidebarBtn.addEventListener('click', () => {
+            if (window.innerWidth <= 767) {
+                openModal();
+            } else {
+                sidebarDesktop.classList.toggle('hidden');
             }
         });
 
-        pdfFileInput.addEventListener('change', (e) => {
+        closeModalBtn.addEventListener('click', closeModal);
+        mobileSidebarModal.addEventListener('click', (e) => {
+            if (e.target.id === 'mobile-sidebar-modal') {
+                closeModal();
+            }
+        });
+
+        visualUploadBtnDesktop.addEventListener('click', () => {
+            if (currentProjectRef) {
+                pdfFileInputDesktop.click();
+            }
+        });
+
+        visualUploadBtnMobile.addEventListener('click', () => {
+            if (currentProjectRef) {
+                pdfFileInputMobile.click();
+            }
+        });
+
+        pdfFileInputDesktop.addEventListener('change', (e) => handleFileUpload(e, 'desktop'));
+        pdfFileInputMobile.addEventListener('change', (e) => handleFileUpload(e, 'mobile'));
+
+        const handleFileUpload = (e, source) => {
             const file = e.target.files[0];
             if (!file) return;
 
@@ -404,12 +447,10 @@
                     });
                     pdfLoaderContainer.style.display = 'none';
                     renderPdf(newPdfRef.id, { name: file.name, url: downloadURL });
-                    if (window.innerWidth <= 767) {
-                        toggleSidebar();
-                    }
+                    closeModal(); // Asegurarse de que el modal se cierre
                 }
             );
-        });
+        };
 
         saveBtn.addEventListener('click', async () => {
             if (!currentProjectRef) return;
