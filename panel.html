@@ -31,55 +31,34 @@
             </div>
     </main>
 
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
-
-    <script>
-        // Configuración de Firebase
-        const firebaseConfig = {
-            apiKey: "AIzaSyDhcJyTriTBrEDftDx_lYAhFgd6Y8Us4dA",
-            authDomain: "papirodigital-1a6c5.firebaseapp.com",
-            projectId: "papirodigital-1a6c5",
-            storageBucket: "papirodigital-1a6c5.appspot.com",
-            messagingSenderId: "274494841235",
-            appId: "1:274494841235:web:99112dde1c6dbd12240866"
-        };
-
-        // Inicializar Firebase
-        const app = firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
+    <script type="module">
+        import { auth, db } from './firebase-config.js';
+        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        import { collectionGroup, getDocs } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
 
         const projectsGrid = document.getElementById('projects-grid');
-        let adminUser = null;
-
-        // Verificar estado de autenticación
-        auth.onAuthStateChanged(user => {
+        
+        onAuthStateChanged(auth, user => {
             if (user) {
-                adminUser = user;
                 loadAllProjects();
             } else {
-                // Si no hay sesión iniciada, redirigir a la página de admin
                 window.location.href = 'admin.html';
             }
         });
 
-        // Función para cerrar sesión
         document.getElementById('logout-btn').addEventListener('click', () => {
-            auth.signOut().then(() => {
+            signOut(auth).then(() => {
                 window.location.href = 'admin.html';
             });
         });
 
-        // Función para cargar TODOS los proyectos
         async function loadAllProjects() {
             projectsGrid.innerHTML = `<p class="text-gray-400 col-span-full">Cargando todos los proyectos...</p>`;
             
             try {
-                // Esta es la consulta mágica que solo el admin puede hacer
-                const projectsQuery = db.collectionGroup('projects');
-                const querySnapshot = await projectsQuery.get();
+                // Consulta de grupo para obtener todos los proyectos de todos los usuarios
+                const projectsQuery = collectionGroup(db, 'projects');
+                const querySnapshot = await getDocs(projectsQuery);
 
                 if (querySnapshot.empty) {
                     projectsGrid.innerHTML = `<p class="text-gray-400 col-span-full">No se encontraron proyectos de ningún usuario.</p>`;
@@ -90,11 +69,13 @@
                 querySnapshot.forEach(doc => {
                     const project = doc.data();
                     const projectId = doc.id;
-                    const userPath = doc.ref.parent.parent.path; // Obtiene users/UID
+                    const userPath = doc.ref.parent.parent.path;
                     const userId = userPath.split('/')[1];
 
                     const card = document.createElement('div');
                     card.className = 'album-card bg-[#181818] rounded-lg p-4 flex flex-col justify-between border border-[#2a2a2a] fade-in-card';
+                    // Nota: El link a espacio.html no funcionará directamente para un admin si no tiene los permisos
+                    // adecuados, pero lo mantenemos para fines de demostración.
                     card.innerHTML = `
                         <div>
                             <h3 class="font-bold text-lg text-white">${project.name || 'Proyecto sin nombre'}</h3>
@@ -102,7 +83,7 @@
                             <p class="text-xs text-gray-500 mt-1 truncate">ID Usuario: ${userId}</p>
                         </div>
                         <div class="mt-4 flex justify-between items-center">
-                            <a href="espacio.html?id=${projectId}" class="text-sm bg-[#88c999] text-[#1C1C1C] px-3 py-1 rounded hover:brightness-110">Abrir Proyecto</a>
+                            <span class="text-sm text-gray-500">Proyecto de usuario</span>
                         </div>
                     `;
                     projectsGrid.appendChild(card);
@@ -110,7 +91,7 @@
 
             } catch (error) {
                 console.error("Error al cargar todos los proyectos: ", error);
-                projectsGrid.innerHTML = `<p class="text-red-400 col-span-full">Error al cargar proyectos. Revisa la consola (F12) para más detalles.</p>`;
+                projectsGrid.innerHTML = `<p class="text-red-400 col-span-full">Error al cargar proyectos. Revisa la consola (F12) y las reglas de seguridad de Firestore.</p>`;
             }
         }
     </script>
