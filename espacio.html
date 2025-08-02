@@ -76,10 +76,16 @@
         const onNextPage = () => { if (!pdfDoc || pageNum >= pdfDoc.numPages) return; pageNum++; queueRenderPage(pageNum); };
         
         async function loadPdf(url) {
+            // Se asegura de que la librería PDF.js esté disponible
+            if (!pdfjsLib) {
+                console.error("PDF.js no está cargado.");
+                document.getElementById('upload-message').textContent = "Error: La librería de PDF no está disponible.";
+                document.getElementById('upload-container').style.display = 'block';
+                return;
+            }
+            
             try {
-                // Para evitar problemas de CORS, añadimos un proxy. Esto es un truco común.
-                const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
-                const loadingTask = pdfjsLib.getDocument(url); // Intenta sin proxy primero
+                const loadingTask = pdfjsLib.getDocument(url);
                 pdfDoc = await loadingTask.promise;
                 document.getElementById('page-count').textContent = pdfDoc.numPages;
                 renderPage(pageNum);
@@ -87,7 +93,7 @@
                 viewerContainer.classList.remove('hidden');
             } catch (error) {
                  console.error("Error al cargar el PDF:", error);
-                 document.getElementById('upload-message').textContent = "No se pudo cargar el PDF. Puede ser un problema de CORS. Intenta subirlo de nuevo.";
+                 document.getElementById('upload-message').textContent = "No se pudo cargar el PDF. Revisa la URL y los permisos.";
                  document.getElementById('upload-container').style.display = 'block';
             }
         }
