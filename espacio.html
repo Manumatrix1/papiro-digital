@@ -49,7 +49,6 @@
         // Se asegura de que la librería PDF.js esté disponible
         const { pdfjsLib } = window;
         if (pdfjsLib) { 
-            // Se usa una URL de CDN confiable para el worker
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js'; 
         }
 
