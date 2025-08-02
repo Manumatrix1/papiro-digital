@@ -28,33 +28,46 @@
         <div id="projects-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
     </main>
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, collection, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
-        const firebaseConfig = { apiKey: "AIzaSyDhcJyTriTBrEDftDx_lYAhFgd6Y8Us4dA", authDomain: "papirodigital-1a6c5.firebaseapp.com", projectId: "papirodigital-1a6c5", storageBucket: "papirodigital-1a6c5.appspot.com", messagingSenderId: "27449484125", appId: "1:27449484125:web:99112dde1c6dbd12240866" };
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        import { auth, db } from './firebase-config.js';
+        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        import { doc, getDoc, collection, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        
         const projectsGrid = document.getElementById('projects-grid');
         let currentUser = null;
+
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 currentUser = user;
                 const userDocRef = doc(db, "users", user.uid);
                 const userDoc = await getDoc(userDocRef);
                 const greetingElement = document.getElementById('user-greeting');
-                if (userDoc.exists() && userDoc.data().name) { greetingElement.textContent = `Hola ${userDoc.data().name}, ¿qué vamos a estudiar hoy?`; } else { greetingElement.textContent = `Hola, ${user.email}`; }
+                if (userDoc.exists() && userDoc.data().name) { 
+                    greetingElement.textContent = `Hola ${userDoc.data().name}, ¿qué vamos a estudiar hoy?`; 
+                } else { 
+                    greetingElement.textContent = `Hola, ${user.email}`; 
+                }
                 loadUserProjects();
-            } else { window.location.href = 'index.html'; }
+            } else { 
+                window.location.href = 'index.html'; 
+            }
         });
-        document.getElementById('logout-btn').addEventListener('click', () => { signOut(auth).then(() => { window.location.href = 'index.html'; }); });
+
+        document.getElementById('logout-btn').addEventListener('click', () => { 
+            signOut(auth).then(() => { 
+                window.location.href = 'index.html'; 
+            }); 
+        });
+
         async function loadUserProjects() {
             if (!currentUser) return;
             projectsGrid.innerHTML = `<p class="text-gray-400 col-span-full">Cargando mis proyectos...</p>`;
             try {
                 const projectsCollectionRef = collection(db, "users", currentUser.uid, "projects");
                 const querySnapshot = await getDocs(projectsCollectionRef);
-                if (querySnapshot.empty) { projectsGrid.innerHTML = `<p class="text-gray-400 col-span-full">Aún no tienes proyectos. ¡Crea el primero!</p>`; return; }
+                if (querySnapshot.empty) { 
+                    projectsGrid.innerHTML = `<p class="text-gray-400 col-span-full">Aún no tienes proyectos. ¡Crea el primero!</p>`; 
+                    return; 
+                }
                 projectsGrid.innerHTML = '';
                 querySnapshot.forEach(doc => {
                     const project = doc.data();
@@ -63,15 +76,22 @@
                     card.innerHTML = `<div><h3 class="font-bold text-lg text-white">${project.name || 'Proyecto sin nombre'}</h3></div><div class="mt-4"><a href="espacio.html?id=${doc.id}" class="text-sm bg-[#88c999] text-[#1C1C1C] px-3 py-1 rounded hover:brightness-110">Abrir</a></div>`;
                     projectsGrid.appendChild(card);
                 });
-            } catch (error) { console.error("Error al cargar los proyectos: ", error); }
+            } catch (error) { 
+                console.error("Error al cargar los proyectos: ", error); 
+                projectsGrid.innerHTML = `<p class="text-red-400 col-span-full">Hubo un error al cargar tus proyectos. Revisa la consola.</p>`;
+            }
         }
+
         document.getElementById('new-project-btn').addEventListener('click', async () => {
             if (!currentUser) return;
             try {
                 const projectsCollectionRef = collection(db, "users", currentUser.uid, "projects");
-                const newProjectDoc = await addDoc(projectsCollectionRef, { name: "Proyecto sin título", createdAt: new Date(), content: "" });
+                const newProjectDoc = await addDoc(projectsCollectionRef, { name: "Proyecto sin título", createdAt: new Date() });
                 window.location.href = `espacio.html?id=${newProjectDoc.id}`;
-            } catch (error) { console.error("Error al crear un nuevo proyecto:", error); alert("Hubo un error al crear tu proyecto."); }
+            } catch (error) { 
+                console.error("Error al crear un nuevo proyecto:", error); 
+                alert("Hubo un error al crear tu proyecto."); 
+            }
         });
     </script>
 </body>
