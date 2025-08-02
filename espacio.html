@@ -9,6 +9,17 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #0f0f0f; }
+        .pdf-list-item {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .pdf-list-item:hover {
+            background-color: #2a2a2a;
+        }
+        .pdf-list-item.active {
+            border-left: 4px solid #88c999;
+            background-color: #2a2a2a;
+        }
         #pdf-render { 
             box-shadow: 0 4px 15px rgba(0,0,0,0.5); 
             max-width: 100%;
@@ -19,7 +30,7 @@
         }
     </style>
 </head>
-<body class="text-white">
+<body class="text-white flex flex-col h-screen">
     <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-4 sm:px-8 flex justify-between items-center sticky top-0 z-10">
         <div class="flex items-center gap-4">
             <a href="mi_tablero.html" class="flex items-center text-gray-400 hover:text-white transition group">
@@ -39,26 +50,36 @@
         </div>
     </header>
 
-    <main class="flex flex-col items-center p-4 sm:p-8 min-h-[calc(100vh-64px)]">
-        
-        <div id="pdf-loader-container" class="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
-            <div class="text-center">
-                <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#88c999]"></div>
-                <p id="pdf-loader-text" class="mt-4 text-xl">Subiendo PDF...</p>
+    <main class="flex flex-1 overflow-hidden p-4 sm:p-8">
+        <aside class="w-full sm:w-64 bg-[#181818] border border-[#2a2a2a] rounded-lg p-4 mr-4 sm:mr-8 overflow-y-auto">
+            <h2 class="text-lg font-semibold mb-4">Mis PDFs</h2>
+            <div id="pdf-list" class="space-y-2">
+                </div>
+            <div id="no-pdfs-message" class="text-gray-500 text-sm mt-4" style="display: none;">
+                No hay PDFs en este tablero.
             </div>
-        </div>
+        </aside>
 
-        <div id="pdf-viewer-container" class="mt-4 sm:mt-8 relative max-w-full w-full">
-            <div id="no-pdf-message" class="text-center text-gray-500 text-lg p-10 border border-dashed border-gray-700 rounded-lg" style="display: none;">
-                <p>No hay un PDF cargado para este proyecto. Sube uno para empezar a trabajar.</p>
+        <div class="flex-1 flex flex-col items-center overflow-auto">
+            <div id="pdf-loader-container" class="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
+                <div class="text-center">
+                    <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#88c999]"></div>
+                    <p id="pdf-loader-text" class="mt-4 text-xl">Subiendo PDF...</p>
+                </div>
             </div>
-            
-            <canvas id="pdf-render" class="bg-[#181818] rounded-md"></canvas>
 
-            <div id="pdf-controls" class="mt-4 flex justify-center gap-4" style="display: none;">
-                <button id="prev-page-btn" class="bg-[#2a2a2a] text-white px-4 py-2 rounded-lg hover:bg-[#3a3a3a]">Página Anterior</button>
-                <span id="page-info" class="self-center"></span>
-                <button id="next-page-btn" class="bg-[#2a2a3a] text-white px-4 py-2 rounded-lg hover:bg-[#3a3a3a]">Página Siguiente</button>
+            <div id="pdf-viewer-container" class="mt-4 sm:mt-8 relative max-w-full w-full">
+                <div id="no-pdf-message" class="text-center text-gray-500 text-lg p-10 border border-dashed border-gray-700 rounded-lg" style="display: none;">
+                    <p>Selecciona un PDF del panel lateral para empezar a trabajar.</p>
+                </div>
+                
+                <canvas id="pdf-render" class="bg-[#181818] rounded-md"></canvas>
+
+                <div id="pdf-controls" class="mt-4 flex justify-center gap-4" style="display: none;">
+                    <button id="prev-page-btn" class="bg-[#2a2a2a] text-white px-4 py-2 rounded-lg hover:bg-[#3a3a3a]">Página Anterior</button>
+                    <span id="page-info" class="self-center"></span>
+                    <button id="next-page-btn" class="bg-[#2a2a3a] text-white px-4 py-2 rounded-lg hover:bg-[#3a3a3a]">Página Siguiente</button>
+                </div>
             </div>
         </div>
     </main>
@@ -66,8 +87,8 @@
     <script type="module">
         import { auth, db, storage } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { doc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
-        import { ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
+        import { doc, updateDoc, onSnapshot, collection, addDoc, query, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
 
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
@@ -84,10 +105,12 @@
         const logoutBtn = document.getElementById('logout-btn');
         const pdfRenderCanvas = document.getElementById('pdf-render');
         const noPdfMessage = document.getElementById('no-pdf-message');
+        const noPdfsMessageAside = document.getElementById('no-pdfs-message');
         const pdfControls = document.getElementById('pdf-controls');
         const prevPageBtn = document.getElementById('prev-page-btn');
         const nextPageBtn = document.getElementById('next-page-btn');
         const pageInfoSpan = document.getElementById('page-info');
+        const pdfListContainer = document.getElementById('pdf-list');
 
         onAuthStateChanged(auth, async (user) => {
             currentUser = user;
@@ -105,25 +128,91 @@
 
             currentProjectRef = doc(db, "users", currentUser.uid, "projects", projectId);
             
+            // Listener para el nombre del proyecto
             onSnapshot(currentProjectRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const projectData = docSnap.data();
                     projectTitleEl.value = projectData.name;
-                    if (projectData.pdfUrl) {
-                        renderPdf(projectData.pdfUrl);
-                    } else {
-                        noPdfMessage.style.display = 'block';
-                        pdfRenderCanvas.style.display = 'none';
-                        pdfControls.style.display = 'none';
-                    }
                 } else {
                     alert("Este proyecto ya no existe.");
                     window.location.href = 'mi_tablero.html';
                 }
             });
-        });
 
-        // Esta función se ha optimizado para que el PDF se adapte a la pantalla
+            // Listener para la lista de PDFs del proyecto
+            const pdfsCollectionRef = collection(currentProjectRef, "pdfs");
+            const q = query(pdfsCollectionRef, orderBy("createdAt", "desc"));
+            onSnapshot(q, (querySnapshot) => {
+                pdfListContainer.innerHTML = '';
+                if (querySnapshot.empty) {
+                    noPdfsMessageAside.style.display = 'block';
+                    noPdfMessage.style.display = 'block';
+                    pdfRenderCanvas.style.display = 'none';
+                    pdfControls.style.display = 'none';
+                } else {
+                    noPdfsMessageAside.style.display = 'none';
+                    querySnapshot.forEach((doc) => {
+                        const pdfData = doc.data();
+                        displayPdfItem(doc.id, pdfData);
+                    });
+                    // Opcional: Cargar el primer PDF de la lista automáticamente
+                    // const firstPdf = querySnapshot.docs[0].data();
+                    // renderPdf(firstPdf.url);
+                }
+            });
+        });
+        
+        const displayPdfItem = (pdfId, pdfData) => {
+            const pdfItemDiv = document.createElement('div');
+            pdfItemDiv.className = 'pdf-list-item flex items-center justify-between p-2 rounded-md';
+            pdfItemDiv.setAttribute('data-url', pdfData.url);
+
+            const pdfNameSpan = document.createElement('span');
+            pdfNameSpan.className = 'text-sm font-medium truncate flex-1';
+            pdfNameSpan.textContent = pdfData.name;
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.innerHTML = `
+                <svg class="h-4 w-4 text-gray-400 hover:text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+            `;
+            deleteBtn.className = 'ml-2';
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Evita que se active el evento de click del padre
+                if (confirm(`¿Estás seguro de que quieres borrar el PDF "${pdfData.name}"?`)) {
+                    deletePdf(pdfId, pdfData.storagePath);
+                }
+            });
+            
+            pdfItemDiv.appendChild(pdfNameSpan);
+            pdfItemDiv.appendChild(deleteBtn);
+            pdfListContainer.appendChild(pdfItemDiv);
+
+            pdfItemDiv.addEventListener('click', () => {
+                // Eliminar la clase 'active' de todos los elementos
+                document.querySelectorAll('.pdf-list-item').forEach(el => el.classList.remove('active'));
+                // Añadir la clase 'active' al elemento clicado
+                pdfItemDiv.classList.add('active');
+                renderPdf(pdfData.url);
+            });
+        };
+
+        const deletePdf = async (pdfId, storagePath) => {
+            try {
+                // 1. Borrar el archivo de Firebase Storage
+                const fileRef = ref(storage, storagePath);
+                await deleteObject(fileRef);
+
+                // 2. Borrar el documento de la subcolección de Firestore
+                const pdfDocRef = doc(currentProjectRef, "pdfs", pdfId);
+                await deleteDoc(pdfDocRef);
+            } catch (error) {
+                console.error("Error al borrar el PDF:", error);
+                alert("No se pudo borrar el PDF.");
+            }
+        };
+
         const renderPdf = (url) => {
             noPdfMessage.style.display = 'none';
             pdfRenderCanvas.style.display = 'block';
@@ -150,7 +239,6 @@
         const renderPage = (num) => {
             if (!pdfDoc) return;
             pdfDoc.getPage(num).then(function(page) {
-                // Obtenemos el ancho del contenedor para calcular el 'viewport'
                 const containerWidth = document.getElementById('pdf-viewer-container').offsetWidth;
                 const viewport = page.getViewport({ scale: 1 });
                 const scale = containerWidth / viewport.width;
@@ -172,7 +260,6 @@
             });
         };
         
-        // El resto de tus funciones
         const onPrevPage = () => {
             if (pageNum <= 1) return;
             pageNum--;
@@ -214,8 +301,15 @@
                 }, 
                 async () => {
                     const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                    await updateDoc(currentProjectRef, { pdfUrl: downloadURL });
-                    // No hace falta recargar, el listener onSnapshot lo maneja.
+                    const pdfsCollectionRef = collection(currentProjectRef, "pdfs");
+                    await addDoc(pdfsCollectionRef, { 
+                        name: file.name,
+                        url: downloadURL,
+                        storagePath: filePath,
+                        createdAt: new Date()
+                    });
+                    // El listener onSnapshot se encargará de refrescar la lista.
+                    pdfLoaderContainer.style.display = 'none';
                 }
             );
         });
@@ -244,8 +338,4 @@
             window.location.href = 'index.html';
         });
 
-        prevPageBtn.addEventListener('click', onPrevPage);
-        nextPageBtn.addEventListener('click', onNextPage);
-    </script>
-</body>
-</html>
+        prevPageBtn.addEventListener('click
