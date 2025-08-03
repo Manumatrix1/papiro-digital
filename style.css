@@ -1,0 +1,145 @@
+/* Estilo General */
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #f4f7f9;
+    color: #333;
+    margin: 0;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 40px auto;
+    padding: 20px;
+}
+
+/* Encabezados y Títulos */
+h1, h2, h3 {
+    color: #1a202c;
+    font-weight: 700;
+}
+
+/* Botones */
+.btn {
+    background-color: #4A90E2;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-block;
+    transition: background-color 0.3s, transform 0.2s;
+}
+
+.btn:hover {
+    background-color: #357ABD;
+    transform: translateY(-2px);
+}
+
+.btn-danger {
+    background-color: #D0021B;
+}
+
+.btn-danger:hover {
+    background-color: #a00215;
+}
+
+/* Formularios y Entradas */
+input[type="text"], input[type="email"], input[type="password"] {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-sizing: border-box;
+}
+
+/* Navbar */
+.navbar {
+    background-color: #ffffff;
+    padding: 15px 30px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.navbar .logo {
+    font-size: 1.5em;
+    font-weight: 700;
+    color: #4A90E2;
+}
+
+.navbar #user-info {
+    font-weight: 600;
+}
+
+.navbar #logout-btn {
+    margin-left: 20px;
+}
+
+/* Tarjetas de Proyecto (mi_tablero.html) */
+.project-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 25px;
+    margin-top: 30px;
+}
+
+.project-card {
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.project-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+}
+
+.project-card h3 {
+    margin-top: 0;
+}
+
+.project-card-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: space-between;
+}
+
+/* Espacio de Trabajo (espacio.html) */
+.workspace-grid {
+    display: grid;
+    grid-template-columns: 250px 1fr 300px; /* Sidebar | Visor | Notas */
+    gap: 20px;
+    height: calc(100vh - 80px); /* Altura completa menos navbar */
+}
+
+.content-list, .notes-area {
+    background-color: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    overflow-y: auto;
+}
+
+.pdf-viewer {
+    background-color: #e9ecef;
+    border-radius: 8px;
+    overflow: auto;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+#pdf-canvas {
+    border: 1px solid #ccc;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
