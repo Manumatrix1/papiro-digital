@@ -50,6 +50,8 @@
         #pdf-viewer-container {
             display: none;
             width: 100%;
+            overflow-y: auto;
+            max-height: calc(100vh - 10rem); /* Asegurarse de que el visor tenga un scroll propio */
         }
         .pdf-grid {
             display: grid;
@@ -121,13 +123,10 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
             </button>
-            <div id="pdf-scroll-container" class="relative w-full h-screen overflow-y-auto">
-                <canvas id="pdf-render" class="bg-[#181818] rounded-md"></canvas>
-            </div>
+            <div id="pages-container" class="w-full h-full overflow-y-auto space-y-4">
+                </div>
             <div id="pdf-controls" class="mt-4 flex flex-col sm:flex-row justify-center items-center gap-4" style="display: none;">
-                <button id="prev-page-btn" class="bg-[#2a2a2a] text-white px-4 py-2 rounded-lg hover:bg-[#3a3a3a]">Página Anterior</button>
                 <span id="page-info" class="self-center">Página <span id="current-page-span">1</span> de <span id="total-pages-span">1</span></span>
-                <button id="next-page-btn" class="bg-[#2a2a3a] text-white px-4 py-2 rounded-lg hover:bg-[#3a3a3a]">Página Siguiente</button>
             </div>
         </div>
     </main>
@@ -143,7 +142,6 @@
         let currentProjectRef = null;
         let currentUser = null;
         let pdfDoc = null;
-        let pageNum = 1;
         let currentPdfId = null;
         let currentPdfRef = null;
 
@@ -153,10 +151,7 @@
         const pdfLoaderText = document.getElementById('pdf-loader-text');
         const saveBtn = document.getElementById('save-btn');
         const logoutBtn = document.getElementById('logout-btn');
-        const pdfRenderCanvas = document.getElementById('pdf-render');
         const pdfControls = document.getElementById('pdf-controls');
-        const prevPageBtn = document.getElementById('prev-page-btn');
-        const nextPageBtn = document.getElementById('next-page-btn');
         const currentPageSpan = document.getElementById('current-page-span');
         const totalPagesSpan = document.getElementById('total-pages-span');
         
@@ -174,7 +169,7 @@
         
         const pdfViewerContainer = document.getElementById('pdf-viewer-container');
         const backToGridBtn = document.getElementById('back-to-grid-btn');
-        const pdfScrollContainer = document.getElementById('pdf-scroll-container');
+        const pagesContainer = document.getElementById('pages-container');
 
         onAuthStateChanged(auth, async (user) => {
             currentUser = user;
@@ -317,8 +312,15 @@
             const loadingTask = pdfjsLib.getDocument(pdfData.url);
             loadingTask.promise.then(function(pdf) {
                 pdfDoc = pdf;
-                pageNum = 1;
-                renderPage(pageNum);
+                
+                // Limpiar el contenedor de páginas
+                pagesContainer.innerHTML = '';
+                
+                // Renderizar todas las páginas
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    renderPage(i);
+                }
+
                 pdfLoaderContainer.style.display = 'none';
                 pdfControls.style.display = 'flex';
                 totalPagesSpan.textContent = pdf.numPages;
@@ -341,38 +343,45 @@
                 const scale = (containerWidth / viewport.width) * devicePixelRatio;
                 const scaledViewport = page.getViewport({ scale });
 
-                const context = pdfRenderCanvas.getContext('2d');
-                pdfRenderCanvas.height = scaledViewport.height;
-                pdfRenderCanvas.width = scaledViewport.width;
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.className = 'mb-4 rounded-md';
+                canvas.id = `page-${num}`;
+                canvas.height = scaledViewport.height;
+                canvas.width = scaledViewport.width;
                 
-                pdfRenderCanvas.style.width = `${containerWidth}px`;
-                pdfRenderCanvas.style.height = `${scaledViewport.height / devicePixelRatio}px`;
+                canvas.style.width = `${containerWidth}px`;
+                canvas.style.height = `${scaledViewport.height / devicePixelRatio}px`;
 
                 const renderContext = {
                     canvasContext: context,
                     viewport: scaledViewport
                 };
                 page.render(renderContext);
-                currentPageSpan.textContent = num;
-
-                // Desplazar el scroll al principio de la página
-                pdfScrollContainer.scrollTop = 0;
-
-                prevPageBtn.disabled = pageNum <= 1;
-                nextPageBtn.disabled = pageNum >= pdfDoc.numPages;
+                pagesContainer.appendChild(canvas);
             });
         };
 
+        // Ahora la navegación es por scroll
+        pagesContainer.addEventListener('scroll', () => {
+            // Lógica para actualizar el contador de página visible
+            const pages = pagesContainer.querySelectorAll('canvas');
+            let currentPage = 1;
+            pages.forEach((page, index) => {
+                const rect = page.getBoundingClientRect();
+                if (rect.top >= 0 && rect.top <= window.innerHeight / 2) {
+                    currentPage = index + 1;
+                }
+            });
+            currentPageSpan.textContent = currentPage;
+        });
+        
         const onPrevPage = () => {
-            if (pageNum <= 1) return;
-            pageNum--;
-            renderPage(pageNum);
+            // Ya no se usa la navegación con botones
         };
 
         const onNextPage = () => {
-            if (pageNum >= pdfDoc.numPages) return;
-            pageNum++;
-            renderPage(pageNum);
+            // Ya no se usa la navegación con botones
         };
 
         const backToGrid = () => {
@@ -385,12 +394,6 @@
             pdfDoc = null;
             document.querySelectorAll('.pdf-list-item').forEach(el => el.classList.remove('active'));
         };
-
-        // Nuevo: Lógica para el scroll
-        pdfScrollContainer.addEventListener('scroll', () => {
-            // Lógica para detectar el cambio de página al hacer scroll
-            // Por ahora solo actualizamos el contador con los botones
-        });
 
         uploadCoverBtn.addEventListener('click', () => {
             coverFileInput.click();
@@ -495,7 +498,8 @@
         
         window.addEventListener('resize', () => {
             if (pdfDoc && currentPdfId) {
-                renderPage(pageNum);
+                // Para el scroll continuo, un resize implica volver a renderizar todo
+                renderPdf(currentPdfId, {name: pageTitleEl.textContent, url: pdfDoc.url});
             }
         });
     </script>
