@@ -50,7 +50,6 @@
         #pdf-viewer-container {
             display: none;
             width: 100%;
-            overflow-y: auto;
         }
         .pdf-grid {
             display: grid;
@@ -70,6 +69,12 @@
             display: none;
             z-index: 50;
             transition: opacity 0.2s ease-in-out;
+        }
+        #pages-container {
+            width: 100%;
+            max-height: calc(100vh - 8rem);
+            overflow-y: auto;
+            scroll-behavior: smooth;
         }
     </style>
 </head>
@@ -92,34 +97,36 @@
     </header>
 
     <main class="flex-1 flex flex-col items-center overflow-auto p-4 sm:p-8" id="main-content">
-        <div id="cover-section" class="w-full max-w-4xl flex justify-center items-center">
-            <div id="cover-container" class="relative group w-full flex items-center justify-center rounded-lg">
-                <div class="absolute inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center text-center p-4 transition-opacity">
-                    <span id="cover-placeholder" class="text-xl font-bold text-gray-300 mb-2">Añadir Portada</span>
-                    <p class="text-sm text-gray-400 mb-4">Haz clic para añadir o cambiar la portada.<br>(Recomendado: 1200x400 px)</p>
-                    <button id="upload-cover-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-4 rounded-lg hover:brightness-110 transition text-sm">
-                        Subir Imagen
-                    </button>
-                    <input type="file" id="cover-file-input" class="hidden" accept="image/*">
+        <div id="grid-view-container" class="w-full max-w-4xl">
+            <div id="cover-section" class="w-full flex justify-center items-center">
+                <div id="cover-container" class="relative group w-full flex items-center justify-center rounded-lg">
+                    <div class="absolute inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center text-center p-4 transition-opacity">
+                        <span id="cover-placeholder" class="text-xl font-bold text-gray-300 mb-2">Añadir Portada</span>
+                        <p class="text-sm text-gray-400 mb-4">Haz clic para añadir o cambiar la portada.<br>(Recomendado: 1200x400 px)</p>
+                        <button id="upload-cover-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-4 rounded-lg hover:brightness-110 transition text-sm">
+                            Subir Imagen
+                        </button>
+                        <input type="file" id="cover-file-input" class="hidden" accept="image/*">
+                    </div>
                 </div>
             </div>
-        </div>
-
-        <div id="pdfs-section" class="w-full max-w-4xl mt-8">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-semibold">Mis PDFs</h2>
-            </div>
-            <div id="pdf-list" class="pdf-grid">
-                <div class="pdf-list-item flex flex-col items-center justify-center bg-[#181818] rounded-lg p-4 sm:p-6 shadow-lg border border-dashed border-gray-600 transition hover:bg-[#2a2a2a] cursor-pointer" id="visual-upload-btn">
-                    <svg class="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    <span class="mt-4 font-semibold text-gray-400 text-sm sm:text-base">Nuevo PDF</span>
+            
+            <div id="pdfs-section" class="w-full mt-8">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold">Mis PDFs</h2>
                 </div>
-            </div>
-            <input type="file" id="pdf-file-input" class="hidden" accept="application/pdf">
-            <div id="no-pdfs-message" class="text-gray-500 text-sm mt-4" style="display: none;">
-                No hay PDFs en este tablero.
+                <div id="pdf-list" class="pdf-grid">
+                    <div class="pdf-list-item flex flex-col items-center justify-center bg-[#181818] rounded-lg p-4 sm:p-6 shadow-lg border border-dashed border-gray-600 transition hover:bg-[#2a2a2a] cursor-pointer" id="visual-upload-btn">
+                        <svg class="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        <span class="mt-4 font-semibold text-gray-400 text-sm sm:text-base">Nuevo PDF</span>
+                    </div>
+                </div>
+                <input type="file" id="pdf-file-input" class="hidden" accept="application/pdf">
+                <div id="no-pdfs-message" class="text-gray-500 text-sm mt-4" style="display: none;">
+                    No hay PDFs en este tablero.
+                </div>
             </div>
         </div>
 
@@ -140,9 +147,7 @@
                 </div>
         </div>
     </main>
-
     <div id="page-number-indicator" class="z-50"></div>
-
     <script type="module">
         import { auth, db, storage } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
@@ -156,6 +161,8 @@
         let pdfDoc = null;
         let currentPdfId = null;
         let currentPdfRef = null;
+        let pagesHeight = []; // Para almacenar la altura de cada página
+
 
         const pageTitleEl = document.getElementById('page-title');
         const projectTitleEl = document.getElementById('project-title');
@@ -163,10 +170,8 @@
         const pdfLoaderText = document.getElementById('pdf-loader-text');
         const saveBtn = document.getElementById('save-btn');
         const logoutBtn = document.getElementById('logout-btn');
-        const pdfControls = document.getElementById('pdf-controls');
-        const currentPageSpan = document.getElementById('current-page-span');
-        const totalPagesSpan = document.getElementById('total-pages-span');
 
+        const gridViewContainer = document.getElementById('grid-view-container');
         const coverSection = document.getElementById('cover-section');
         const coverContainer = document.getElementById('cover-container');
         const coverPlaceholder = document.getElementById('cover-placeholder');
@@ -236,7 +241,7 @@
                     if (querySnapshot.empty) {
                         noPdfsMessage.style.display = 'block';
                         pdfViewerContainer.style.display = 'none';
-                        pdfsSection.style.display = 'block';
+                        gridViewContainer.style.display = 'block';
                     } else {
                         noPdfsMessage.style.display = 'none';
                         querySnapshot.forEach((doc) => {
@@ -245,7 +250,7 @@
                                 displayPdfItem(doc.id, pdfData);
                             }
                         });
-                        pdfsSection.style.display = 'block';
+                        gridViewContainer.style.display = 'block';
                     }
                 });
             });
@@ -292,8 +297,7 @@
                     document.querySelectorAll('.pdf-list-item').forEach(el => el.classList.remove('active'));
                     pdfItemDiv.classList.add('active');
                     renderPdf(pdfId, pdfData);
-                    coverSection.style.display = 'none';
-                    pdfsSection.style.display = 'none';
+                    gridViewContainer.style.display = 'none';
                     pdfViewerContainer.style.display = 'block';
                     pageTitleEl.textContent = pdfData.name;
                 });
@@ -338,9 +342,9 @@
                         
                         renderPage(canvas, i);
                     }
-
+                    
                     pdfLoaderContainer.style.display = 'none';
-
+                    pagesContainer.scrollTop = 0;
                 }, function (reason) {
                     console.error('Error al cargar el PDF:', reason);
                     alert('No se pudo cargar el PDF. Verifica que el archivo exista y los permisos.');
@@ -376,8 +380,7 @@
             };
 
             const backToGrid = () => {
-                coverSection.style.display = 'flex';
-                pdfsSection.style.display = 'block';
+                gridViewContainer.style.display = 'block';
                 pdfViewerContainer.style.display = 'none';
                 pageTitleEl.textContent = projectTitleEl.value;
                 currentPdfId = null;
@@ -387,8 +390,6 @@
             };
 
             let scrollTimeout = null;
-            const pageNumberIndicator = document.getElementById('page-number-indicator');
-
             pagesContainer.addEventListener('scroll', () => {
                 clearTimeout(scrollTimeout);
                 pageNumberIndicator.style.display = 'block';
@@ -475,8 +476,7 @@
                         });
                         pdfLoaderContainer.style.display = 'none';
                         renderPdf(newPdfRef.id, { name: file.name, url: downloadURL });
-                        coverSection.style.display = 'none';
-                        pdfsSection.style.display = 'none';
+                        gridViewContainer.style.display = 'none';
                         pdfViewerContainer.style.display = 'block';
                     }
                 );
