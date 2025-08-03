@@ -3,12 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Papiro Digital - Acceso Admin</title>
+    <title>Bienvenido a Papiro Digital</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #0f0f0f; }
         .form-container { background-color: #181818; border: 1px solid #2a2a2a; }
+        .tab-btn { transition: background-color 0.3s, color 0.3s; }
+        .tab-btn.active { background-color: #88c999; color: #1C1C1C; }
+        .tab-btn:not(.active) { background-color: #2a2a2a; }
+        .form-section { display: none; }
+        .form-section.active { display: block; }
+        .password-container { position: relative; }
+        .toggle-password { position: absolute; top: 50%; right: 1rem; transform: translateY(-50%); cursor: pointer; color: #9ca3af; }
     </style>
 </head>
 <body class="text-white">
@@ -16,49 +23,200 @@
         <header class="text-center mb-8">
             <img src="https://i.postimg.cc/g0HxbpQF/PAPIRO-1.png" alt="Logo de Papiro Digital" class="mx-auto h-28 w-auto mb-4">
             <h1 class="text-5xl font-bold text-white mb-3">Papiro Digital</h1>
-            <p class="text-gray-400 text-xl">Panel de Administración</p>
+            <p class="text-gray-400 text-xl">Organiza tus estudios, visualiza tus documentos.</p>
         </header>
         
-        <div class="w-full max-w-md p-8 space-y-6 form-container rounded-lg">
-            <form id="admin-login-form">
-                <div class="space-y-4">
-                    <div>
-                        <label for="admin-email" class="text-sm font-medium text-gray-300">Correo Electrónico</label>
-                        <input type="email" id="admin-email" required class="w-full px-4 py-2 mt-1 bg-[#2a2a2a] border border-[#3a3a3a] rounded-md focus:ring-[#88c999] focus:border-[#88c999]">
+        <div class="w-full max-w-md p-8 space-y-8 form-container rounded-xl">
+            <div class="flex border-b border-gray-700">
+                <button id="login-tab" class="tab-btn flex-1 py-2 px-4 rounded-t-lg font-semibold">Iniciar Sesión</button>
+                <button id="register-tab" class="tab-btn flex-1 py-2 px-4 rounded-t-lg font-semibold">Registrarse</button>
+            </div>
+            
+            <section id="login-form-section" class="form-section">
+                <form id="login-form">
+                     <div>
+                        <label for="login-email" class="text-sm font-medium text-gray-300 block mb-2">Correo Electrónico</label>
+                        <input type="email" id="login-email" name="email" required class="w-full p-3 bg-[#0f0f0f] border border-[#3a3a3a] rounded-md focus:ring-[#88c999] focus:border-[#88c999]">
                     </div>
-                    <div class="relative">
-                        <label for="admin-password" class="text-sm font-medium text-gray-300">Contraseña</label>
-                        <input type="password" id="admin-password" required class="w-full px-4 py-2 mt-1 bg-[#2a2a2a] border border-[#3a3a3a] rounded-md focus:ring-[#88c999] focus:border-[#88c999]">
+                    <div class="mt-4">
+                        <label for="login-password" class="text-sm font-medium text-gray-300 block mb-2">Contraseña</label>
+                        <div class="password-container">
+                             <input type="password" id="login-password" name="password" required class="w-full p-3 bg-[#0f0f0f] border border-[#3a3a3a] rounded-md focus:ring-[#88c999] focus:border-[#88c999]">
+                             <span id="login-toggle" class="toggle-password">
+                                <svg id="login-eye-open" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.022 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" /></svg>
+                                <svg id="login-eye-closed" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.022 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" /></svg>
+                            </span>
+                        </div>
                     </div>
-                </div>
-                <div id="error-message" class="text-red-400 text-sm mt-4"></div>
-                <button type="submit" class="w-full mt-6 bg-[#88c999] text-[#1C1C1C] font-bold py-3 rounded-lg hover:brightness-110 transition">Iniciar Sesión</button>
-            </form>
+                    <div id="login-error-message" class="text-red-400 text-sm mt-4 h-5"></div>
+                    <button type="submit" class="w-full mt-6 bg-[#88c999] text-[#1C1C1C] font-bold py-3 rounded-lg hover:brightness-110 transition">Iniciar Sesión</button>
+                </form>
+                <div class="text-center mt-4">
+                    <button id="google-signin-btn" class="w-full bg-gray-700 text-white font-bold py-3 rounded-lg hover:bg-gray-600 transition flex items-center justify-center">
+                        <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48px" height="48px"><path fill="#fbc02d" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12	s5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20	s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path><path fill="#e53935" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657	C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path><path fill="#4caf50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36	c-5.222,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path><path fill="#1565c0" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.089,5.571	l6.19,5.238C42.021,35.596,44,30.138,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path></svg>
+                        Continuar con Google
+                    </button>
+                    </div>
+            </section>
+            
+            <section id="register-form-section" class="form-section">
+                <form id="register-form">
+                    <div class="mt-4">
+                        <label for="register-name" class="text-sm font-medium text-gray-300 block mb-2">Nombre Completo</label>
+                        <input type="text" id="register-name" name="name" required class="w-full p-3 bg-[#0f0f0f] border border-[#3a3a3a] rounded-md focus:ring-[#88c999] focus:border-[#88c999]">
+                    </div>
+                    <div class="mt-4">
+                        <label for="register-email" class="text-sm font-medium text-gray-300 block mb-2">Correo Electrónico</albel>
+                        <input type="email" id="register-email" name="email" required class="w-full p-3 bg-[#0f0f0f] border border-[#3a3a3a] rounded-md focus:ring-[#88c999] focus:border-[#88c999]">
+                    </div>
+                    <div class="mt-4">
+                        <label for="register-password" class="text-sm font-medium text-gray-300 block mb-2">Contraseña</label>
+                        <div class="password-container">
+                             <input type="password" id="register-password" name="password" required class="w-full p-3 bg-[#0f0f0f] border border-[#3a3a3a] rounded-md focus:ring-[#88c999] focus:border-[#88c999]">
+                             <span id="register-toggle" class="toggle-password">
+                                <svg id="register-eye-open" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.022 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" /></svg>
+                                <svg id="register-eye-closed" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.022 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" /></svg>
+                            </span>
+                        </div>
+                    </div>
+                    <div id="register-error-message" class="text-red-400 text-sm mt-4 h-5"></div>
+                    <button type="submit" class="w-full mt-6 bg-[#88c999] text-[#1C1C1C] font-bold py-3 rounded-lg hover:brightness-110 transition">Crear Cuenta</button>
+                </form>
+            </section>
         </div>
     </div>
 
     <script type="module">
-        import { auth } from './firebase-config.js';
-        import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        import { auth, db } from './firebase-config.js';
+        import { 
+            createUserWithEmailAndPassword, 
+            signInWithEmailAndPassword, 
+            GoogleAuthProvider, 
+            signInWithPopup,
+            onAuthStateChanged
+        } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        import { doc, setDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
 
-        const loginForm = document.getElementById('admin-login-form');
-        const errorMessageDiv = document.getElementById('error-message');
+        const loginTab = document.getElementById('login-tab');
+        const registerTab = document.getElementById('register-tab');
+        const loginFormSection = document.getElementById('login-form-section');
+        const registerFormSection = document.getElementById('register-form-section');
 
-        loginForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const email = document.getElementById('admin-email').value;
-            const password = document.getElementById('admin-password').value;
-            errorMessageDiv.textContent = '';
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        const googleSigninBtn = document.getElementById('google-signin-btn');
+        const quickLoginBtn = document.getElementById('quick-login-btn'); 
 
-            signInWithEmailAndPassword(auth, email, password)
-                .then((userCredential) => {
-                    window.location.href = 'panel.html';
-                })
-                .catch((error) => {
-                    console.error("Error de inicio de sesión de admin:", error);
-                    errorMessageDiv.textContent = 'Correo o contraseña de administrador incorrectos.';
-                });
+        const loginErrorMessage = document.getElementById('login-error-message');
+        const registerErrorMessage = document.getElementById('register-error-message');
+
+        onAuthStateChanged(auth, user => {
+            if (user) window.location.href = 'mi_tablero.html';
         });
+        
+        function showLogin() {
+            loginTab.classList.add('active');
+            registerTab.classList.remove('active');
+            loginFormSection.classList.add('active');
+            registerFormSection.classList.remove('active');
+        }
+
+        function showRegister() {
+            loginTab.classList.remove('active');
+            registerTab.classList.add('active');
+            loginFormSection.classList.remove('active');
+            registerFormSection.classList.add('active');
+        }
+
+        loginTab.addEventListener('click', showLogin);
+        registerTab.addEventListener('click', showRegister);
+        showLogin();
+
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('register-name').value;
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+            registerErrorMessage.textContent = '';
+
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+                await setDoc(doc(db, "users", user.uid), {
+                    name: name,
+                    email: email,
+                    createdAt: new Date()
+                });
+                window.location.href = 'mi_tablero.html';
+            } catch (error) {
+                if (error.code === 'auth/email-already-in-use') {
+                    registerErrorMessage.textContent = 'Este correo ya está en uso.';
+                } else {
+                    registerErrorMessage.textContent = 'Error al registrar. Inténtalo de nuevo.';
+                }
+            }
+        });
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            loginErrorMessage.textContent = '';
+            
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                window.location.href = 'mi_tablero.html';
+            } catch (error) {
+                 if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+                    loginErrorMessage.textContent = 'Correo o contraseña incorrectos.';
+                } else {
+                    loginErrorMessage.textContent = 'Error al iniciar sesión. Inténtalo de nuevo.';
+                }
+            }
+        });
+        
+        googleSigninBtn.addEventListener('click', async () => {
+            const provider = new GoogleAuthProvider();
+            try {
+                const result = await signInWithPopup(auth, provider);
+                const user = result.user;
+                
+                await setDoc(doc(db, "users", user.uid), {
+                    name: user.displayName,
+                    email: user.email,
+                    createdAt: new Date()
+                }, { merge: true });
+
+                window.location.href = 'mi_tablero.html';
+            } catch (error) {
+                loginErrorMessage.textContent = 'Error al iniciar sesión con Google.';
+            }
+        });
+
+        /* CORRECCIÓN DE SEGURIDAD: La lógica del botón de login rápido ha sido comentada para desactivarla.
+        if (quickLoginBtn) {
+            quickLoginBtn.addEventListener('click', async () => {
+                const testEmail = "tester@papiro.com", testPassword = "123456";
+                loginErrorMessage.textContent = 'Iniciando sesión de prueba...';
+                try {
+                    await signInWithEmailAndPassword(auth, testEmail, testPassword);
+                    window.location.href = 'mi_tablero.html';
+                } catch (error) {
+                    loginErrorMessage.textContent = 'El usuario de prueba (tester@papiro.com) no existe. Regístralo primero.';
+                }
+            });
+        }
+        */
+
+        function setupPasswordToggle(inputId, toggleId, eyeOpenId, eyeClosedId) {
+            const passwordInput = document.getElementById(inputId), toggle = document.getElementById(toggleId), eyeOpen = document.getElementById(eyeOpenId), eyeClosed = document.getElementById(eyeClosedId);
+            if (!passwordInput || !toggle || !eyeOpen || !eyeClosed) return;
+            toggle.addEventListener('click', () => {
+                if (passwordInput.type === 'password') { passwordInput.type = 'text'; eyeOpen.classList.add('hidden'); eyeClosed.classList.remove('hidden'); } else { passwordInput.type = 'password'; eyeOpen.classList.remove('hidden'); eyeClosed.classList.add('hidden'); }
+            });
+        }
+        setupPasswordToggle('login-password', 'login-toggle', 'login-eye-open', 'login-eye-closed');
+        setupPasswordToggle('register-password', 'register-toggle', 'register-eye-open', 'register-eye-closed');
     </script>
 </body>
 </html>
