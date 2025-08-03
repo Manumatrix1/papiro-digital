@@ -12,7 +12,7 @@
         .pdf-list-item {
             transition: transform 0.2s ease-in-out;
             aspect-ratio: 1 / 1;
-            position: relative; /* Para posicionar los botones de acción */
+            position: relative;
         }
         .pdf-list-item:hover {
             transform: translateY(-5px);
@@ -121,8 +121,10 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
             </button>
-            <canvas id="pdf-render" class="bg-[#181818] rounded-md"></canvas>
-            <div id="pdf-controls" class="mt-4 flex justify-center items-center gap-4" style="display: none;">
+            <div id="pdf-scroll-container" class="relative w-full h-screen overflow-y-auto">
+                <canvas id="pdf-render" class="bg-[#181818] rounded-md"></canvas>
+            </div>
+            <div id="pdf-controls" class="mt-4 flex flex-col sm:flex-row justify-center items-center gap-4" style="display: none;">
                 <button id="prev-page-btn" class="bg-[#2a2a2a] text-white px-4 py-2 rounded-lg hover:bg-[#3a3a3a]">Página Anterior</button>
                 <span id="page-info" class="self-center">Página <span id="current-page-span">1</span> de <span id="total-pages-span">1</span></span>
                 <button id="next-page-btn" class="bg-[#2a2a3a] text-white px-4 py-2 rounded-lg hover:bg-[#3a3a3a]">Página Siguiente</button>
@@ -157,7 +159,7 @@
         const nextPageBtn = document.getElementById('next-page-btn');
         const currentPageSpan = document.getElementById('current-page-span');
         const totalPagesSpan = document.getElementById('total-pages-span');
-
+        
         const coverSection = document.getElementById('cover-section');
         const coverContainer = document.getElementById('cover-container');
         const coverPlaceholder = document.getElementById('cover-placeholder');
@@ -172,7 +174,7 @@
         
         const pdfViewerContainer = document.getElementById('pdf-viewer-container');
         const backToGridBtn = document.getElementById('back-to-grid-btn');
-
+        const pdfScrollContainer = document.getElementById('pdf-scroll-container');
 
         onAuthStateChanged(auth, async (user) => {
             currentUser = user;
@@ -216,7 +218,6 @@
             const pdfsCollectionRef = collection(currentProjectRef, "pdfs");
             const q = query(pdfsCollectionRef, orderBy("createdAt", "desc"));
             onSnapshot(q, (querySnapshot) => {
-                // Mantener el botón de subir nuevo PDF en la lista
                 const existingUploadButton = document.getElementById('visual-upload-btn');
                 pdfList.innerHTML = '';
                 pdfList.appendChild(existingUploadButton);
@@ -280,11 +281,10 @@
                 document.querySelectorAll('.pdf-list-item').forEach(el => el.classList.remove('active'));
                 pdfItemDiv.classList.add('active');
                 renderPdf(pdfId, pdfData);
-                // Ocultar la cuadrícula y mostrar el visor
                 coverSection.style.display = 'none';
                 pdfsSection.style.display = 'none';
                 pdfViewerContainer.style.display = 'block';
-                pageTitleEl.textContent = pdfData.name; // Cambiar el título a "nombre del PDF"
+                pageTitleEl.textContent = pdfData.name;
             });
         };
 
@@ -355,6 +355,9 @@
                 page.render(renderContext);
                 currentPageSpan.textContent = num;
 
+                // Desplazar el scroll al principio de la página
+                pdfScrollContainer.scrollTop = 0;
+
                 prevPageBtn.disabled = pageNum <= 1;
                 nextPageBtn.disabled = pageNum >= pdfDoc.numPages;
             });
@@ -376,12 +379,18 @@
             coverSection.style.display = 'flex';
             pdfsSection.style.display = 'block';
             pdfViewerContainer.style.display = 'none';
-            pageTitleEl.textContent = projectTitleEl.value; // Volver al título del tablero
+            pageTitleEl.textContent = projectTitleEl.value;
             currentPdfId = null;
             currentPdfRef = null;
             pdfDoc = null;
             document.querySelectorAll('.pdf-list-item').forEach(el => el.classList.remove('active'));
         };
+
+        // Nuevo: Lógica para el scroll
+        pdfScrollContainer.addEventListener('scroll', () => {
+            // Lógica para detectar el cambio de página al hacer scroll
+            // Por ahora solo actualizamos el contador con los botones
+        });
 
         uploadCoverBtn.addEventListener('click', () => {
             coverFileInput.click();
@@ -449,7 +458,6 @@
                     });
                     pdfLoaderContainer.style.display = 'none';
                     renderPdf(newPdfRef.id, { name: file.name, url: downloadURL });
-                    // Ocultar la cuadrícula y mostrar el visor
                     coverSection.style.display = 'none';
                     pdfsSection.style.display = 'none';
                     pdfViewerContainer.style.display = 'block';
