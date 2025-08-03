@@ -81,12 +81,12 @@
 <body class="text-white flex flex-col min-h-screen">
     <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-4 sm:px-8 flex justify-between items-center sticky top-0 z-10">
         <div class="flex items-center gap-4">
-            <a href="mi_tablero.html" class="flex items-center text-gray-400 hover:text-white transition group">
+            <button id="dynamic-back-btn" class="flex items-center text-gray-400 hover:text-white transition group">
                 <svg class="h-6 w-6 text-gray-400 group-hover:text-white transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
-                <span class="ml-2 font-medium hidden sm:inline">Mis Tableros</span>
-            </a>
+                <span id="dynamic-back-text" class="ml-2 font-medium hidden sm:inline">Mis Tableros</span>
+            </button>
             <input id="project-title" type="text" class="bg-transparent text-xl sm:text-2xl font-bold text-white focus:outline-none w-full truncate" value="Cargando...">
         </div>
         
@@ -138,16 +138,13 @@
         </div>
 
         <div id="pdf-viewer-container" class="mt-4 sm:mt-8 relative w-full max-w-4xl">
-            <button id="back-to-grid-btn" class="absolute -top-12 left-0 text-gray-400 hover:text-white transition">
-                <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-            </button>
             <div id="pages-container" class="w-full h-full overflow-y-auto space-y-4">
                 </div>
         </div>
     </main>
+
     <div id="page-number-indicator" class="z-50"></div>
+
     <script type="module">
         import { auth, db, storage } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
@@ -186,7 +183,8 @@
         const noPdfsMessage = document.getElementById('no-pdfs-message');
         
         const pdfViewerContainer = document.getElementById('pdf-viewer-container');
-        const backToGridBtn = document.getElementById('back-to-grid-btn');
+        const dynamicBackBtn = document.getElementById('dynamic-back-btn');
+        const dynamicBackText = document.getElementById('dynamic-back-text');
         const pagesContainer = document.getElementById('pages-container');
 
         const pageNumberIndicator = document.getElementById('page-number-indicator');
@@ -217,15 +215,15 @@
                         pageTitleEl.textContent = projectData.name;
                         
                         if (projectData.coverUrl) {
-                            coverContainer.style.backgroundImage = `url('${projectData.coverUrl}')`;
-                            coverContainer.classList.remove('bg-[#2a2a2a]');
-                            coverPlaceholder.parentElement.classList.add('opacity-0');
-                            coverPlaceholder.textContent = 'Cambiar Portada';
+                            if (coverContainer) coverContainer.style.backgroundImage = `url('${projectData.coverUrl}')`;
+                            if (coverContainer) coverContainer.classList.remove('bg-[#2a2a2a]');
+                            if (coverPlaceholder) coverPlaceholder.parentElement.classList.add('opacity-0');
+                            if (coverPlaceholder) coverPlaceholder.textContent = 'Cambiar Portada';
                         } else {
-                            coverContainer.style.backgroundImage = 'none';
-                            coverContainer.classList.add('bg-[#2a2a2a]');
-                            coverPlaceholder.parentElement.classList.remove('opacity-0');
-                            coverPlaceholder.textContent = 'Añadir Portada';
+                            if (coverContainer) coverContainer.style.backgroundImage = 'none';
+                            if (coverContainer) coverContainer.classList.add('bg-[#2a2a2a]');
+                            if (coverPlaceholder) coverPlaceholder.parentElement.classList.remove('opacity-0');
+                            if (coverPlaceholder) coverPlaceholder.textContent = 'Añadir Portada';
                         }
                     } else {
                         alert("Este proyecto ya no existe.");
@@ -258,7 +256,7 @@
                     }
                 });
             });
-        
+
             const displayPdfItem = (pdfId, pdfData) => {
                 if (!pdfList) return;
                 const pdfItemDiv = document.createElement('div');
@@ -339,7 +337,6 @@
                     const loadingTask = pdfjsLib.getDocument(pdfData.url);
                     pdfDoc = await loadingTask.promise;
                     
-                    pagesHeight = [];
                     for (let i = 1; i <= pdfDoc.numPages; i++) {
                         const canvas = document.createElement('canvas');
                         canvas.className = 'mb-4 rounded-md';
@@ -350,7 +347,7 @@
                     if (pdfLoaderContainer) pdfLoaderContainer.style.display = 'none';
                     if (pagesContainer) pagesContainer.scrollTop = 0;
                     
-                    // Renderizar las páginas después de que el DOM está listo
+                    // Renderizar las páginas
                     const pageCanvases = pagesContainer.querySelectorAll('canvas');
                     for (let i = 0; i < pageCanvases.length; i++) {
                         renderPage(pageCanvases[i], i + 1);
@@ -388,9 +385,7 @@
                         canvasContext: context,
                         viewport: scaledViewport
                     };
-                    page.render(renderContext).promise.then(() => {
-                        pagesHeight[num - 1] = canvas.offsetHeight;
-                    });
+                    page.render(renderContext);
                 });
             };
 
@@ -415,10 +410,9 @@
 
                     const pages = pagesContainer.querySelectorAll('canvas');
                     let currentPage = 1;
-                    let accumulatedHeight = 0;
                     pages.forEach((page, index) => {
                         const rect = page.getBoundingClientRect();
-                        if (rect.top >= 0 && rect.top <= window.innerHeight) {
+                        if (rect.top >= -page.offsetHeight / 2 && rect.top <= window.innerHeight / 2) {
                             currentPage = index + 1;
                         }
                     });
@@ -530,18 +524,16 @@
 
             if (backToGridBtn) backToGridBtn.addEventListener('click', backToGrid);
             
-            // Observer para la calidad de renderizado
+            const resizeObserver = new ResizeObserver(() => {
+                if (pdfDoc && currentPdfId) {
+                    const pages = pagesContainer.querySelectorAll('canvas');
+                    pages.forEach((canvas, index) => {
+                        renderPage(canvas, index + 1);
+                    });
+                }
+            });
+
             if (pdfViewerContainer) {
-                if (resizeObserver) resizeObserver.disconnect();
-                resizeObserver = new ResizeObserver(() => {
-                    if (pdfDoc && currentPdfId) {
-                        // Vuelve a renderizar las páginas para ajustar la calidad
-                        const pages = pagesContainer.querySelectorAll('canvas');
-                        pages.forEach((canvas, index) => {
-                            renderPage(canvas, index + 1);
-                        });
-                    }
-                });
                 resizeObserver.observe(pdfViewerContainer);
             }
         });
