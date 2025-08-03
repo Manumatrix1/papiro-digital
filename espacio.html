@@ -161,7 +161,7 @@
         let pagesHeight = [];
         let renderPagePending = false;
         let pagesRendering = false;
-
+        
         const pageTitleEl = document.getElementById('page-title');
         const projectTitleEl = document.getElementById('project-title');
         const pdfLoaderContainer = document.getElementById('pdf-loader-container');
@@ -179,109 +179,4 @@
         const pdfsSection = document.getElementById('pdfs-section');
         const pdfList = document.getElementById('pdf-list');
         const visualUploadBtn = document.getElementById('visual-upload-btn');
-        const pdfFileInput = document.getElementById('pdf-file-input');
-        const noPdfsMessage = document.getElementById('no-pdfs-message');
-        
-        const pdfViewerContainer = document.getElementById('pdf-viewer-container');
-        const dynamicBackBtn = document.getElementById('dynamic-back-btn');
-        const dynamicBackText = document.getElementById('dynamic-back-text');
-        const pagesContainer = document.getElementById('pages-container');
-
-        const pageNumberIndicator = document.getElementById('page-number-indicator');
-        let scrollTimeout = null;
-        let resizeObserver = null;
-        let pageRenderingPromises = [];
-
-        document.addEventListener('DOMContentLoaded', () => {
-            onAuthStateChanged(auth, async (user) => {
-                currentUser = user;
-                if (!currentUser) {
-                    window.location.href = 'index.html';
-                    return;
-                }
-
-                const urlParams = new URLSearchParams(window.location.search);
-                const projectId = urlParams.get('id');
-                if (!projectId) {
-                    window.location.href = 'mi_tablero.html';
-                    return;
-                }
-
-                currentProjectRef = doc(db, "users", currentUser.uid, "projects", projectId);
-                
-                onSnapshot(currentProjectRef, (docSnap) => {
-                    if (docSnap.exists()) {
-                        const projectData = docSnap.data();
-                        if (projectTitleEl) projectTitleEl.value = projectData.name;
-                        if (pageTitleEl) pageTitleEl.textContent = projectData.name;
-                        
-                        if (projectData.coverUrl) {
-                            if (coverContainer) {
-                                coverContainer.style.backgroundImage = `url('${projectData.coverUrl}')`;
-                                coverContainer.classList.remove('bg-[#2a2a2a]');
-                            }
-                            if (coverPlaceholder) coverPlaceholder.parentElement.classList.add('opacity-0');
-                            if (coverPlaceholder) coverPlaceholder.textContent = 'Cambiar Portada';
-                        } else {
-                            if (coverContainer) {
-                                coverContainer.style.backgroundImage = 'none';
-                                coverContainer.classList.add('bg-[#2a2a2a]');
-                            }
-                            if (coverPlaceholder) coverPlaceholder.parentElement.classList.remove('opacity-0');
-                            if (coverPlaceholder) coverPlaceholder.textContent = 'Añadir Portada';
-                        }
-                    } else {
-                        alert("Este proyecto ya no existe.");
-                        window.location.href = 'mi_tablero.html';
-                    }
-                });
-
-                const pdfsCollectionRef = collection(currentProjectRef, "pdfs");
-                const q = query(pdfsCollectionRef, orderBy("createdAt", "desc"));
-                onSnapshot(q, (querySnapshot) => {
-                    if (pdfList) {
-                        const existingUploadButton = document.getElementById('visual-upload-btn');
-                        pdfList.innerHTML = '';
-                        pdfList.appendChild(existingUploadButton);
-                    }
-
-                    if (querySnapshot.empty) {
-                        if (noPdfsMessage) noPdfsMessage.style.display = 'block';
-                        if (pdfViewerContainer) pdfViewerContainer.style.display = 'none';
-                        if (gridViewContainer) gridViewContainer.style.display = 'block';
-                    } else {
-                        if (noPdfsMessage) noPdfsMessage.style.display = 'none';
-                        querySnapshot.forEach((doc) => {
-                            const pdfData = doc.data();
-                            if (pdfData && pdfData.name && pdfData.url) {
-                                displayPdfItem(doc.id, pdfData);
-                            }
-                        });
-                        if (gridViewContainer) gridViewContainer.style.display = 'block';
-                    }
-                });
-            });
-
-            const displayPdfItem = (pdfId, pdfData) => {
-                if (!pdfList) return;
-                const pdfItemDiv = document.createElement('div');
-                pdfItemDiv.className = 'pdf-list-item flex flex-col items-center justify-center bg-[#181818] rounded-lg p-4 sm:p-6 shadow-lg hover:bg-[#2a2a2a] relative aspect-square';
-                pdfItemDiv.setAttribute('data-pdf-id', pdfId);
-                
-                const pdfIcon = document.createElement('div');
-                pdfIcon.innerHTML = `
-                    <svg class="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h2a2 2 0 012 2v1h6a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2z" />
-                    </svg>
-                `;
-                const pdfNameSpan = document.createElement('span');
-                pdfNameSpan.className = 'mt-4 font-semibold text-gray-400 text-sm sm:text-base text-center break-words max-w-full truncate';
-                pdfNameSpan.textContent = pdfData.name;
-
-                const actionsDiv = document.createElement('div');
-                actionsDiv.className = 'pdf-list-item-actions flex absolute top-2 right-2';
-
-                const deleteBtn = document.createElement('button');
-                deleteBtn.innerHTML = `
-                    <svg class="h-4 w-4 text-gray-400 hover:text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0
+        const pdfFileInput = document.getElementById('pdf-file-input
