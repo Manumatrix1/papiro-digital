@@ -2,110 +2,172 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Mis Tableros - Papiro Digital</title>
-    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
-    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Tablero - Papiro Digital</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f0f0f; }
+        .project-card { transition: transform 0.2s ease-in-out; aspect-ratio: 1 / 1; }
+        .project-card:hover { transform: translateY(-5px); }
+        .project-actions { display: none; gap: 0.5rem; }
+        .project-card:hover .project-actions { display: flex; }
+        #projects-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* Ajustado para mejor visualización */
+            gap: 1.5rem;
+        }
+    </style>
 </head>
-<body>
-
-    <nav class="navbar">
-        <div class="logo">Papiro Digital</div>
-        <div>
-            <span id="user-info"></span>
-            <button id="logout-btn" class="btn btn-danger">Cerrar Sesión</button>
+<body class="text-white">
+    <header class="bg-[#181818] border-b border-[#2a2a2a] py-4 px-6 sm:px-8 flex justify-between items-center">
+        <img src="https://i.postimg.cc/g0HxbpQF/PAPIRO-1.png" alt="Logo" class="h-10 w-auto">
+        <div class="flex-grow max-w-xl mx-4">
+            <input type="text" id="search-input" placeholder="Buscar en mis tableros..." class="w-full bg-[#2a2a2a] text-white placeholder-gray-400 border border-[#3a3a3a] rounded-full px-4 py-2 focus:ring-2 focus:ring-[#88c999] focus:outline-none">
         </div>
-    </nav>
-
-    <div class="container">
-        <h2>Mis Tableros</h2>
-        
-        <div id="create-project-form">
-            <h3>Crear Nuevo Tablero</h3>
-            <input type="text" id="project-name" placeholder="Nombre del tema (ej. Neurociencia)">
-            <button id="create-project-btn" class="btn">Crear Tablero</button>
+        <div class="flex items-center gap-4">
+            <span id="user-email" class="hidden sm:block"></span>
+            <button id="logout-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition">Salir</button>
         </div>
+    </header>
 
-        <div id="project-grid" class="project-grid">
+    <main class="p-6 sm:p-8">
+        <div class="mb-8 p-6 bg-[#181818] rounded-lg border border-[#2a2a2a]">
+            <h2 class="text-2xl font-bold mb-4">Crear un nuevo tablero</h2>
+            <div class="flex gap-4">
+                <input type="text" id="new-project-name" placeholder="Nombre del tema de estudio" class="flex-grow bg-[#2a2a2a] text-white border border-[#3a3a3a] rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#88c999] focus:outline-none">
+                <button id="add-project-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-6 rounded-lg hover:brightness-110 transition">Crear</button>
             </div>
-    </div>
+        </div>
 
-    <script src="firebase-config.js"></script>
-    <script>
-        const userInfo = document.getElementById('user-info');
-        const projectGrid = document.getElementById('project-grid');
-        const createProjectBtn = document.getElementById('create-project-btn');
+        <h1 class="text-3xl font-bold mb-6">Mis Tableros</h1>
+        <div id="projects-container">
+            </div>
+    </main>
+
+    <script type="module">
+        import { auth, db, storage } from './firebase-config.js';
+        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        import { collection, addDoc, onSnapshot, query, where, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { ref, deleteObject, listAll } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
+
+        const userEmailSpan = document.getElementById('user-email');
         const logoutBtn = document.getElementById('logout-btn');
-
+        const projectsContainer = document.getElementById('projects-container');
+        const addProjectBtn = document.getElementById('add-project-btn');
+        const newProjectNameInput = document.getElementById('new-project-name');
+        
         let currentUser;
 
-        auth.onAuthStateChanged(user => {
+        onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
-                userInfo.textContent = `Hola, ${user.email}`;
+                userEmailSpan.textContent = user.email;
                 loadProjects(user.uid);
             } else {
                 window.location.href = 'index.html';
             }
         });
 
-        logoutBtn.addEventListener('click', () => {
-            auth.signOut();
-        });
+        // Cargar y mostrar proyectos
+        function loadProjects(uid) {
+            const projectsRef = collection(db, "users", uid, "projects");
+            const q = query(projectsRef);
 
-        // Cargar proyectos del usuario
-        async function loadProjects(userId) {
-            const projectsRef = db.collection('users').doc(userId).collection('projects');
-            projectsRef.onSnapshot(snapshot => {
-                projectGrid.innerHTML = ''; // Limpiar la grilla
+            onSnapshot(q, (snapshot) => {
+                projectsContainer.innerHTML = '';
                 if (snapshot.empty) {
-                    projectGrid.innerHTML = "<p>Aún no tienes tableros. ¡Crea el primero!</p>";
-                    return;
+                    projectsContainer.innerHTML = `<p class="col-span-full text-gray-400">No tienes tableros. ¡Crea el primero para empezar a organizar tus estudios!</p>`;
                 }
-                snapshot.forEach(doc => {
+                snapshot.forEach((doc) => {
                     const project = doc.data();
                     const projectId = doc.id;
                     const card = document.createElement('div');
-                    card.className = 'project-card';
+                    card.className = "project-card bg-[#181818] rounded-lg p-4 flex flex-col justify-between border border-[#2a2a2a] group";
                     card.innerHTML = `
-                        <h3>${project.name}</h3>
-                        <p>Creado: ${project.createdAt.toDate().toLocaleDateString()}</p>
-                        <div class="project-card-actions">
-                            <a href="espacio.html?projectId=${projectId}" class="btn">Abrir</a>
-                            <button class="btn btn-danger" onclick="deleteProject('${projectId}')">Borrar</button>
+                        <a href="espacio.html?id=${projectId}" class="flex flex-col h-full">
+                            <div class="flex-grow flex items-center justify-center">
+                                <img src="${project.coverUrl || 'https://i.postimg.cc/g0HxbpQF/PAPIRO-1.png'}" alt="Portada" class="max-h-24 object-contain rounded-md">
+                            </div>
+                            <h3 class="font-bold text-lg mt-4 text-center">${project.name}</h3>
+                        </a>
+                        <div class="project-actions absolute bottom-2 right-2">
+                            <button data-id="${projectId}" data-cover="${project.coverUrl || ''}" class="delete-btn bg-red-600 p-2 rounded-full hover:bg-red-700">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" /></svg>
+                            </button>
                         </div>
                     `;
-                    projectGrid.appendChild(card);
+                    projectsContainer.appendChild(card);
+                });
+
+                // Añadir listeners a los botones de borrado
+                document.querySelectorAll('.delete-btn').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (confirm('¿Estás seguro de que quieres eliminar este tablero y todo su contenido? Esta acción no se puede deshacer.')) {
+                            const projectId = button.dataset.id;
+                            const coverUrl = button.dataset.cover;
+                            deleteProject(projectId, coverUrl);
+                        }
+                    });
                 });
             });
         }
 
-        // Crear un nuevo proyecto
-        createProjectBtn.addEventListener('click', async () => {
-            const projectNameInput = document.getElementById('project-name');
-            const projectName = projectNameInput.value.trim();
-
-            if (projectName && currentUser) {
-                await db.collection('users').doc(currentUser.uid).collection('projects').add({
-                    name: projectName,
-                    owner: currentUser.uid,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                projectNameInput.value = ''; // Limpiar el input
-            } else {
-                alert('Por favor, introduce un nombre para el tablero.');
+        // Crear proyecto
+        addProjectBtn.addEventListener('click', async () => {
+            const name = newProjectNameInput.value.trim();
+            if (name && currentUser) {
+                try {
+                    await addDoc(collection(db, "users", currentUser.uid, "projects"), {
+                        name: name,
+                        createdAt: new Date()
+                    });
+                    newProjectNameInput.value = '';
+                } catch (error) {
+                    console.error("Error al crear tablero:", error);
+                }
             }
         });
+        
+        // Borrar proyecto y todo su contenido
+        const deleteProject = async (projectId, coverUrl) => {
+            if (!currentUser) return;
+            try {
+                // Borrar archivos PDF del storage
+                const filesFolderRef = ref(storage, `users/${currentUser.uid}/${projectId}`);
+                const filesList = await listAll(filesFolderRef);
+                await Promise.all(filesList.items.map(fileRef => deleteObject(fileRef)));
 
-        // Borrar un proyecto (Función global para el onclick)
-        async function deleteProject(projectId) {
-            if (confirm('¿Estás seguro de que quieres borrar este tablero y todo su contenido?')) {
-                await db.collection('users').doc(currentUser.uid).collection('projects').doc(projectId).delete();
-                // Nota: Borrar los archivos de Storage requeriría una Cloud Function para hacerlo de forma segura y completa.
+                // Borrar portada del storage
+                if (coverUrl) {
+                    try {
+                        const coverRef = ref(storage, coverUrl);
+                        await deleteObject(coverRef);
+                    } catch (storageError) {
+                        console.warn("No se encontró la portada para borrar o ya fue borrada:", storageError.code);
+                    }
+                }
+
+                // Borrar documentos de la subcolección 'pdfs'
+                const pdfsCollectionRef = collection(db, "users", currentUser.uid, "projects", projectId, "pdfs");
+                const pdfsSnapshot = await getDocs(pdfsCollectionRef);
+                await Promise.all(pdfsSnapshot.docs.map(pdfDoc => deleteDoc(pdfDoc.ref)));
+
+                // Finalmente, borrar el documento del proyecto
+                const projectDocRef = doc(db, "users", currentUser.uid, "projects", projectId);
+                await deleteDoc(projectDocRef);
+
+            } catch (error) {
+                console.error("Error al borrar el tablero:", error);
+                alert("No se pudo borrar el tablero completo.");
             }
-        }
+        };
+
+        logoutBtn.addEventListener('click', async () => {
+            await signOut(auth);
+        });
+
     </script>
 </body>
 </html>
