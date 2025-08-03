@@ -18,7 +18,7 @@
             top: 50%;
             right: 1.5rem;
             transform: translateY(-50%);
-            background-color: rgba(0, 0, 0, 0.7);
+            background-color: rgba(0, 0, 0, 0.75);
             color: white;
             padding: 0.5rem 1rem;
             border-radius: 9999px;
@@ -72,7 +72,7 @@
             </div>
         </div>
     </main>
-    <div id="page-number-indicator">1 / 1</div>
+    <div id="page-number-indicator"></div>
 
     <script type="module">
         import { auth, db, storage } from './firebase-config.js';
@@ -82,16 +82,12 @@
 
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-        // ===================================================================
-        // ==== LA SOLUCIÓN: ESPERAR A QUE EL HTML ESTÉ LISTO ANTES DE EJECUTAR ====
-        // ===================================================================
         document.addEventListener('DOMContentLoaded', () => {
             let currentUser = null;
             let projectId = null;
             let pageCanvases = [];
             let scrollTimeout = null;
 
-            // Selectores de elementos
             const projectTitleEl = document.getElementById('project-title');
             const mainContent = document.getElementById('main-content');
             const saveBtn = document.getElementById('save-btn');
@@ -132,18 +128,6 @@
                 } finally {
                     pdfLoader.style.display = 'none';
                 }
-            };
-
-            const showGridView = () => {
-                pdfViewerContainer.classList.add('hidden');
-                gridViewContainer.classList.remove('hidden');
-                dynamicBackText.textContent = "Mis Tableros";
-            };
-
-            const showPdfView = (pdfName) => {
-                gridViewContainer.classList.add('hidden');
-                pdfViewerContainer.classList.remove('hidden');
-                dynamicBackText.textContent = projectTitleEl.value;
             };
 
             onAuthStateChanged(auth, (user) => {
@@ -215,22 +199,39 @@
                     });
                 });
 
+                // ===================================================================
+                // ==== LÓGICA DE SCROLL CORREGIDA ===================================
+                // ===================================================================
                 mainContent.addEventListener('scroll', () => {
-                    if (pageCanvases.length === 0) return;
+                    // Solo activar el indicador si estamos en la vista de PDF
+                    if (pdfViewerContainer.classList.contains('hidden')) {
+                        return;
+                    }
+                    
+                    // Mostrar el indicador
                     pageNumberIndicator.style.opacity = '1';
+
+                    // Ocultarlo después de un tiempo de inactividad
                     clearTimeout(scrollTimeout);
                     scrollTimeout = setTimeout(() => {
                         pageNumberIndicator.style.opacity = '0';
                     }, 1500);
 
+                    // Si no hay páginas cargadas, no hacer nada más
+                    if (pageCanvases.length === 0) return;
+
+                    // Encontrar la página más visible
                     let currentPage = 1;
                     for (const canvas of pageCanvases) {
                         const rect = canvas.getBoundingClientRect();
-                        if (rect.top >= 0 && rect.top < window.innerHeight / 2) {
+                        // El criterio es: la primera página cuya parte superior
+                        // esté dentro del área visible de la pantalla.
+                        if (rect.top >= 0 && rect.top < window.innerHeight) {
                             currentPage = parseInt(canvas.dataset.pageNumber, 10);
                             break;
                         }
                     }
+                    
                     pageNumberIndicator.textContent = `${currentPage} / ${pageCanvases.length}`;
                 });
                 
@@ -239,7 +240,7 @@
                         window.location.href = 'mi_tablero.html';
                     } else {
                         showGridView();
-                        pageNumberIndicator.style.opacity = '0';
+                        pageNumberator.style.opacity = '0'; // Ocultar al volver
                     }
                 });
 
@@ -250,26 +251,18 @@
                 pdfFileInput.addEventListener('change', (e) => uploadFile(e.target.files[0], 'pdf'));
             });
 
+            const showGridView = () => {
+                pdfViewerContainer.classList.add('hidden');
+                gridViewContainer.classList.remove('hidden');
+                dynamicBackText.textContent = "Mis Tableros";
+            };
+
+            const showPdfView = (pdfName) => {
+                gridViewContainer.classList.add('hidden');
+                pdfViewerContainer.classList.remove('hidden');
+                dynamicBackText.textContent = projectTitleEl.value;
+            };
+
             const uploadFile = (file, type) => {
                 if (!file || !currentUser || !projectId) return;
-                const firestoreRef = type === 'cover' ? doc(db, "users", currentUser.uid, "projects", projectId) : collection(db, "users", currentUser.uid, "projects", projectId, "pdfs");
-                const storagePath = type === 'cover' ? `users/${currentUser.uid}/projects/${projectId}/cover_${Date.now()}_${file.name}` : `users/${currentUser.uid}/projects/${projectId}/pdfs/${Date.now()}_${file.name}`;
-                const fileRef = ref(storage, storagePath);
-                const uploadTask = uploadBytesResumable(fileRef, file);
-                
-                uploadTask.on('state_changed', null, 
-                    (error) => console.error("Error al subir:", error), 
-                    async () => {
-                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                        if (type === 'cover') {
-                            await updateDoc(firestoreRef, { coverUrl: downloadURL, coverStoragePath: storagePath });
-                        } else {
-                            await addDoc(firestoreRef, { name: file.name, url: downloadURL, storagePath, createdAt: new Date() });
-                        }
-                    }
-                );
-            };
-        });
-    </script>
-</body>
-</html>
+                const firestoreRef = type === 'cover' ? doc(db, "users", currentUser.uid, "projects", projectId) : collection(db, "users", currentUser.uid, "projects
