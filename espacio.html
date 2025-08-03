@@ -162,8 +162,7 @@
         let currentPdfId = null;
         let currentPdfRef = null;
         let pagesHeight = [];
-        let renderPagePending = false;
-        let pagesRendering = false;
+        let resizeObserver = null;
 
         const pageTitleEl = document.getElementById('page-title');
         const projectTitleEl = document.getElementById('project-title');
@@ -171,28 +170,23 @@
         const pdfLoaderText = document.getElementById('pdf-loader-text');
         const saveBtn = document.getElementById('save-btn');
         const logoutBtn = document.getElementById('logout-btn');
-
         const gridViewContainer = document.getElementById('grid-view-container');
         const coverSection = document.getElementById('cover-section');
         const coverContainer = document.getElementById('cover-container');
         const coverPlaceholder = document.getElementById('cover-placeholder');
         const uploadCoverBtn = document.getElementById('upload-cover-btn');
         const coverFileInput = document.getElementById('cover-file-input');
-
         const pdfsSection = document.getElementById('pdfs-section');
         const pdfList = document.getElementById('pdf-list');
         const visualUploadBtn = document.getElementById('visual-upload-btn');
         const pdfFileInput = document.getElementById('pdf-file-input');
         const noPdfsMessage = document.getElementById('no-pdfs-message');
-        
         const pdfViewerContainer = document.getElementById('pdf-viewer-container');
         const dynamicBackBtn = document.getElementById('dynamic-back-btn');
         const dynamicBackText = document.getElementById('dynamic-back-text');
         const pagesContainer = document.getElementById('pages-container');
-
         const pageNumberIndicator = document.getElementById('page-number-indicator');
         let scrollTimeout = null;
-        let resizeObserver = null;
 
         document.addEventListener('DOMContentLoaded', () => {
             onAuthStateChanged(auth, async (user) => {
@@ -222,15 +216,19 @@
                                 coverContainer.style.backgroundImage = `url('${projectData.coverUrl}')`;
                                 coverContainer.classList.remove('bg-[#2a2a2a]');
                             }
-                            if (coverPlaceholder) coverPlaceholder.parentElement.classList.add('opacity-0');
-                            if (coverPlaceholder) coverPlaceholder.textContent = 'Cambiar Portada';
+                            if (coverPlaceholder) {
+                                coverPlaceholder.parentElement.classList.add('opacity-0');
+                                coverPlaceholder.textContent = 'Cambiar Portada';
+                            }
                         } else {
                             if (coverContainer) {
                                 coverContainer.style.backgroundImage = 'none';
                                 coverContainer.classList.add('bg-[#2a2a2a]');
                             }
-                            if (coverPlaceholder) coverPlaceholder.parentElement.classList.remove('opacity-0');
-                            if (coverPlaceholder) coverPlaceholder.textContent = 'Añadir Portada';
+                            if (coverPlaceholder) {
+                                coverPlaceholder.parentElement.classList.remove('opacity-0');
+                                coverPlaceholder.textContent = 'Añadir Portada';
+                            }
                         }
                     } else {
                         alert("Este proyecto ya no existe.");
@@ -241,8 +239,8 @@
                 const pdfsCollectionRef = collection(currentProjectRef, "pdfs");
                 const q = query(pdfsCollectionRef, orderBy("createdAt", "desc"));
                 onSnapshot(q, (querySnapshot) => {
+                    const existingUploadButton = document.getElementById('visual-upload-btn');
                     if (pdfList) {
-                        const existingUploadButton = document.getElementById('visual-upload-btn');
                         pdfList.innerHTML = '';
                         if (existingUploadButton) pdfList.appendChild(existingUploadButton);
                     }
@@ -406,11 +404,13 @@
             };
 
             let scrollTimeout = null;
-            if (pagesContainer && pageNumberIndicator) {
+            if (pagesContainer) {
                 pagesContainer.addEventListener('scroll', () => {
                     clearTimeout(scrollTimeout);
-                    pageNumberIndicator.style.display = 'block';
-                    pageNumberIndicator.style.opacity = '1';
+                    if (pageNumberIndicator) {
+                        pageNumberIndicator.style.display = 'block';
+                        pageNumberIndicator.style.opacity = '1';
+                    }
 
                     const pages = pagesContainer.querySelectorAll('canvas');
                     let currentPage = 1;
@@ -421,10 +421,10 @@
                             currentPage = index + 1;
                         }
                     });
-                    pageNumberIndicator.textContent = currentPage;
+                    if (pageNumberIndicator) pageNumberIndicator.textContent = currentPage;
 
                     scrollTimeout = setTimeout(() => {
-                        pageNumberIndicator.style.opacity = '0';
+                        if (pageNumberIndicator) pageNumberIndicator.style.opacity = '0';
                     }, 1000);
                 });
             }
