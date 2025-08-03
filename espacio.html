@@ -28,27 +28,24 @@
         #pdf-loader-container {
             display: none;
         }
-        #cover-container {
-            width: 100%;
-            height: 150px;
-            background-color: #2a2a2a;
-            position: relative;
-            overflow: hidden;
-            border-radius: 8px;
-            background-size: cover;
-            background-position: center;
-        }
-        @media (min-width: 640px) {
-            #cover-container {
-                height: 250px;
-            }
-        }
-        #pdf-viewer-container {
+        /* Estilos del modal para móvil y escritorio */
+        #mobile-sidebar-modal {
             display: none;
+        }
+        #mobile-sidebar-modal.open {
+            display: flex;
+        }
+        @media (min-width: 768px) {
+            #mobile-sidebar-modal {
+                display: none !important;
+            }
+            #sidebar {
+                display: block !important;
+            }
         }
     </style>
 </head>
-<body class="text-white flex flex-col min-h-screen">
+<body class="text-white flex flex-col h-screen">
     <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-4 sm:px-8 flex justify-between items-center sticky top-0 z-10">
         <div class="flex items-center gap-4">
             <a href="mi_tablero.html" class="flex items-center text-gray-400 hover:text-white transition group">
@@ -59,58 +56,81 @@
             </a>
             <input id="project-title" type="text" class="bg-transparent text-xl sm:text-2xl font-bold text-white focus:outline-none w-full truncate" value="Cargando...">
         </div>
-        
+
         <div class="flex items-center gap-2 sm:gap-4">
             <button id="save-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-3 sm:px-4 rounded-lg hover:brightness-110 transition text-sm sm:text-base">Guardar Título</button>
+            <button id="show-sidebar-btn" class="bg-[#2a2a2a] text-white font-bold py-2 px-3 sm:px-4 rounded-lg hover:brightness-110 transition text-sm sm:text-base">
+                <span class="hidden sm:inline">Mis PDFs</span>
+                <svg class="h-5 w-5 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
             <button id="logout-btn" class="text-gray-400 hover:text-white transition text-sm sm:text-base">Cerrar Sesión</button>
         </div>
     </header>
 
-    <main class="flex-1 flex flex-col items-center overflow-auto p-4 sm:p-8" id="main-content">
-        <div id="cover-section" class="w-full max-w-4xl flex justify-center items-center">
-            <div id="cover-container" class="relative group w-full flex items-center justify-center rounded-lg">
-                <div class="absolute inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center text-center p-4 transition-opacity">
-                    <span id="cover-placeholder" class="text-xl font-bold text-gray-300 mb-2">Añadir Portada</span>
-                    <p class="text-sm text-gray-400 mb-4">Haz clic para añadir o cambiar la portada.<br>(Recomendado: 1200x400 px)</p>
-                    <button id="upload-cover-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-4 rounded-lg hover:brightness-110 transition text-sm">
-                        Subir Imagen
-                    </button>
-                    <input type="file" id="cover-file-input" class="hidden" accept="image/*">
-                </div>
-            </div>
-        </div>
-
-        <div id="pdfs-section" class="w-full max-w-4xl mt-8">
+    <main class="flex flex-1 overflow-hidden p-4 sm:p-8" id="main-content">
+        <aside id="sidebar" class="hidden w-full sm:w-64 bg-[#181818] border border-[#2a2a2a] rounded-lg p-4 mr-4 sm:mr-8 overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-lg font-semibold">Mis PDFs</h2>
             </div>
-            <div id="pdf-list" class="space-y-2">
-                <div class="flex flex-col items-center p-4 border border-dashed border-gray-600 rounded-lg text-gray-400 hover:bg-[#2a2a2a] transition cursor-pointer" id="visual-upload-btn">
+            <div id="pdf-list-desktop" class="space-y-2">
+                <div class="flex flex-col items-center p-4 border border-dashed border-gray-600 rounded-lg text-gray-400 hover:bg-[#2a2a2a] transition cursor-pointer" id="visual-upload-btn-desktop">
                     <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
                     <span class="text-sm mt-2">Nuevo PDF</span>
                 </div>
             </div>
-            <input type="file" id="pdf-file-input" class="hidden" accept="application/pdf">
-            <div id="no-pdfs-message" class="text-gray-500 text-sm mt-4" style="display: none;">
+            <input type="file" id="pdf-file-input-desktop" class="hidden" accept="application/pdf">
+            <div id="no-pdfs-message-desktop" class="text-gray-500 text-sm mt-4" style="display: none;">
                 No hay PDFs en este tablero.
             </div>
-        </div>
+        </aside>
 
-        <div id="pdf-loader-container" class="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
-            <div class="text-center">
-                <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#88c999]"></div>
-                <p id="pdf-loader-text" class="mt-4 text-xl">Cargando PDF...</p>
+        <div id="mobile-sidebar-modal" class="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
+            <div class="bg-[#181818] w-11/12 max-w-sm rounded-lg p-6 relative">
+                <button id="close-modal-btn" class="absolute top-4 right-4 text-gray-400 hover:text-white">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+                <h2 class="text-lg font-semibold mb-4">Mis PDFs</h2>
+                <div id="pdf-list-mobile" class="space-y-2 max-h-96 overflow-y-auto">
+                    <div class="flex flex-col items-center p-4 border border-dashed border-gray-600 rounded-lg text-gray-400 hover:bg-[#2a2a2a] transition cursor-pointer" id="visual-upload-btn-mobile">
+                        <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        <span class="text-sm mt-2">Nuevo PDF</span>
+                    </div>
+                </div>
+                <input type="file" id="pdf-file-input-mobile" class="hidden" accept="application/pdf">
+                <div id="no-pdfs-message-mobile" class="text-gray-500 text-sm mt-4" style="display: none;">
+                    No hay PDFs en este tablero.
+                </div>
             </div>
         </div>
 
-        <div id="pdf-viewer-container" class="mt-4 sm:mt-8 relative w-full">
-            <canvas id="pdf-render" class="bg-[#181818] rounded-md"></canvas>
-            <div id="pdf-controls" class="mt-4 flex justify-center gap-4" style="display: none;">
-                <button id="prev-page-btn" class="bg-[#2a2a2a] text-white px-4 py-2 rounded-lg hover:bg-[#3a3a3a]">Página Anterior</button>
-                <span id="page-info" class="self-center"></span>
-                <button id="next-page-btn" class="bg-[#2a2a3a] text-white px-4 py-2 rounded-lg hover:bg-[#3a3a3a]">Página Siguiente</button>
+        <div class="flex-1 flex flex-col items-center overflow-auto">
+            <div id="pdf-loader-container" class="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
+                <div class="text-center">
+                    <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#88c999]"></div>
+                    <p id="pdf-loader-text" class="mt-4 text-xl">Cargando PDF...</p>
+                </div>
+            </div>
+
+            <div id="pdf-viewer-container" class="mt-4 sm:mt-8 relative max-w-full w-full">
+                <div id="no-pdf-message" class="text-center text-gray-500 text-lg p-10 border border-dashed border-gray-700 rounded-lg" style="display: none;">
+                    <p>No hay PDFs en este tablero. Usa el botón "Mis PDFs" para subir uno.</p>
+                </div>
+
+                <canvas id="pdf-render" class="bg-[#181818] rounded-md"></canvas>
+
+                <div id="pdf-controls" class="mt-4 flex justify-center gap-4" style="display: none;">
+                    <button id="prev-page-btn" class="bg-[#2a2a2a] text-white px-4 py-2 rounded-lg hover:bg-[#3a3a3a]">Página Anterior</button>
+                    <span id="page-info" class="self-center"></span>
+                    <button id="next-page-btn" class="bg-[#2a2a3a] text-white px-4 py-2 rounded-lg hover:bg-[#3a3a3a]">Página Siguiente</button>
+                </div>
             </div>
         </div>
     </main>
@@ -137,24 +157,25 @@
         const saveBtn = document.getElementById('save-btn');
         const logoutBtn = document.getElementById('logout-btn');
         const pdfRenderCanvas = document.getElementById('pdf-render');
+        const noPdfMessage = document.getElementById('no-pdf-message');
         const pdfControls = document.getElementById('pdf-controls');
         const prevPageBtn = document.getElementById('prev-page-btn');
         const nextPageBtn = document.getElementById('next-page-btn');
         const pageInfoSpan = document.getElementById('page-info');
-        
-        const coverSection = document.getElementById('cover-section');
-        const coverContainer = document.getElementById('cover-container');
-        const coverPlaceholder = document.getElementById('cover-placeholder');
-        const uploadCoverBtn = document.getElementById('upload-cover-btn');
-        const coverFileInput = document.getElementById('cover-file-input');
+        const sidebarDesktop = document.getElementById('sidebar');
+        const pdfListDesktop = document.getElementById('pdf-list-desktop');
+        const noPdfsMessageDesktop = document.getElementById('no-pdfs-message-desktop');
+        const visualUploadBtnDesktop = document.getElementById('visual-upload-btn-desktop');
+        const pdfFileInputDesktop = document.getElementById('pdf-file-input-desktop');
 
-        const pdfsSection = document.getElementById('pdfs-section');
-        const pdfList = document.getElementById('pdf-list');
-        const visualUploadBtn = document.getElementById('visual-upload-btn');
-        const pdfFileInput = document.getElementById('pdf-file-input');
-        const noPdfsMessage = document.getElementById('no-pdfs-message');
-        
-        const pdfViewerContainer = document.getElementById('pdf-viewer-container');
+        const showSidebarBtn = document.getElementById('show-sidebar-btn');
+        const mobileSidebarModal = document.getElementById('mobile-sidebar-modal');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const pdfListMobile = document.getElementById('pdf-list-mobile');
+        const visualUploadBtnMobile = document.getElementById('visual-upload-btn-mobile');
+        const pdfFileInputMobile = document.getElementById('pdf-file-input-mobile');
+        const noPdfsMessageMobile = document.getElementById('no-pdfs-message-mobile');
+        const mainContent = document.querySelector('main');
 
         onAuthStateChanged(auth, async (user) => {
             currentUser = user;
@@ -177,18 +198,6 @@
                     const projectData = docSnap.data();
                     projectTitleEl.value = projectData.name;
                     pageTitleEl.textContent = projectData.name;
-                    
-                    if (projectData.coverUrl) {
-                        coverContainer.style.backgroundImage = `url('${projectData.coverUrl}')`;
-                        coverContainer.classList.remove('bg-[#2a2a2a]');
-                        coverPlaceholder.parentElement.classList.add('opacity-0');
-                        coverPlaceholder.textContent = 'Cambiar Portada';
-                    } else {
-                        coverContainer.style.backgroundImage = 'none';
-                        coverContainer.classList.add('bg-[#2a2a2a]');
-                        coverPlaceholder.parentElement.classList.remove('opacity-0');
-                        coverPlaceholder.textContent = 'Añadir Portada';
-                    }
                 } else {
                     alert("Este proyecto ya no existe.");
                     window.location.href = 'mi_tablero.html';
@@ -198,27 +207,52 @@
             const pdfsCollectionRef = collection(currentProjectRef, "pdfs");
             const q = query(pdfsCollectionRef, orderBy("createdAt", "desc"));
             onSnapshot(q, (querySnapshot) => {
-                pdfList.innerHTML = '';
-                pdfList.appendChild(visualUploadBtn);
+                pdfListDesktop.innerHTML = '';
+                pdfListMobile.innerHTML = '';
+
+                pdfListDesktop.appendChild(visualUploadBtnDesktop);
+                pdfListMobile.appendChild(visualUploadBtnMobile);
 
                 if (querySnapshot.empty) {
-                    noPdfsMessage.style.display = 'block';
-                    pdfViewerContainer.style.display = 'none';
-                    pdfsSection.style.display = 'block';
+                    noPdfsMessageDesktop.style.display = 'block';
+                    noPdfsMessageMobile.style.display = 'block';
+                    noPdfMessage.style.display = 'block';
+                    pdfRenderCanvas.style.display = 'none';
+                    pdfControls.style.display = 'none';
                 } else {
-                    noPdfsMessage.style.display = 'none';
+                    noPdfsMessageDesktop.style.display = 'none';
+                    noPdfsMessageMobile.style.display = 'none';
                     querySnapshot.forEach((doc) => {
                         const pdfData = doc.data();
                         if (pdfData && pdfData.name && pdfData.url) {
-                            displayPdfItem(doc.id, pdfData);
+                            displayPdfItem(doc.id, pdfData, 'desktop');
+                            displayPdfItem(doc.id, pdfData, 'mobile');
                         }
                     });
-                    pdfsSection.style.display = 'block';
+
+                    if (!currentPdfId) {
+                        const firstPdf = querySnapshot.docs.shift();
+                        if (firstPdf) {
+                            renderPdf(firstPdf.id, firstPdf.data());
+                            document.querySelector(`.pdf-list-item[data-pdf-id='${firstPdf.id}']`)?.classList.add('active');
+                        } else {
+                            noPdfMessage.style.display = 'block';
+                            pdfRenderCanvas.style.display = 'none';
+                            pdfControls.style.display = 'none';
+                            pageTitleEl.textContent = projectTitleEl.value;
+                        }
+                    } else {
+                        document.querySelectorAll('.pdf-list-item').forEach(el => el.classList.remove('active'));
+                        const currentActivePdf = document.querySelector(`.pdf-list-item[data-pdf-id='${currentPdfId}']`);
+                        if (currentActivePdf) {
+                            currentActivePdf.classList.add('active');
+                        }
+                    }
                 }
             });
         });
 
-        const displayPdfItem = (pdfId, pdfData) => {
+        const displayPdfItem = (pdfId, pdfData, target) => {
             const pdfItemDiv = document.createElement('div');
             pdfItemDiv.className = 'pdf-list-item flex items-center justify-between p-2 rounded-md';
             pdfItemDiv.setAttribute('data-pdf-id', pdfId);
@@ -243,14 +277,18 @@
 
             pdfItemDiv.appendChild(pdfNameSpan);
             pdfItemDiv.appendChild(deleteBtn);
-            pdfList.appendChild(pdfItemDiv);
+
+            if (target === 'desktop') {
+                pdfListDesktop.appendChild(pdfItemDiv);
+            } else {
+                pdfListMobile.appendChild(pdfItemDiv);
+            }
 
             pdfItemDiv.addEventListener('click', () => {
                 document.querySelectorAll('.pdf-list-item').forEach(el => el.classList.remove('active'));
                 document.querySelectorAll(`.pdf-list-item[data-pdf-id='${pdfId}']`).forEach(el => el.classList.add('active'));
                 renderPdf(pdfId, pdfData);
-                coverSection.style.display = 'none';
-                pdfViewerContainer.style.display = 'block';
+                closeModal();
             });
         };
 
@@ -263,8 +301,9 @@
                 await deleteDoc(pdfDocRef);
 
                 if (pdfId === currentPdfId) {
-                    pdfViewerContainer.style.display = 'none';
-                    coverSection.style.display = 'flex';
+                    pdfRenderCanvas.style.display = 'none';
+                    pdfControls.style.display = 'none';
+                    noPdfMessage.style.display = 'block';
                     pageTitleEl.textContent = projectTitleEl.value;
                     currentPdfId = null;
                     currentPdfRef = null;
@@ -278,7 +317,10 @@
         const renderPdf = (pdfId, pdfData) => {
             currentPdfId = pdfId;
             currentPdfRef = doc(currentProjectRef, "pdfs", pdfId);
+
             pageTitleEl.textContent = pdfData.name;
+            noPdfMessage.style.display = 'none';
+            pdfRenderCanvas.style.display = 'block';
             pdfLoaderText.textContent = "Cargando PDF...";
             pdfLoaderContainer.style.display = 'flex';
 
@@ -292,8 +334,9 @@
             }, function (reason) {
                 console.error('Error al cargar el PDF:', reason);
                 alert('No se pudo cargar el PDF. Verifica que el archivo exista y los permisos.');
-                pdfViewerContainer.style.display = 'none';
-                coverSection.style.display = 'flex';
+                noPdfMessage.style.display = 'block';
+                pdfRenderCanvas.style.display = 'none';
+                pdfControls.style.display = 'none';
                 pdfLoaderContainer.style.display = 'none';
             });
         };
@@ -304,17 +347,12 @@
                 const viewerContainer = document.getElementById('pdf-viewer-container');
                 const containerWidth = viewerContainer.offsetWidth;
                 const viewport = page.getViewport({ scale: 1 });
-                
-                const devicePixelRatio = window.devicePixelRatio || 1;
-                const scale = (containerWidth / viewport.width) * devicePixelRatio;
+                const scale = containerWidth / viewport.width;
                 const scaledViewport = page.getViewport({ scale });
 
                 const context = pdfRenderCanvas.getContext('2d');
                 pdfRenderCanvas.height = scaledViewport.height;
                 pdfRenderCanvas.width = scaledViewport.width;
-                
-                pdfRenderCanvas.style.width = `${containerWidth}px`;
-                pdfRenderCanvas.style.height = `${scaledViewport.height / devicePixelRatio}px`;
 
                 const renderContext = {
                     canvasContext: context,
@@ -340,43 +378,44 @@
             renderPage(pageNum);
         };
 
-        uploadCoverBtn.addEventListener('click', () => {
-            coverFileInput.click();
+        const openModal = () => {
+            mobileSidebarModal.classList.add('open');
+        };
+
+        const closeModal = () => {
+            mobileSidebarModal.classList.remove('open');
+        };
+
+        // Escucha del botón "Mis PDFs" para abrir el modal en móvil
+        showSidebarBtn.addEventListener('click', () => {
+            openModal();
         });
 
-        coverFileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            const coverPath = `${currentUser.uid}/${currentProjectRef.id}/cover/${file.name}`;
-            const storageRef = ref(storage, coverPath);
-            const uploadTask = uploadBytesResumable(storageRef, file);
-
-            uploadTask.on('state_changed',
-                (snapshot) => {
-                    // Opcional: mostrar un loader
-                },
-                (error) => {
-                    console.error("Error al subir la portada:", error);
-                    alert("Hubo un error al subir la portada.");
-                },
-                async () => {
-                    const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                    await updateDoc(currentProjectRef, { coverUrl: downloadURL });
-                    alert("¡Portada subida con éxito!");
-                }
-            );
-        });
-
-        visualUploadBtn.addEventListener('click', () => {
-            if (currentProjectRef) {
-                pdfFileInput.click();
+        // Evento para cerrar el modal
+        closeModalBtn.addEventListener('click', closeModal);
+        mobileSidebarModal.addEventListener('click', (e) => {
+            if (e.target.id === 'mobile-sidebar-modal') {
+                closeModal();
             }
         });
 
-        pdfFileInput.addEventListener('change', (e) => handleFileUpload(e));
+        // Manejo de eventos de click para los botones de subir PDF
+        visualUploadBtnDesktop.addEventListener('click', () => {
+            if (currentProjectRef) {
+                pdfFileInputDesktop.click();
+            }
+        });
 
-        const handleFileUpload = (e) => {
+        visualUploadBtnMobile.addEventListener('click', () => {
+            if (currentProjectRef) {
+                pdfFileInputMobile.click();
+            }
+        });
+
+        pdfFileInputDesktop.addEventListener('change', (e) => handleFileUpload(e, 'desktop'));
+        pdfFileInputMobile.addEventListener('change', (e) => handleFileUpload(e, 'mobile'));
+
+        const handleFileUpload = (e, source) => {
             const file = e.target.files[0];
             if (!file) return;
 
@@ -408,6 +447,7 @@
                     });
                     pdfLoaderContainer.style.display = 'none';
                     renderPdf(newPdfRef.id, { name: file.name, url: downloadURL });
+                    closeModal(); // Asegurarse de que el modal se cierre
                 }
             );
         };
@@ -439,6 +479,7 @@
         prevPageBtn.addEventListener('click', onPrevPage);
         nextPageBtn.addEventListener('click', onNextPage);
         
+        // Listener para redimensionar el PDF si el tamaño de la ventana cambia
         window.addEventListener('resize', () => {
             if (pdfDoc && currentPdfId) {
                 renderPage(pageNum);
