@@ -161,7 +161,7 @@
         let pagesHeight = [];
         let renderPagePending = false;
         let pagesRendering = false;
-        
+
         const pageTitleEl = document.getElementById('page-title');
         const projectTitleEl = document.getElementById('project-title');
         const pdfLoaderContainer = document.getElementById('pdf-loader-container');
@@ -190,6 +190,7 @@
         const pageNumberIndicator = document.getElementById('page-number-indicator');
         let scrollTimeout = null;
         let resizeObserver = null;
+        let pageRenderingPromises = [];
 
         document.addEventListener('DOMContentLoaded', () => {
             onAuthStateChanged(auth, async (user) => {
@@ -211,17 +212,21 @@
                 onSnapshot(currentProjectRef, (docSnap) => {
                     if (docSnap.exists()) {
                         const projectData = docSnap.data();
-                        projectTitleEl.value = projectData.name;
-                        pageTitleEl.textContent = projectData.name;
+                        if (projectTitleEl) projectTitleEl.value = projectData.name;
+                        if (pageTitleEl) pageTitleEl.textContent = projectData.name;
                         
                         if (projectData.coverUrl) {
-                            if (coverContainer) coverContainer.style.backgroundImage = `url('${projectData.coverUrl}')`;
-                            if (coverContainer) coverContainer.classList.remove('bg-[#2a2a2a]');
+                            if (coverContainer) {
+                                coverContainer.style.backgroundImage = `url('${projectData.coverUrl}')`;
+                                coverContainer.classList.remove('bg-[#2a2a2a]');
+                            }
                             if (coverPlaceholder) coverPlaceholder.parentElement.classList.add('opacity-0');
                             if (coverPlaceholder) coverPlaceholder.textContent = 'Cambiar Portada';
                         } else {
-                            if (coverContainer) coverContainer.style.backgroundImage = 'none';
-                            if (coverContainer) coverContainer.classList.add('bg-[#2a2a2a]');
+                            if (coverContainer) {
+                                coverContainer.style.backgroundImage = 'none';
+                                coverContainer.classList.add('bg-[#2a2a2a]');
+                            }
                             if (coverPlaceholder) coverPlaceholder.parentElement.classList.remove('opacity-0');
                             if (coverPlaceholder) coverPlaceholder.textContent = 'Añadir Portada';
                         }
@@ -234,8 +239,8 @@
                 const pdfsCollectionRef = collection(currentProjectRef, "pdfs");
                 const q = query(pdfsCollectionRef, orderBy("createdAt", "desc"));
                 onSnapshot(q, (querySnapshot) => {
-                    const existingUploadButton = document.getElementById('visual-upload-btn');
                     if (pdfList) {
+                        const existingUploadButton = document.getElementById('visual-upload-btn');
                         pdfList.innerHTML = '';
                         pdfList.appendChild(existingUploadButton);
                     }
@@ -279,264 +284,4 @@
                 const deleteBtn = document.createElement('button');
                 deleteBtn.innerHTML = `
                     <svg class="h-4 w-4 text-gray-400 hover:text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                `;
-                deleteBtn.className = 'p-1';
-                deleteBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    if (confirm(`¿Estás seguro de que quieres borrar el PDF "${pdfData.name}"?`)) {
-                        deletePdf(pdfId, pdfData.storagePath);
-                    }
-                });
-
-                actionsDiv.appendChild(deleteBtn);
-                pdfItemDiv.appendChild(pdfIcon);
-                pdfItemDiv.appendChild(pdfNameSpan);
-                pdfItemDiv.appendChild(actionsDiv);
-                pdfList.appendChild(pdfItemDiv);
-
-                pdfItemDiv.addEventListener('click', () => {
-                    document.querySelectorAll('.pdf-list-item').forEach(el => el.classList.remove('active'));
-                    pdfItemDiv.classList.add('active');
-                    renderPdf(pdfId, pdfData);
-                    if (gridViewContainer) gridViewContainer.style.display = 'none';
-                    if (pdfViewerContainer) pdfViewerContainer.style.display = 'block';
-                    if (pageTitleEl) pageTitleEl.textContent = pdfData.name;
-                });
-            };
-
-            const deletePdf = async (pdfId, storagePath) => {
-                try {
-                    const fileRef = ref(storage, storagePath);
-                    await deleteObject(fileRef);
-
-                    const pdfDocRef = doc(currentProjectRef, "pdfs", pdfId);
-                    await deleteDoc(pdfDocRef);
-
-                    if (pdfId === currentPdfId) {
-                        currentPdfId = null;
-                        currentPdfRef = null;
-                        backToGrid();
-                    }
-                } catch (error) {
-                    console.error("Error al borrar el PDF:", error);
-                    alert("No se pudo borrar el PDF.");
-                }
-            };
-
-            const renderPdf = async (pdfId, pdfData) => {
-                currentPdfId = pdfId;
-                currentPdfRef = doc(currentProjectRef, "pdfs", pdfId);
-
-                if (pdfLoaderText) pdfLoaderText.textContent = "Cargando PDF...";
-                if (pdfLoaderContainer) pdfLoaderContainer.style.display = 'flex';
-                if (pagesContainer) pagesContainer.innerHTML = '';
-                
-                try {
-                    const loadingTask = pdfjsLib.getDocument(pdfData.url);
-                    pdfDoc = await loadingTask.promise;
-                    
-                    for (let i = 1; i <= pdfDoc.numPages; i++) {
-                        const canvas = document.createElement('canvas');
-                        canvas.className = 'mb-4 rounded-md';
-                        canvas.id = `page-${i}`;
-                        if (pagesContainer) pagesContainer.appendChild(canvas);
-                    }
-                    
-                    if (pdfLoaderContainer) pdfLoaderContainer.style.display = 'none';
-                    if (pagesContainer) pagesContainer.scrollTop = 0;
-                    
-                    // Renderizar las páginas
-                    const pageCanvases = pagesContainer.querySelectorAll('canvas');
-                    for (let i = 0; i < pageCanvases.length; i++) {
-                        renderPage(pageCanvases[i], i + 1);
-                    }
-
-                } catch (reason) {
-                    console.error('Error al cargar el PDF:', reason);
-                    alert('No se pudo cargar el PDF. Verifica que el archivo exista y los permisos.');
-                    backToGrid();
-                    if (pdfLoaderContainer) pdfLoaderContainer.style.display = 'none';
-                }
-            };
-
-            const renderPage = (canvas, num) => {
-                if (!pdfDoc) return;
-                pdfDoc.getPage(num).then(function(page) {
-                    const viewerContainer = document.getElementById('pdf-viewer-container');
-                    if (!viewerContainer) return;
-
-                    const containerWidth = viewerContainer.offsetWidth;
-                    const viewport = page.getViewport({ scale: 1 });
-                    
-                    const devicePixelRatio = window.devicePixelRatio || 1;
-                    const scale = (containerWidth / viewport.width) * devicePixelRatio;
-                    const scaledViewport = page.getViewport({ scale });
-
-                    const context = canvas.getContext('2d');
-                    canvas.height = scaledViewport.height;
-                    canvas.width = scaledViewport.width;
-                    
-                    canvas.style.width = `${containerWidth}px`;
-                    canvas.style.height = `${scaledViewport.height / devicePixelRatio}px`;
-
-                    const renderContext = {
-                        canvasContext: context,
-                        viewport: scaledViewport
-                    };
-                    page.render(renderContext);
-                });
-            };
-
-            const backToGrid = () => {
-                if (gridViewContainer) gridViewContainer.style.display = 'block';
-                if (pdfViewerContainer) pdfViewerContainer.style.display = 'none';
-                if (pageTitleEl && projectTitleEl) pageTitleEl.textContent = projectTitleEl.value;
-                currentPdfId = null;
-                currentPdfRef = null;
-                pdfDoc = null;
-                document.querySelectorAll('.pdf-list-item').forEach(el => el.classList.remove('active'));
-            };
-
-            let scrollTimeout = null;
-            if (pagesContainer) {
-                pagesContainer.addEventListener('scroll', () => {
-                    clearTimeout(scrollTimeout);
-                    if (pageNumberIndicator) {
-                        pageNumberIndicator.style.display = 'block';
-                        pageNumberIndicator.style.opacity = '1';
-                    }
-
-                    const pages = pagesContainer.querySelectorAll('canvas');
-                    let currentPage = 1;
-                    pages.forEach((page, index) => {
-                        const rect = page.getBoundingClientRect();
-                        if (rect.top >= -page.offsetHeight / 2 && rect.top <= window.innerHeight / 2) {
-                            currentPage = index + 1;
-                        }
-                    });
-                    if (pageNumberIndicator) pageNumberIndicator.textContent = currentPage;
-
-                    scrollTimeout = setTimeout(() => {
-                        if (pageNumberIndicator) pageNumberIndicator.style.opacity = '0';
-                    }, 1000);
-                });
-            }
-
-            if (uploadCoverBtn) uploadCoverBtn.addEventListener('click', () => {
-                if (coverFileInput) coverFileInput.click();
-            });
-
-            if (coverFileInput) coverFileInput.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                
-                const coverPath = `${currentUser.uid}/${currentProjectRef.id}/cover/${file.name}`;
-                const storageRef = ref(storage, coverPath);
-                const uploadTask = uploadBytesResumable(storageRef, file);
-
-                uploadTask.on('state_changed',
-                    (snapshot) => {},
-                    (error) => {
-                        console.error("Error al subir la portada:", error);
-                        alert("Hubo un error al subir la portada.");
-                    },
-                    async () => {
-                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                        if (currentProjectRef) {
-                            await updateDoc(currentProjectRef, { coverUrl: downloadURL });
-                            alert("¡Portada subida con éxito!");
-                        }
-                    }
-                );
-            });
-
-            if (visualUploadBtn) visualUploadBtn.addEventListener('click', () => {
-                if (currentProjectRef && pdfFileInput) {
-                    pdfFileInput.click();
-                }
-            });
-
-            if (pdfFileInput) pdfFileInput.addEventListener('change', (e) => handleFileUpload(e));
-
-            const handleFileUpload = (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-
-                if (pdfLoaderText) pdfLoaderText.textContent = "Subiendo PDF...";
-                if (pdfLoaderContainer) pdfLoaderContainer.style.display = 'flex';
-
-                const filePath = `${currentUser.uid}/${currentProjectRef.id}/${file.name}`;
-                const storageRef = ref(storage, filePath);
-                const uploadTask = uploadBytesResumable(storageRef, file);
-
-                uploadTask.on('state_changed',
-                    (snapshot) => {
-                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                        if (pdfLoaderText) pdfLoaderText.textContent = `Subiendo PDF: ${Math.round(progress)}%`;
-                    },
-                    (error) => {
-                        console.error("Error al subir:", error);
-                        alert(`Hubo un error al subir el PDF. Si el archivo ya existe en este tablero, debes borrarlo primero. Error: ${error.message}`);
-                        if (pdfLoaderContainer) pdfLoaderContainer.style.display = 'none';
-                    },
-                    async () => {
-                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                        const pdfsCollectionRef = collection(currentProjectRef, "pdfs");
-                        const newPdfRef = await addDoc(pdfsCollectionRef, {
-                            name: file.name,
-                            url: downloadURL,
-                            storagePath: filePath,
-                            createdAt: new Date()
-                        });
-                        if (pdfLoaderContainer) pdfLoaderContainer.style.display = 'none';
-                        renderPdf(newPdfRef.id, { name: file.name, url: downloadURL });
-                        if (gridViewContainer) gridViewContainer.style.display = 'none';
-                        if (pdfViewerContainer) pdfViewerContainer.style.display = 'block';
-                    }
-                );
-            };
-
-            if (saveBtn) saveBtn.addEventListener('click', async () => {
-                if (!currentProjectRef) return;
-                saveBtn.textContent = "Guardando...";
-                saveBtn.disabled = true;
-                try {
-                    await updateDoc(currentProjectRef, { name: projectTitleEl.value });
-                    saveBtn.textContent = "¡Guardado!";
-                    setTimeout(() => {
-                        saveBtn.textContent = "Guardar Título";
-                        saveBtn.disabled = false;
-                    }, 2000);
-                } catch (error) {
-                    console.error("Error al guardar:", error);
-                    alert("No se pudo guardar el título del tablero.");
-                    saveBtn.textContent = "Guardar Título";
-                    saveBtn.disabled = false;
-                }
-            });
-
-            if (logoutBtn) logoutBtn.addEventListener('click', async () => {
-                await signOut(auth);
-                window.location.href = 'index.html';
-            });
-
-            if (backToGridBtn) backToGridBtn.addEventListener('click', backToGrid);
-            
-            const resizeObserver = new ResizeObserver(() => {
-                if (pdfDoc && currentPdfId) {
-                    const pages = pagesContainer.querySelectorAll('canvas');
-                    pages.forEach((canvas, index) => {
-                        renderPage(canvas, index + 1);
-                    });
-                }
-            });
-
-            if (pdfViewerContainer) {
-                resizeObserver.observe(pdfViewerContainer);
-            }
-        });
-    </script>
-</body>
-</html>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0
