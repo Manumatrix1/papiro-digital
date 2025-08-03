@@ -51,7 +51,6 @@
             display: none;
             width: 100%;
             overflow-y: auto;
-            max-height: calc(100vh - 10rem);
         }
         .pdf-grid {
             display: grid;
@@ -72,22 +71,9 @@
             z-index: 50;
             transition: opacity 0.2s ease-in-out;
         }
-        #page-thumbnail-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 1.5rem;
-        }
-        .thumbnail-card {
-            aspect-ratio: 1 / 1.414; /* Proporción de un A4 */
-            background-color: #181818;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            transition: transform 0.2s ease-in-out;
-            cursor: pointer;
-            overflow: hidden;
-        }
-        .thumbnail-card:hover {
-            transform: translateY(-5px);
+        /* Clase para ocultar los botones de navegación de página */
+        .page-controls-hidden {
+            display: none !important;
         }
     </style>
 </head>
@@ -110,36 +96,34 @@
     </header>
 
     <main class="flex-1 flex flex-col items-center overflow-auto p-4 sm:p-8" id="main-content">
-        <div id="grid-view-container" class="w-full max-w-4xl">
-            <div id="cover-section" class="w-full flex justify-center items-center">
-                <div id="cover-container" class="relative group w-full flex items-center justify-center rounded-lg">
-                    <div class="absolute inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center text-center p-4 transition-opacity">
-                        <span id="cover-placeholder" class="text-xl font-bold text-gray-300 mb-2">Añadir Portada</span>
-                        <p class="text-sm text-gray-400 mb-4">Haz clic para añadir o cambiar la portada.<br>(Recomendado: 1200x400 px)</p>
-                        <button id="upload-cover-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-4 rounded-lg hover:brightness-110 transition text-sm">
-                            Subir Imagen
-                        </button>
-                        <input type="file" id="cover-file-input" class="hidden" accept="image/*">
-                    </div>
+        <div id="cover-section" class="w-full max-w-4xl flex justify-center items-center">
+            <div id="cover-container" class="relative group w-full flex items-center justify-center rounded-lg">
+                <div class="absolute inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center text-center p-4 transition-opacity">
+                    <span id="cover-placeholder" class="text-xl font-bold text-gray-300 mb-2">Añadir Portada</span>
+                    <p class="text-sm text-gray-400 mb-4">Haz clic para añadir o cambiar la portada.<br>(Recomendado: 1200x400 px)</p>
+                    <button id="upload-cover-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-4 rounded-lg hover:brightness-110 transition text-sm">
+                        Subir Imagen
+                    </button>
+                    <input type="file" id="cover-file-input" class="hidden" accept="image/*">
                 </div>
             </div>
+        </div>
 
-            <div id="pdfs-section" class="w-full mt-8">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-lg font-semibold">Mis PDFs</h2>
+        <div id="pdfs-section" class="w-full max-w-4xl mt-8">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold">Mis PDFs</h2>
+            </div>
+            <div id="pdf-list" class="pdf-grid">
+                <div class="pdf-list-item flex flex-col items-center justify-center bg-[#181818] rounded-lg p-4 sm:p-6 shadow-lg border border-dashed border-gray-600 transition hover:bg-[#2a2a2a] cursor-pointer" id="visual-upload-btn">
+                    <svg class="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    <span class="mt-4 font-semibold text-gray-400 text-sm sm:text-base">Nuevo PDF</span>
                 </div>
-                <div id="pdf-list" class="pdf-grid">
-                    <div class="pdf-list-item flex flex-col items-center justify-center bg-[#181818] rounded-lg p-4 sm:p-6 shadow-lg border border-dashed border-gray-600 transition hover:bg-[#2a2a2a] cursor-pointer" id="visual-upload-btn">
-                        <svg class="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
-                        <span class="mt-4 font-semibold text-gray-400 text-sm sm:text-base">Nuevo PDF</span>
-                    </div>
-                </div>
-                <input type="file" id="pdf-file-input" class="hidden" accept="application/pdf">
-                <div id="no-pdfs-message" class="text-gray-500 text-sm mt-4" style="display: none;">
-                    No hay PDFs en este tablero.
-                </div>
+            </div>
+            <input type="file" id="pdf-file-input" class="hidden" accept="application/pdf">
+            <div id="no-pdfs-message" class="text-gray-500 text-sm mt-4" style="display: none;">
+                No hay PDFs en este tablero.
             </div>
         </div>
 
@@ -156,15 +140,12 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
             </button>
-            <div id="pages-container" class="w-full h-full space-y-4">
+            <div id="pages-container" class="w-full h-full overflow-y-auto space-y-4">
                 </div>
-            <div id="pdf-controls" class="mt-4 flex justify-center items-center gap-4" style="display: none;">
-                <button id="prev-page-btn" class="bg-[#2a2a2a] text-white px-4 py-2 rounded-lg hover:bg-[#3a3a3a]">Página Anterior</button>
-                <span id="page-info" class="self-center">Página <span id="current-page-span">1</span> de <span id="total-pages-span">1</span></span>
-                <button id="next-page-btn" class="bg-[#2a2a3a] text-white px-4 py-2 rounded-lg hover:bg-[#3a3a3a]">Página Siguiente</button>
-            </div>
         </div>
     </main>
+
+    <div id="page-number-indicator" class="z-50"></div>
 
     <script type="module">
         import { auth, db, storage } from './firebase-config.js';
@@ -177,9 +158,9 @@
         let currentProjectRef = null;
         let currentUser = null;
         let pdfDoc = null;
-        let pageNum = 1;
         let currentPdfId = null;
         let currentPdfRef = null;
+        let allPages = []; // Almacenar las páginas renderizadas
 
         const pageTitleEl = document.getElementById('page-title');
         const projectTitleEl = document.getElementById('project-title');
@@ -187,27 +168,21 @@
         const pdfLoaderText = document.getElementById('pdf-loader-text');
         const saveBtn = document.getElementById('save-btn');
         const logoutBtn = document.getElementById('logout-btn');
-        const pdfControls = document.getElementById('pdf-controls');
-        const currentPageSpan = document.getElementById('current-page-span');
-        const totalPagesSpan = document.getElementById('total-pages-span');
-
-        const gridViewContainer = document.getElementById('grid-view-container');
         const coverSection = document.getElementById('cover-section');
         const coverContainer = document.getElementById('cover-container');
         const coverPlaceholder = document.getElementById('cover-placeholder');
         const uploadCoverBtn = document.getElementById('upload-cover-btn');
         const coverFileInput = document.getElementById('cover-file-input');
-
         const pdfsSection = document.getElementById('pdfs-section');
         const pdfList = document.getElementById('pdf-list');
         const visualUploadBtn = document.getElementById('visual-upload-btn');
         const pdfFileInput = document.getElementById('pdf-file-input');
         const noPdfsMessage = document.getElementById('no-pdfs-message');
-        
         const pdfViewerContainer = document.getElementById('pdf-viewer-container');
         const backToGridBtn = document.getElementById('back-to-grid-btn');
         const pagesContainer = document.getElementById('pages-container');
-
+        const pageNumberIndicator = document.getElementById('page-number-indicator');
+        let scrollTimeout = null;
 
         onAuthStateChanged(auth, async (user) => {
             currentUser = user;
@@ -363,9 +338,6 @@
                 }
 
                 pdfLoaderContainer.style.display = 'none';
-                totalPagesSpan.textContent = pdf.numPages;
-                currentPageSpan.textContent = 1;
-                pdfControls.style.display = 'flex';
 
             }, function (reason) {
                 console.error('Error al cargar el PDF:', reason);
