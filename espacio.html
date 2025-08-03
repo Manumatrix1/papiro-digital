@@ -111,7 +111,7 @@
                 </div>
             </div>
             
-            <div id="pdfs-section" class="w-full mt-8">
+            <div id="pdfs-section" class="w-full max-w-4xl mt-8">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-lg font-semibold">Mis PDFs</h2>
                 </div>
@@ -147,7 +147,9 @@
                 </div>
         </div>
     </main>
+
     <div id="page-number-indicator" class="z-50"></div>
+
     <script type="module">
         import { auth, db, storage } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
@@ -161,9 +163,10 @@
         let pdfDoc = null;
         let currentPdfId = null;
         let currentPdfRef = null;
-        let pagesHeight = []; // Para almacenar la altura de cada página
-
-
+        let pagesHeight = [];
+        let renderPagePending = false;
+        let pagesRendering = false;
+        
         const pageTitleEl = document.getElementById('page-title');
         const projectTitleEl = document.getElementById('project-title');
         const pdfLoaderContainer = document.getElementById('pdf-loader-container');
@@ -235,27 +238,30 @@
                 const q = query(pdfsCollectionRef, orderBy("createdAt", "desc"));
                 onSnapshot(q, (querySnapshot) => {
                     const existingUploadButton = document.getElementById('visual-upload-btn');
-                    pdfList.innerHTML = '';
-                    pdfList.appendChild(existingUploadButton);
+                    if (pdfList) {
+                        pdfList.innerHTML = '';
+                        pdfList.appendChild(existingUploadButton);
+                    }
 
                     if (querySnapshot.empty) {
-                        noPdfsMessage.style.display = 'block';
-                        pdfViewerContainer.style.display = 'none';
-                        gridViewContainer.style.display = 'block';
+                        if (noPdfsMessage) noPdfsMessage.style.display = 'block';
+                        if (pdfViewerContainer) pdfViewerContainer.style.display = 'none';
+                        if (gridViewContainer) gridViewContainer.style.display = 'block';
                     } else {
-                        noPdfsMessage.style.display = 'none';
+                        if (noPdfsMessage) noPdfsMessage.style.display = 'none';
                         querySnapshot.forEach((doc) => {
                             const pdfData = doc.data();
                             if (pdfData && pdfData.name && pdfData.url) {
                                 displayPdfItem(doc.id, pdfData);
                             }
                         });
-                        gridViewContainer.style.display = 'block';
+                        if (gridViewContainer) gridViewContainer.style.display = 'block';
                     }
                 });
             });
-
+        
             const displayPdfItem = (pdfId, pdfData) => {
+                if (!pdfList) return;
                 const pdfItemDiv = document.createElement('div');
                 pdfItemDiv.className = 'pdf-list-item flex flex-col items-center justify-center bg-[#181818] rounded-lg p-4 sm:p-6 shadow-lg hover:bg-[#2a2a2a] relative aspect-square';
                 pdfItemDiv.setAttribute('data-pdf-id', pdfId);
@@ -297,9 +303,9 @@
                     document.querySelectorAll('.pdf-list-item').forEach(el => el.classList.remove('active'));
                     pdfItemDiv.classList.add('active');
                     renderPdf(pdfId, pdfData);
-                    gridViewContainer.style.display = 'none';
-                    pdfViewerContainer.style.display = 'block';
-                    pageTitleEl.textContent = pdfData.name;
+                    if (gridViewContainer) gridViewContainer.style.display = 'none';
+                    if (pdfViewerContainer) pdfViewerContainer.style.display = 'block';
+                    if (pageTitleEl) pageTitleEl.textContent = pdfData.name;
                 });
             };
 
@@ -327,8 +333,8 @@
                 currentPdfRef = doc(currentProjectRef, "pdfs", pdfId);
 
                 pdfLoaderText.textContent = "Cargando PDF...";
-                pdfLoaderContainer.style.display = 'flex';
-                pagesContainer.innerHTML = '';
+                if (pdfLoaderContainer) pdfLoaderContainer.style.display = 'flex';
+                if (pagesContainer) pagesContainer.innerHTML = '';
                 
                 const loadingTask = pdfjsLib.getDocument(pdfData.url);
                 loadingTask.promise.then(function(pdf) {
@@ -338,25 +344,26 @@
                         const canvas = document.createElement('canvas');
                         canvas.className = 'mb-4 rounded-md';
                         canvas.id = `page-${i}`;
-                        pagesContainer.appendChild(canvas);
-                        
+                        if (pagesContainer) pagesContainer.appendChild(canvas);
                         renderPage(canvas, i);
                     }
                     
-                    pdfLoaderContainer.style.display = 'none';
-                    pagesContainer.scrollTop = 0;
+                    if (pdfLoaderContainer) pdfLoaderContainer.style.display = 'none';
+                    if (pagesContainer) pagesContainer.scrollTop = 0;
                 }, function (reason) {
                     console.error('Error al cargar el PDF:', reason);
                     alert('No se pudo cargar el PDF. Verifica que el archivo exista y los permisos.');
                     backToGrid();
-                    pdfLoaderContainer.style.display = 'none';
+                    if (pdfLoaderContainer) pdfLoaderContainer.style.display = 'none';
                 });
             };
-
+            
             const renderPage = (canvas, num) => {
                 if (!pdfDoc) return;
                 pdfDoc.getPage(num).then(function(page) {
                     const viewerContainer = document.getElementById('pdf-viewer-container');
+                    if (!viewerContainer) return;
+
                     const containerWidth = viewerContainer.offsetWidth;
                     const viewport = page.getViewport({ scale: 1 });
                     
@@ -380,9 +387,9 @@
             };
 
             const backToGrid = () => {
-                gridViewContainer.style.display = 'block';
-                pdfViewerContainer.style.display = 'none';
-                pageTitleEl.textContent = projectTitleEl.value;
+                if (gridViewContainer) gridViewContainer.style.display = 'block';
+                if (pdfViewerContainer) pdfViewerContainer.style.display = 'none';
+                if (pageTitleEl && projectTitleEl) pageTitleEl.textContent = projectTitleEl.value;
                 currentPdfId = null;
                 currentPdfRef = null;
                 pdfDoc = null;
@@ -390,31 +397,36 @@
             };
 
             let scrollTimeout = null;
-            pagesContainer.addEventListener('scroll', () => {
-                clearTimeout(scrollTimeout);
-                pageNumberIndicator.style.display = 'block';
-                pageNumberIndicator.style.opacity = '1';
-
-                const pages = pagesContainer.querySelectorAll('canvas');
-                let currentPage = 1;
-                pages.forEach((page, index) => {
-                    const rect = page.getBoundingClientRect();
-                    if (rect.top >= -page.offsetHeight / 2 && rect.top <= window.innerHeight / 2) {
-                        currentPage = index + 1;
+            if (pagesContainer) {
+                pagesContainer.addEventListener('scroll', () => {
+                    clearTimeout(scrollTimeout);
+                    if (pageNumberIndicator) {
+                        pageNumberIndicator.style.display = 'block';
+                        pageNumberIndicator.style.opacity = '1';
                     }
+
+                    const pages = pagesContainer.querySelectorAll('canvas');
+                    let currentPage = 1;
+                    pages.forEach((page, index) => {
+                        const rect = page.getBoundingClientRect();
+                        if (rect.top >= -page.offsetHeight / 2 && rect.top <= window.innerHeight / 2) {
+                            currentPage = index + 1;
+                        }
+                    });
+                    if (pageNumberIndicator) pageNumberIndicator.textContent = currentPage;
+
+                    scrollTimeout = setTimeout(() => {
+                        if (pageNumberIndicator) pageNumberIndicator.style.opacity = '0';
+                    }, 1000);
                 });
-                pageNumberIndicator.textContent = currentPage;
+            }
 
-                scrollTimeout = setTimeout(() => {
-                    pageNumberIndicator.style.opacity = '0';
-                }, 1000);
+
+            if (uploadCoverBtn) uploadCoverBtn.addEventListener('click', () => {
+                if (coverFileInput) coverFileInput.click();
             });
 
-            uploadCoverBtn.addEventListener('click', () => {
-                coverFileInput.click();
-            });
-
-            coverFileInput.addEventListener('change', (e) => {
+            if (coverFileInput) coverFileInput.addEventListener('change', (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
                 
@@ -430,26 +442,28 @@
                     },
                     async () => {
                         const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                        await updateDoc(currentProjectRef, { coverUrl: downloadURL });
-                        alert("¡Portada subida con éxito!");
+                        if (currentProjectRef) {
+                            await updateDoc(currentProjectRef, { coverUrl: downloadURL });
+                            alert("¡Portada subida con éxito!");
+                        }
                     }
                 );
             });
 
-            visualUploadBtn.addEventListener('click', () => {
-                if (currentProjectRef) {
+            if (visualUploadBtn) visualUploadBtn.addEventListener('click', () => {
+                if (currentProjectRef && pdfFileInput) {
                     pdfFileInput.click();
                 }
             });
 
-            pdfFileInput.addEventListener('change', (e) => handleFileUpload(e));
+            if (pdfFileInput) pdfFileInput.addEventListener('change', (e) => handleFileUpload(e));
 
             const handleFileUpload = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
 
-                pdfLoaderText.textContent = "Subiendo PDF...";
-                pdfLoaderContainer.style.display = 'flex';
+                if (pdfLoaderText) pdfLoaderText.textContent = "Subiendo PDF...";
+                if (pdfLoaderContainer) pdfLoaderContainer.style.display = 'flex';
 
                 const filePath = `${currentUser.uid}/${currentProjectRef.id}/${file.name}`;
                 const storageRef = ref(storage, filePath);
@@ -458,12 +472,12 @@
                 uploadTask.on('state_changed',
                     (snapshot) => {
                         const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                        pdfLoaderText.textContent = `Subiendo PDF: ${Math.round(progress)}%`;
+                        if (pdfLoaderText) pdfLoaderText.textContent = `Subiendo PDF: ${Math.round(progress)}%`;
                     },
                     (error) => {
                         console.error("Error al subir:", error);
                         alert(`Hubo un error al subir el PDF. Si el archivo ya existe en este tablero, debes borrarlo primero. Error: ${error.message}`);
-                        pdfLoaderContainer.style.display = 'none';
+                        if (pdfLoaderContainer) pdfLoaderContainer.style.display = 'none';
                     },
                     async () => {
                         const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
@@ -474,15 +488,15 @@
                             storagePath: filePath,
                             createdAt: new Date()
                         });
-                        pdfLoaderContainer.style.display = 'none';
+                        if (pdfLoaderContainer) pdfLoaderContainer.style.display = 'none';
                         renderPdf(newPdfRef.id, { name: file.name, url: downloadURL });
-                        gridViewContainer.style.display = 'none';
-                        pdfViewerContainer.style.display = 'block';
+                        if (gridViewContainer) gridViewContainer.style.display = 'none';
+                        if (pdfViewerContainer) pdfViewerContainer.style.display = 'block';
                     }
                 );
             };
 
-            saveBtn.addEventListener('click', async () => {
+            if (saveBtn) saveBtn.addEventListener('click', async () => {
                 if (!currentProjectRef) return;
                 saveBtn.textContent = "Guardando...";
                 saveBtn.disabled = true;
@@ -501,12 +515,12 @@
                 }
             });
 
-            logoutBtn.addEventListener('click', async () => {
+            if (logoutBtn) logoutBtn.addEventListener('click', async () => {
                 await signOut(auth);
                 window.location.href = 'index.html';
             });
 
-            backToGridBtn.addEventListener('click', backToGrid);
+            if (backToGridBtn) backToGridBtn.addEventListener('click', backToGrid);
             
             window.addEventListener('resize', () => {
                 if (pdfDoc && currentPdfId) {
