@@ -13,6 +13,23 @@
         .pdf-list-item { transition: transform 0.2s ease-in-out; }
         .pdf-list-item:hover { transform: translateY(-5px); }
         #pages-container canvas { max-width: 100%; height: auto; display: block; margin: 0 auto 1rem; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        
+        /* ESTILOS PARA EL INDICADOR DE PÁGINA (DE TU DISEÑO) */
+        #page-number-indicator {
+            position: fixed;
+            top: 50%;
+            right: 1.5rem;
+            transform: translateY(-50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-weight: bold;
+            z-index: 50;
+            opacity: 0; /* Empieza invisible */
+            pointer-events: none; /* No interfiere con el mouse */
+            transition: opacity 0.3s ease-in-out;
+        }
     </style>
 </head>
 <body class="text-white flex flex-col min-h-screen">
@@ -57,6 +74,7 @@
             </div>
         </div>
     </main>
+    <div id="page-number-indicator">1 / 1</div>
 
     <script type="module">
         import { auth, db, storage } from './firebase-config.js';
@@ -68,8 +86,14 @@
 
         let currentUser = null;
         let projectId = null;
+        // ===================================================================
+        // ==== VARIABLES PARA EL INDICADOR DE PÁGINA ========================
+        let pageCanvases = [];
+        let scrollTimeout = null;
+        // ===================================================================
 
         const projectTitleEl = document.getElementById('project-title');
+        const mainContent = document.getElementById('main-content');
         const saveBtn = document.getElementById('save-btn');
         const gridViewContainer = document.getElementById('grid-view-container');
         const pdfViewerContainer = document.getElementById('pdf-viewer-container');
@@ -82,21 +106,24 @@
         const pdfFileInput = document.getElementById('pdf-file-input');
         const pagesContainer = document.getElementById('pages-container');
         const pdfLoader = document.getElementById('pdf-loader-container');
+        const pageNumberIndicator = document.getElementById('page-number-indicator');
         
-        // --- FUNCIÓN DE RENDERIZADO DE PDF: CORREGIDA Y SIMPLIFICADA ---
         const renderPdf = async (url) => {
             pdfLoader.style.display = 'flex';
             pagesContainer.innerHTML = '';
+            pageCanvases = []; // Limpiar el array de páginas
             try {
                 const pdf = await pdfjsLib.getDocument(url).promise;
                 for (let i = 1; i <= pdf.numPages; i++) {
                     const page = await pdf.getPage(i);
                     const viewport = page.getViewport({ scale: 1.5 });
                     const canvas = document.createElement('canvas');
+                    canvas.dataset.pageNumber = i; // Guardar el número de página
                     const context = canvas.getContext('2d');
                     canvas.height = viewport.height;
                     canvas.width = viewport.width;
                     pagesContainer.appendChild(canvas);
+                    pageCanvases.push(canvas); // Añadir el canvas al array
                     await page.render({ canvasContext: context, viewport }).promise;
                 }
             } catch (error) {
@@ -107,29 +134,61 @@
             }
         };
 
+        const showGridView = () => { /* ...sin cambios... */ };
+        const showPdfView = () => { /* ...sin cambios... */ };
+        onAuthStateChanged(auth, (user) => { /* ...sin cambios... */ });
+        const uploadFile = (file, type, firestoreRef) => { /* ...sin cambios... */ };
+
+        // ===================================================================
+        // ==== LÓGICA PARA ACTUALIZAR EL INDICADOR DE PÁGINA AL HACER SCROLL ====
+        // ===================================================================
+        mainContent.addEventListener('scroll', () => {
+            if (pageCanvases.length === 0) return;
+
+            // Hacer visible el indicador
+            pageNumberIndicator.style.opacity = '1';
+
+            // Resetear el temporizador para ocultarlo
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                pageNumberIndicator.style.opacity = '0';
+            }, 1500); // Se ocultará después de 1.5 segundos de inactividad
+
+            // Encontrar la página actual
+            let currentPage = 1;
+            for (const canvas of pageCanvases) {
+                const rect = canvas.getBoundingClientRect();
+                // Si la parte superior de la página está en la mitad superior de la ventana
+                if (rect.top >= 0 && rect.top < window.innerHeight / 2) {
+                    currentPage = parseInt(canvas.dataset.pageNumber, 10);
+                    break;
+                }
+            }
+            
+            // Actualizar el texto del indicador
+            pageNumberIndicator.textContent = `${currentPage} / ${pageCanvases.length}`;
+        });
+
+
+        // CÓDIGO RESTANTE (SIN CAMBIOS)
         const showGridView = () => {
             pdfViewerContainer.classList.add('hidden');
             gridViewContainer.classList.remove('hidden');
             dynamicBackText.textContent = "Mis Tableros";
         };
-
         const showPdfView = (pdfName) => {
             gridViewContainer.classList.add('hidden');
             pdfViewerContainer.classList.remove('hidden');
-            dynamicBackText.textContent = projectTitleEl.value; // Muestra el nombre del proyecto
+            dynamicBackText.textContent = projectTitleEl.value;
         };
-
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
             if (!currentUser) { window.location.href = 'index.html'; return; }
             const params = new URLSearchParams(window.location.search);
             projectId = params.get('id');
             if (!projectId) { window.location.href = 'mi_tablero.html'; return; }
-            
             const projectRef = doc(db, "users", currentUser.uid, "projects", projectId);
             const pdfsRef = collection(projectRef, "pdfs");
-
-            // Cargar datos del proyecto y lista de PDFs
             onSnapshot(projectRef, (docSnap) => {
                 if(docSnap.exists()){
                     const data = docSnap.data();
@@ -138,12 +197,10 @@
                     if(data.coverUrl) coverContainer.style.backgroundImage = `url('${data.coverUrl}')`;
                 }
             });
-
             onSnapshot(query(pdfsRef, orderBy("createdAt")), (snapshot) => {
                 const uploadButton = document.getElementById('visual-upload-btn');
                 pdfList.innerHTML = '';
-                pdfList.appendChild(uploadButton); // Re-agregar el botón de subir
-                
+                pdfList.appendChild(uploadButton);
                 snapshot.forEach(docSnap => {
                     const pdfData = docSnap.data();
                     const pdfId = docSnap.id;
@@ -156,19 +213,15 @@
                         <p class="text-xs font-semibold mt-2 break-all w-full text-center">${pdfData.name}</p>
                         <button data-pdf-id="${pdfId}" data-storage-path="${pdfData.storagePath}" class="delete-pdf-btn absolute top-1 right-1 bg-red-600 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
                             <svg class="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                    `;
+                        </button>`;
                     pdfCard.classList.add('group');
-                    
                     pdfCard.addEventListener('click', (e) => {
                         if(e.target.closest('.delete-pdf-btn')) return;
                         showPdfView(pdfData.name);
                         renderPdf(pdfData.url);
                     });
-                    
                     pdfList.insertBefore(pdfCard, uploadButton);
                 });
-
                 document.querySelectorAll('.delete-pdf-btn').forEach(btn => {
                     btn.addEventListener('click', async (e) => {
                         e.stopPropagation();
@@ -179,30 +232,25 @@
                     });
                 });
             });
-
-            // Lógica de botones
             dynamicBackBtn.addEventListener('click', () => {
                 if (pdfViewerContainer.classList.contains('hidden')) {
                     window.location.href = 'mi_tablero.html';
                 } else {
                     showGridView();
+                    pageNumberIndicator.style.opacity = '0'; // Ocultar al volver a la vista de grilla
                 }
             });
-
             saveBtn.addEventListener('click', () => updateDoc(projectRef, { name: projectTitleEl.value }));
             coverContainer.addEventListener('click', () => coverFileInput.click());
             visualUploadBtn.addEventListener('click', () => pdfFileInput.click());
-
             coverFileInput.addEventListener('change', (e) => uploadFile(e.target.files[0], 'cover', projectRef));
             pdfFileInput.addEventListener('change', (e) => uploadFile(e.target.files[0], 'pdf', pdfsRef));
         });
-
         const uploadFile = (file, type, firestoreRef) => {
             if (!file) return;
             const storagePath = type === 'cover' ? `users/${currentUser.uid}/projects/${projectId}/cover_${file.name}` : `users/${currentUser.uid}/projects/${projectId}/pdfs/${file.name}`;
             const fileRef = ref(storage, storagePath);
             const uploadTask = uploadBytesResumable(fileRef, file);
-            
             uploadTask.on('state_changed', null, 
                 (error) => console.error("Error al subir:", error), 
                 async () => {
