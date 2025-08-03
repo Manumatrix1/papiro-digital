@@ -147,9 +147,7 @@
                 </div>
         </div>
     </main>
-
     <div id="page-number-indicator" class="z-50"></div>
-
     <script type="module">
         import { auth, db, storage } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
@@ -164,7 +162,9 @@
         let currentPdfId = null;
         let currentPdfRef = null;
         let pagesHeight = [];
-
+        let renderPagePending = false;
+        let pagesRendering = false;
+        
         const pageTitleEl = document.getElementById('page-title');
         const projectTitleEl = document.getElementById('project-title');
         const pdfLoaderContainer = document.getElementById('pdf-loader-container');
@@ -258,7 +258,7 @@
                     }
                 });
             });
-
+        
             const displayPdfItem = (pdfId, pdfData) => {
                 if (!pdfList) return;
                 const pdfItemDiv = document.createElement('div');
@@ -330,7 +330,7 @@
             const renderPdf = async (pdfId, pdfData) => {
                 currentPdfId = pdfId;
                 currentPdfRef = doc(currentProjectRef, "pdfs", pdfId);
-                
+
                 if (pdfLoaderText) pdfLoaderText.textContent = "Cargando PDF...";
                 if (pdfLoaderContainer) pdfLoaderContainer.style.display = 'flex';
                 if (pagesContainer) pagesContainer.innerHTML = '';
@@ -339,18 +339,22 @@
                     const loadingTask = pdfjsLib.getDocument(pdfData.url);
                     pdfDoc = await loadingTask.promise;
                     
-                    const numPages = pdfDoc.numPages;
                     pagesHeight = [];
-                    for (let i = 1; i <= numPages; i++) {
+                    for (let i = 1; i <= pdfDoc.numPages; i++) {
                         const canvas = document.createElement('canvas');
                         canvas.className = 'mb-4 rounded-md';
                         canvas.id = `page-${i}`;
                         if (pagesContainer) pagesContainer.appendChild(canvas);
-                        renderPage(canvas, i);
                     }
-
+                    
                     if (pdfLoaderContainer) pdfLoaderContainer.style.display = 'none';
                     if (pagesContainer) pagesContainer.scrollTop = 0;
+                    
+                    // Renderizar las páginas después de que el DOM está listo
+                    const pageCanvases = pagesContainer.querySelectorAll('canvas');
+                    for (let i = 0; i < pageCanvases.length; i++) {
+                        renderPage(pageCanvases[i], i + 1);
+                    }
 
                 } catch (reason) {
                     console.error('Error al cargar el PDF:', reason);
@@ -384,7 +388,9 @@
                         canvasContext: context,
                         viewport: scaledViewport
                     };
-                    page.render(renderContext);
+                    page.render(renderContext).promise.then(() => {
+                        pagesHeight[num - 1] = canvas.offsetHeight;
+                    });
                 });
             };
 
@@ -409,9 +415,10 @@
 
                     const pages = pagesContainer.querySelectorAll('canvas');
                     let currentPage = 1;
+                    let accumulatedHeight = 0;
                     pages.forEach((page, index) => {
                         const rect = page.getBoundingClientRect();
-                        if (rect.top >= -page.offsetHeight / 2 && rect.top <= window.innerHeight / 2) {
+                        if (rect.top >= 0 && rect.top <= window.innerHeight) {
                             currentPage = index + 1;
                         }
                     });
@@ -523,13 +530,18 @@
 
             if (backToGridBtn) backToGridBtn.addEventListener('click', backToGrid);
             
-            const resizeObserver = new ResizeObserver(() => {
-                if (pdfDoc && currentPdfId) {
-                    renderPdf(currentPdfId, {name: pageTitleEl.textContent, url: pdfDoc.url});
-                }
-            });
-
+            // Observer para la calidad de renderizado
             if (pdfViewerContainer) {
+                if (resizeObserver) resizeObserver.disconnect();
+                resizeObserver = new ResizeObserver(() => {
+                    if (pdfDoc && currentPdfId) {
+                        // Vuelve a renderizar las páginas para ajustar la calidad
+                        const pages = pagesContainer.querySelectorAll('canvas');
+                        pages.forEach((canvas, index) => {
+                            renderPage(canvas, index + 1);
+                        });
+                    }
+                });
                 resizeObserver.observe(pdfViewerContainer);
             }
         });
