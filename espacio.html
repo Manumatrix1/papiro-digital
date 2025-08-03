@@ -164,9 +164,7 @@
         let currentPdfId = null;
         let currentPdfRef = null;
         let pagesHeight = [];
-        let renderPagePending = false;
-        let pagesRendering = false;
-        
+
         const pageTitleEl = document.getElementById('page-title');
         const projectTitleEl = document.getElementById('project-title');
         const pdfLoaderContainer = document.getElementById('pdf-loader-container');
@@ -193,6 +191,7 @@
 
         const pageNumberIndicator = document.getElementById('page-number-indicator');
         let scrollTimeout = null;
+        let resizeObserver = null;
 
         document.addEventListener('DOMContentLoaded', () => {
             onAuthStateChanged(auth, async (user) => {
@@ -259,7 +258,7 @@
                     }
                 });
             });
-        
+
             const displayPdfItem = (pdfId, pdfData) => {
                 if (!pdfList) return;
                 const pdfItemDiv = document.createElement('div');
@@ -328,36 +327,39 @@
                 }
             };
 
-            const renderPdf = (pdfId, pdfData) => {
+            const renderPdf = async (pdfId, pdfData) => {
                 currentPdfId = pdfId;
                 currentPdfRef = doc(currentProjectRef, "pdfs", pdfId);
-
-                pdfLoaderText.textContent = "Cargando PDF...";
+                
+                if (pdfLoaderText) pdfLoaderText.textContent = "Cargando PDF...";
                 if (pdfLoaderContainer) pdfLoaderContainer.style.display = 'flex';
                 if (pagesContainer) pagesContainer.innerHTML = '';
                 
-                const loadingTask = pdfjsLib.getDocument(pdfData.url);
-                loadingTask.promise.then(function(pdf) {
-                    pdfDoc = pdf;
+                try {
+                    const loadingTask = pdfjsLib.getDocument(pdfData.url);
+                    pdfDoc = await loadingTask.promise;
                     
-                    for (let i = 1; i <= pdf.numPages; i++) {
+                    const numPages = pdfDoc.numPages;
+                    pagesHeight = [];
+                    for (let i = 1; i <= numPages; i++) {
                         const canvas = document.createElement('canvas');
                         canvas.className = 'mb-4 rounded-md';
                         canvas.id = `page-${i}`;
                         if (pagesContainer) pagesContainer.appendChild(canvas);
                         renderPage(canvas, i);
                     }
-                    
+
                     if (pdfLoaderContainer) pdfLoaderContainer.style.display = 'none';
                     if (pagesContainer) pagesContainer.scrollTop = 0;
-                }, function (reason) {
+
+                } catch (reason) {
                     console.error('Error al cargar el PDF:', reason);
                     alert('No se pudo cargar el PDF. Verifica que el archivo exista y los permisos.');
                     backToGrid();
                     if (pdfLoaderContainer) pdfLoaderContainer.style.display = 'none';
-                });
+                }
             };
-            
+
             const renderPage = (canvas, num) => {
                 if (!pdfDoc) return;
                 pdfDoc.getPage(num).then(function(page) {
@@ -420,7 +422,6 @@
                     }, 1000);
                 });
             }
-
 
             if (uploadCoverBtn) uploadCoverBtn.addEventListener('click', () => {
                 if (coverFileInput) coverFileInput.click();
@@ -522,11 +523,15 @@
 
             if (backToGridBtn) backToGridBtn.addEventListener('click', backToGrid);
             
-            window.addEventListener('resize', () => {
+            const resizeObserver = new ResizeObserver(() => {
                 if (pdfDoc && currentPdfId) {
                     renderPdf(currentPdfId, {name: pageTitleEl.textContent, url: pdfDoc.url});
                 }
             });
+
+            if (pdfViewerContainer) {
+                resizeObserver.observe(pdfViewerContainer);
+            }
         });
     </script>
 </body>
