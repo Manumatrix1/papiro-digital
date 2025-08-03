@@ -9,12 +9,11 @@ const firebaseConfig = {
     apiKey: "AIzaSyDhcJyTriTBrEDftDx_lYAhFgd6Y8Us4dA",
     authDomain: "papirodigital-1a6c5.firebaseapp.com",
     projectId: "papirodigital-1a6c5",
-    storageBucket: "papirodigital-1a6c5.firebasestorage.app", // ¡CORREGIDO!
+    storageBucket: "papirodigital-1a6c5.appspot.com", // CORREGIDO
     messagingSenderId: "274494841235",
     appId: "1:274494841235:web:99112dde1c6dbd12240866"
 };
 
-// Inicializa Firebase y exporta los servicios que necesitas
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
