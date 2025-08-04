@@ -1,12 +1,12 @@
-// Importa las funciones que necesitas de los SDKs
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+// Importa las funciones desde las URLs completas del CDN de Firebase
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+import { getStorage } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-storage.js";
 
 // La configuración de tu aplicación web de Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyDhcJyTriTBrEDftDx_lYAhFgd6Y8Us4dA", // Reemplaza si generaste una nueva
+  apiKey: "AIzaSyDhcJyTriTBrEDftDx_lYAhFgd6Y8Us4dA",
   authDomain: "papirodigital-1a6c5.firebaseapp.com",
   databaseURL: "https://papirodigital-1a6c5-default-rtdb.firebaseio.com",
   projectId: "papirodigital-1a6c5",
@@ -19,7 +19,7 @@ const firebaseConfig = {
 // Inicializa Firebase
 const app = initializeApp(firebaseConfig);
 
-// Inicializa y exporta los servicios para que otros archivos puedan usarlos
+// Inicializa y exporta los servicios
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
