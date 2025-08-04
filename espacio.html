@@ -8,4 +8,502 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
-…</html>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f0f0f; }
+        .pdf-list-item {
+            transition: transform 0.2s ease-in-out;
+            aspect-ratio: 1 / 1;
+            position: relative;
+        }
+        .pdf-list-item:hover {
+            transform: translateY(-5px);
+        }
+        .pdf-list-item-actions {
+            display: none;
+            gap: 0.5rem;
+        }
+        .pdf-list-item:hover .pdf-list-item-actions {
+            display: flex;
+        }
+        #pdf-render {
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            max-width: 100%;
+            height: auto;
+        }
+        #pdf-loader-container {
+            display: none;
+        }
+        #cover-container {
+            width: 100%;
+            height: 150px;
+            background-color: #2a2a2a;
+            position: relative;
+            overflow: hidden;
+            border-radius: 8px;
+            background-size: cover;
+            background-position: center;
+        }
+        @media (min-width: 640px) {
+            #cover-container {
+                height: 250px;
+            }
+        }
+        #pdf-viewer-container {
+            display: none;
+            width: 100%;
+        }
+        .pdf-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1.5rem;
+        }
+        #page-number-indicator {
+            position: fixed;
+            top: 50%;
+            right: 1rem;
+            transform: translateY(-50%);
+            background-color: rgba(0,0,0,0.7);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-weight: bold;
+            display: none;
+            z-index: 50;
+            transition: opacity 0.2s ease-in-out;
+        }
+        #pages-container {
+            width: 100%;
+            max-height: calc(100vh - 8rem);
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+    </style>
+</head>
+<body class="text-white flex flex-col min-h-screen">
+    <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-4 sm:px-8 flex justify-between items-center sticky top-0 z-10">
+        <div class="flex items-center gap-4">
+            <button id="dynamic-back-btn" class="flex items-center text-gray-400 hover:text-white transition group">
+                <svg class="h-6 w-6 text-gray-400 group-hover:text-white transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                <span id="dynamic-back-text" class="ml-2 font-medium hidden sm:inline">Mis Tableros</span>
+            </button>
+            <input id="project-title" type="text" class="bg-transparent text-xl sm:text-2xl font-bold text-white focus:outline-none w-full truncate" value="Cargando...">
+        </div>
+        
+        <div class="flex items-center gap-2 sm:gap-4">
+            <button id="save-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-3 sm:px-4 rounded-lg hover:brightness-110 transition text-sm sm:text-base">Guardar Título</button>
+            <button id="logout-btn" class="text-gray-400 hover:text-white transition text-sm sm:text-base">Cerrar Sesión</button>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col items-center overflow-auto p-4 sm:p-8" id="main-content">
+        <div id="grid-view-container" class="w-full max-w-4xl">
+            <div id="cover-section" class="w-full flex justify-center items-center">
+                <div id="cover-container" class="relative group w-full flex items-center justify-center rounded-lg">
+                    <div class="absolute inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center text-center p-4 transition-opacity">
+                        <span id="cover-placeholder" class="text-xl font-bold text-gray-300 mb-2">Añadir Portada</span>
+                        <p class="text-sm text-gray-400 mb-4">Haz clic para añadir o cambiar la portada.<br>(Recomendado: 1200x400 px)</p>
+                        <button id="upload-cover-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-4 rounded-lg hover:brightness-110 transition text-sm">
+                            Subir Imagen
+                        </button>
+                        <input type="file" id="cover-file-input" class="hidden" accept="image/*">
+                    </div>
+                </div>
+            </div>
+            
+            <div id="pdfs-section" class="w-full max-w-4xl mt-8">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold">Mis PDFs</h2>
+                </div>
+                <div id="pdf-list" class="pdf-grid">
+                    <div class="pdf-list-item flex flex-col items-center justify-center bg-[#181818] rounded-lg p-4 sm:p-6 shadow-lg border border-dashed border-gray-600 transition hover:bg-[#2a2a2a] cursor-pointer" id="visual-upload-btn">
+                        <svg class="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        <span class="mt-4 font-semibold text-gray-400 text-sm sm:text-base">Nuevo PDF</span>
+                    </div>
+                </div>
+                <input type="file" id="pdf-file-input" class="hidden" accept="application/pdf">
+                <div id="no-pdfs-message" class="text-gray-500 text-sm mt-4" style="display: none;">
+                    No hay PDFs en este tablero.
+                </div>
+            </div>
+        </div>
+
+        <div id="pdf-loader-container" class="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
+            <div class="text-center">
+                <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#88c999]"></div>
+                <p id="pdf-loader-text" class="mt-4 text-xl">Cargando PDF...</p>
+            </div>
+        </div>
+
+        <div id="pdf-viewer-container" class="mt-4 sm:mt-8 relative w-full max-w-4xl">
+            <div id="pages-container" class="w-full h-full overflow-y-auto space-y-4">
+                </div>
+        </div>
+    </main>
+    <div id="page-number-indicator" class="z-50"></div>
+    
+    <!-- Script principal de la aplicación, unificado y con la sintaxis corregida -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        import { getFirestore, collection, query, where, getDocs, doc, updateDoc, onSnapshot, deleteDoc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
+
+        // Inicializamos Firebase con tu configuración
+        const firebaseConfig = {
+            apiKey: "AIzaSyBYVYRdA_DB1Kob9b_wGd5Wd4JsYFMyBRc",
+            authDomain: "papiro2025-d09e0.firebaseapp.com",
+            projectId: "papiro2025-d09e0",
+            storageBucket: "papiro2025-d09e0.firebasestorage.app",
+            messagingSenderId: "1096335704864",
+            appId: "1:1096335704864:web:75f1f27cd920df64554d45",
+            measurementId: "G-03Y1260F1S"
+        };
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+        
+        let currentProjectRef = null;
+        let currentUser = null;
+        let pdfDoc = null;
+        let currentPdfId = null;
+        let currentPdfRef = null;
+        let pagesHeight = [];
+        let renderPagePending = false;
+        let pagesRendering = false;
+
+        const pageTitleEl = document.getElementById('page-title');
+        const projectTitleEl = document.getElementById('project-title');
+        const pdfLoaderContainer = document.getElementById('pdf-loader-container');
+        const pdfLoaderText = document.getElementById('pdf-loader-text');
+        const saveBtn = document.getElementById('save-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+
+        const gridViewContainer = document.getElementById('grid-view-container');
+        const coverSection = document.getElementById('cover-section');
+        const coverContainer = document.getElementById('cover-container');
+        const coverPlaceholder = document.getElementById('cover-placeholder');
+        const uploadCoverBtn = document.getElementById('upload-cover-btn');
+        const coverFileInput = document.getElementById('cover-file-input');
+
+        const pdfsSection = document.getElementById('pdfs-section');
+        const pdfList = document.getElementById('pdf-list');
+        const visualUploadBtn = document.getElementById('visual-upload-btn');
+        const pdfFileInput = document.getElementById('pdf-file-input');
+        const noPdfsMessage = document.getElementById('no-pdfs-message');
+        
+        const pdfViewerContainer = document.getElementById('pdf-viewer-container');
+        const dynamicBackBtn = document.getElementById('dynamic-back-btn');
+        const pagesContainer = document.getElementById('pages-container');
+
+        const pageNumberIndicator = document.getElementById('page-number-indicator');
+        let scrollTimeout = null;
+        let resizeObserver = null;
+        
+        // Importamos pdf.js y lo asignamos a la ventana global para que esté disponible
+        window.pdfjsLib = window['pdfjs-dist/build/pdf'];
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+        // --- CÓDIGO CORREGIDO PARA LA AUTENTICACIÓN Y CARGA DEL PDF ---
+        document.addEventListener('DOMContentLoaded', () => {
+            onAuthStateChanged(auth, async (user) => {
+                currentUser = user;
+                if (!currentUser) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                const urlParams = new URLSearchParams(window.location.search);
+                const projectId = urlParams.get('id');
+                const docId = urlParams.get('docId'); // Corregido: Obtenemos el docId de la URL
+
+                if (!projectId) {
+                    window.location.href = 'mi_tablero.html';
+                    return;
+                }
+                currentProjectRef = doc(db, "users", currentUser.uid, "projects", projectId);
+                
+                onSnapshot(currentProjectRef, (projectDoc) => {
+                    if (projectDoc.exists()) {
+                        const projectData = projectDoc.data();
+                        projectTitleEl.value = projectData.name;
+                        pageTitleEl.textContent = projectData.name;
+                        if (projectData.coverURL) {
+                            coverContainer.style.backgroundImage = `url(${projectData.coverURL})`;
+                            coverPlaceholder.style.display = 'none';
+                        } else {
+                            coverContainer.style.backgroundImage = 'none';
+                            coverPlaceholder.style.display = 'block';
+                        }
+                        
+                        // Si hay un PDF seleccionado, lo cargamos
+                        if (currentPdfId) {
+                            loadPDFViewer(currentPdfId);
+                        }
+
+                    } else {
+                        console.log("No such document!");
+                        window.location.href = 'mi_tablero.html';
+                    }
+                });
+
+                // Nueva lógica para cargar el PDF si se accede a través de un enlace directo
+                if (docId) {
+                    currentPdfId = docId;
+                    loadPDFViewer(docId);
+                }
+
+                const pdfsQuery = query(collection(db, "users", currentUser.uid, "projects", projectId, "pdfs"));
+                onSnapshot(pdfsQuery, (snapshot) => {
+                    pdfList.innerHTML = `<div class="pdf-list-item flex flex-col items-center justify-center bg-[#181818] rounded-lg p-4 sm:p-6 shadow-lg border border-dashed border-gray-600 transition hover:bg-[#2a2a2a] cursor-pointer" id="visual-upload-btn">
+                                            <svg class="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                            </svg>
+                                            <span class="mt-4 font-semibold text-gray-400 text-sm sm:text-base">Nuevo PDF</span>
+                                        </div>`;
+                    if (snapshot.docs.length > 0) {
+                        noPdfsMessage.style.display = 'none';
+                        snapshot.forEach((pdfDoc) => {
+                            createPdfCard(pdfDoc);
+                        });
+                    } else {
+                        noPdfsMessage.style.display = 'block';
+                    }
+                    setupVisualUploadButton();
+                });
+            });
+        });
+        
+        async function loadPDFViewer(docId) {
+            try {
+                // Obtiene la referencia al documento del PDF para obtener el nombre del archivo
+                const pdfDoc = await getDoc(doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", docId));
+                if (!pdfDoc.exists()) {
+                    throw new Error("Documento PDF no encontrado en Firestore");
+                }
+                const pdfData = pdfDoc.data();
+                const pdfFileName = pdfData.fileName;
+                projectTitleEl.value = pdfData.name;
+                
+                // Verificamos que haya un usuario autenticado.
+                const user = auth.currentUser;
+                if (!user) {
+                    console.error("No hay usuario autenticado. No se puede cargar el PDF.");
+                    showLoader('Ocurrió un error. Intente de nuevo.');
+                    return;
+                }
+                
+                // Obtenemos la referencia al archivo PDF en Storage.
+                const pdfRef = ref(storage, `proyectos/${currentUser.uid}/${currentProjectRef.id}/pdfs/${pdfFileName}`);
+
+                // Con la referencia, obtenemos la URL de descarga segura que incluye un token válido.
+                const url = await getDownloadURL(pdfRef);
+
+                pdfLoaderText.textContent = 'Cargando PDF...';
+                showLoader();
+                
+                const loadingTask = pdfjsLib.getDocument({ url: url });
+                pdfDoc = await loadingTask.promise;
+                const numPages = pdfDoc.numPages;
+                pagesContainer.innerHTML = '';
+                pagesHeight = [];
+                
+                for (let i = 1; i <= numPages; i++) {
+                    const page = await pdfDoc.getPage(i);
+                    const viewport = page.getViewport({ scale: 1.5 });
+                    const pageDiv = document.createElement('div');
+                    pageDiv.className = 'pdf-page-container w-full h-auto';
+                    const canvas = document.createElement('canvas');
+                    canvas.id = `page-${i}`;
+                    canvas.className = 'w-full h-auto shadow-lg bg-[#121212] mb-8';
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    pageDiv.appendChild(canvas);
+                    pagesContainer.appendChild(pageDiv);
+
+                    const renderContext = {
+                        canvasContext: canvas.getContext('2d'),
+                        viewport: viewport
+                    };
+                    await page.render(renderContext).promise;
+                    pagesHeight.push(canvas.offsetHeight);
+                }
+
+                pagesContainer.addEventListener('scroll', updatePageNumberIndicator);
+                resizeObserver = new ResizeObserver(() => updatePageNumberIndicator());
+                resizeObserver.observe(pagesContainer);
+                updatePageNumberIndicator();
+                dynamicBackBtn.onclick = () => {
+                    pdfViewerContainer.style.display = 'none';
+                    gridViewContainer.style.display = 'block';
+                    resetViewer();
+                };
+
+            } catch (reason) {
+                console.error("Error al renderizar la vista previa del PDF:", reason);
+                Swal.fire('Error', 'No se pudo cargar el documento PDF. Intente de nuevo.', 'error');
+                resetViewer();
+            } finally {
+                hideLoader();
+            }
+        }
+        
+        function createPdfCard(pdfDoc) {
+            const pdfData = pdfDoc.data();
+            const card = document.createElement('div');
+            card.className = 'pdf-list-item bg-[#181818] rounded-lg p-4 flex flex-col justify-between shadow-lg border border-[#2a2a2a] transition relative cursor-pointer';
+            card.innerHTML = `
+                <div>
+                    <h3 class="font-bold text-lg text-white">${pdfData.name || 'PDF sin título'}</h3>
+                    <p class="text-sm text-gray-400 truncate">${pdfData.fileName}</p>
+                </div>
+                <div class="mt-4 flex justify-end items-center pdf-list-item-actions">
+                    <button class="text-red-400 hover:text-red-300 transition delete-pdf-btn" data-id="${pdfDoc.id}">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
+            `;
+            
+            card.addEventListener('click', (e) => {
+                if (!e.target.closest('.delete-pdf-btn')) {
+                    currentPdfId = pdfDoc.id;
+                    currentPdfRef = doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId);
+                    loadPDFViewer(pdfDoc.id);
+                }
+            });
+
+            card.querySelector('.delete-pdf-btn').addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const pdfId = e.currentTarget.dataset.id;
+                Swal.fire({
+                    title: '¿Estás seguro?',
+                    text: "¡No podrás revertir esto!",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#88c999',
+                    cancelButtonColor: '#d33',
+                    confirmButtonText: 'Sí, eliminarlo',
+                    cancelButtonText: 'Cancelar'
+                }).then(async (result) => {
+                    if (result.isConfirmed) {
+                        try {
+                            const pdfRefToDelete = doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", pdfId);
+                            await deleteDoc(pdfRefToDelete);
+                            Swal.fire('¡Eliminado!', 'El PDF ha sido eliminado.', 'success');
+                        } catch (error) {
+                            console.error("Error al eliminar el PDF:", error);
+                            Swal.fire('Error', 'Error al eliminar el PDF.', 'error');
+                        }
+                    }
+                });
+            });
+
+            pdfList.appendChild(card);
+        }
+
+        function showLoader(message = 'Cargando...') {
+            pdfLoaderText.textContent = message;
+            pdfLoaderContainer.style.display = 'flex';
+        }
+
+        function hideLoader() {
+            pdfLoaderContainer.style.display = 'none';
+        }
+        
+        function setupVisualUploadButton() {
+            const visualUploadBtn = document.getElementById('visual-upload-btn');
+            visualUploadBtn.addEventListener('click', () => {
+                pdfFileInput.click();
+            });
+        }
+        
+        pdfFileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (file.type !== 'application/pdf') {
+                Swal.fire('Error', 'El archivo debe ser un PDF.', 'error');
+                return;
+            }
+
+            pdfLoaderText.textContent = "Subiendo PDF...";
+            showLoader();
+
+            const newPdfRef = doc(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs"));
+            const storageRef = ref(storage, `proyectos/${currentUser.uid}/${currentProjectRef.id}/pdfs/${file.name}`);
+            const uploadTask = uploadBytesResumable(storageRef, file);
+
+            uploadTask.on('state_changed',
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    pdfLoaderText.textContent = `Subiendo PDF: ${Math.round(progress)}%`;
+                },
+                (error) => {
+                    console.error("Error al subir PDF:", error);
+                    hideLoader();
+                    Swal.fire('Error', 'Error al subir el PDF.', 'error');
+                },
+                async () => {
+                    try {
+                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                        await setDoc(newPdfRef, {
+                            name: file.name.split('.').slice(0, -1).join('.'),
+                            fileName: file.name,
+                            url: downloadURL,
+                            createdAt: new Date()
+                        });
+                        hideLoader();
+                        Swal.fire('Éxito', 'PDF subido con éxito.', 'success');
+                    } catch (error) {
+                        console.error("Error al guardar la URL del PDF:", error);
+                        hideLoader();
+                        Swal.fire('Error', 'Error al guardar la URL del PDF.', 'error');
+                    }
+                }
+            );
+        });
+
+        // Event listener para el botón de cerrar sesión
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                window.location.href = 'index.html';
+            } catch (error) {
+                console.error("Error al cerrar sesión:", error);
+            }
+        });
+
+        // Event listener para el botón de volver
+        dynamicBackBtn.addEventListener('click', () => {
+            if (pdfViewerContainer.style.display === 'flex') {
+                pdfViewerContainer.style.display = 'none';
+                gridViewContainer.style.display = 'block';
+                resetViewer();
+            } else {
+                window.location.href = 'mi_tablero.html';
+            }
+        });
+        
+        function resetViewer() {
+            pagesContainer.innerHTML = '';
+            pdfDoc = null;
+            currentPdfId = null;
+            if (resizeObserver) resizeObserver.disconnect();
+            pagesHeight = [];
+            pagesContainer.removeEventListener('scroll', updatePageNumberIndicator);
+        }
+        
+        function updatePageNumberIndicator() {
+            // Implementa tu lógica de indicador de página aquí
+        }
+
+        // Más listeners para otros botones...
+
+    </script>
+</body>
+</html>
