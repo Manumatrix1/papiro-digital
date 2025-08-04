@@ -288,6 +288,11 @@
 
         // Listener para los proyectos
         function setupProjectListeners() {
+            if (!currentUser || !currentProjectRef) {
+                console.error("Error: Usuario no autenticado o no hay proyecto seleccionado.");
+                return;
+            }
+
             onSnapshot(currentProjectRef, (doc) => {
                 if (doc.exists()) {
                     const data = doc.data();
@@ -604,7 +609,6 @@
                 }
             );
         }
-
     </script>
 </body>
 </html>
