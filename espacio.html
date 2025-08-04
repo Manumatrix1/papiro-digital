@@ -256,11 +256,15 @@
 
         // Funciones de utilidad
         function showLoader() {
-            pdfLoaderContainer.style.display = 'flex';
+            if (pdfLoaderContainer) {
+                pdfLoaderContainer.style.display = 'flex';
+            }
         }
 
         function hideLoader() {
-            pdfLoaderContainer.style.display = 'none';
+            if (pdfLoaderContainer) {
+                pdfLoaderContainer.style.display = 'none';
+            }
         }
 
         function showPdfViewer() {
@@ -517,8 +521,10 @@
                 return;
             }
 
-            pdfLoaderText.textContent = "Subiendo PDF...";
-            showLoader();
+            if (pdfLoaderContainer) {
+                pdfLoaderText.textContent = "Subiendo PDF...";
+                showLoader();
+            }
 
             const storageRef = ref(storage, `proyectos/${currentUser.uid}/${currentProjectRef.id}/pdfs/${file.name}`);
             const uploadTask = uploadBytesResumable(storageRef, file);
@@ -526,7 +532,9 @@
             uploadTask.on('state_changed',
                 (snapshot) => {
                     const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    pdfLoaderText.textContent = `Subiendo PDF: ${Math.round(progress)}%`;
+                    if (pdfLoaderContainer) {
+                        pdfLoaderText.textContent = `Subiendo PDF: ${Math.round(progress)}%`;
+                    }
                 },
                 (error) => {
                     console.error("Error al subir PDF:", error);
@@ -562,8 +570,10 @@
                 return;
             }
 
-            pdfLoaderText.textContent = "Subiendo portada...";
-            showLoader();
+            if (pdfLoaderContainer) {
+                pdfLoaderText.textContent = "Subiendo portada...";
+                showLoader();
+            }
 
             const storageRef = ref(storage, `proyectos/${currentUser.uid}/${currentProjectRef.id}/cover/${file.name}`);
             const uploadTask = uploadBytesResumable(storageRef, file);
@@ -571,7 +581,9 @@
             uploadTask.on('state_changed',
                 (snapshot) => {
                     const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    pdfLoaderText.textContent = `Subiendo portada: ${Math.round(progress)}%`;
+                    if (pdfLoaderContainer) {
+                        pdfLoaderText.textContent = `Subiendo portada: ${Math.round(progress)}%`;
+                    }
                 },
                 (error) => {
                     console.error("Error al subir portada:", error);
