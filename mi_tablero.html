@@ -3,237 +3,185 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mi Tablero - Papiro Digital</title>
+    <title>Mis Tableros</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #0f0f0f; }
         .project-card {
             transition: transform 0.2s ease-in-out;
-            aspect-ratio: 1 / 1;
+            aspect-ratio: 16 / 9;
         }
         .project-card:hover {
             transform: translateY(-5px);
         }
-        .project-actions {
-            display: none;
-            gap: 0.5rem;
-        }
-        .project-card:hover .project-actions {
-            display: flex;
-        }
-        .editable-title-input {
-            background-color: transparent;
-            border: 1px solid #4a4a4a;
-            padding: 4px;
-            border-radius: 4px;
-        }
-        /* Estilos de cuadrícula para que se ajusten a la pantalla */
-        #projects-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); /* CORRECCIÓN: Tamaño mínimo más pequeño */
-            gap: 1.5rem;
-        }
     </style>
 </head>
-<body class="text-white">
-    <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-4 sm:px-8 flex flex-col sm:flex-row justify-between items-center sticky top-0 z-10">
-        <h1 class="text-2xl sm:text-3xl font-bold mb-2 sm:mb-0">Mis Tableros</h1>
-        <div class="relative flex items-center w-full max-w-sm ml-0 sm:ml-8">
-            <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input id="search-input" type="text" placeholder="Buscar tableros..." class="w-full bg-[#2a2a2a] text-white rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#88c999] transition">
-        </div>
-        <div class="flex items-center gap-2 sm:gap-4 mt-2 sm:mt-0 ml-auto">
-            <button id="logout-btn" class="text-gray-400 hover:text-white transition text-sm sm:text-base">
-                Cerrar Sesión
-            </button>
+<body class="text-white flex flex-col min-h-screen">
+    <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-4 sm:px-8 flex justify-between items-center sticky top-0 z-10">
+        <h1 class="text-xl sm:text-2xl font-bold">Mis Tableros</h1>
+        <div class="flex items-center gap-4">
+            <span id="user-info" class="text-gray-400 text-sm hidden sm:inline">Cargando...</span>
+            <button id="logout-btn" class="text-gray-400 hover:text-white transition text-sm sm:text-base">Cerrar Sesión</button>
         </div>
     </header>
 
-    <main class="p-4 sm:p-8">
-        <div id="projects-container">
-            </div>
-    </main>
-
-    <script type="module">
-        import { auth, db, storage } from './firebase-config.js';
-        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { collection, addDoc, onSnapshot, query, orderBy, doc, deleteDoc, updateDoc, getDocs } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
-        import { ref, listAll, deleteObject } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
-
-        const projectsContainer = document.getElementById('projects-container');
-        const logoutBtn = document.getElementById('logout-btn');
-        const searchInput = document.getElementById('search-input');
-
-        let currentUser = null;
-        let projectsCollectionRef = null;
-        let allProjects = [];
-
-        onAuthStateChanged(auth, (user) => {
-            currentUser = user;
-            if (!currentUser) {
-                window.location.href = 'index.html';
-                return;
-            }
-            
-            projectsCollectionRef = collection(db, "users", currentUser.uid, "projects");
-            
-            const q = query(projectsCollectionRef, orderBy("createdAt", "desc"));
-            onSnapshot(q, (querySnapshot) => {
-                allProjects = [];
-                querySnapshot.forEach((doc) => {
-                    allProjects.push({ id: doc.id, data: doc.data() });
-                });
-                displayProjects();
-            });
-        });
-
-        const displayProjects = () => {
-            projectsContainer.innerHTML = '';
-            
-            const createProjectCard = document.createElement('div');
-            createProjectCard.id = 'create-project-card';
-            createProjectCard.className = 'flex flex-col items-center justify-center bg-[#181818] rounded-lg p-4 sm:p-6 shadow-lg border border-dashed border-gray-600 transition hover:bg-[#2a2a2a] cursor-pointer aspect-square';
-            createProjectCard.innerHTML = `
+    <main class="flex-1 overflow-auto p-4 sm:p-8">
+        <div id="projects-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 w-full max-w-7xl mx-auto">
+            <div class="project-card flex flex-col items-center justify-center bg-[#181818] rounded-lg p-6 shadow-lg border border-dashed border-gray-600 transition hover:bg-[#2a2a2a] cursor-pointer" id="new-project-card">
                 <svg class="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
-                <span class="mt-4 font-semibold text-gray-400 text-sm sm:text-base">Crear Tablero</span>
-            `;
-            createProjectCard.addEventListener('click', createNewProject);
-            projectsContainer.appendChild(createProjectCard);
-            
-            const searchTerm = searchInput.value.toLowerCase();
-            const filteredProjects = allProjects.filter(project => project.data.name.toLowerCase().includes(searchTerm));
+                <span class="mt-4 font-semibold text-gray-400 text-sm sm:text-base">Crear nuevo tablero</span>
+            </div>
+        </div>
+        <div id="no-projects-message" class="text-gray-500 text-center mt-8 text-xl" style="display: none;">
+            No hay tableros creados. Crea uno para comenzar.
+        </div>
+    </main>
 
-            filteredProjects.forEach(project => {
-                displayProjectCard(project.id, project.data);
-            });
-        };
+    <script type="module">
+        import { auth, db } from './firebase-config.js';
+        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        import { collection, addDoc, onSnapshot, query, orderBy, doc, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
 
-        const displayProjectCard = (projectId, projectData) => {
-            const projectLink = document.createElement('a');
-            projectLink.href = `espacio.html?id=${projectId}`;
-            projectLink.className = 'project-card flex flex-col bg-[#181818] rounded-lg p-4 sm:p-6 shadow-lg hover:bg-[#2a2a2a] relative';
+        let currentUser = null;
+        const projectsContainer = document.getElementById('projects-container');
+        const newProjectCard = document.getElementById('new-project-card');
+        const noProjectsMessage = document.getElementById('no-projects-message');
+        const logoutBtn = document.getElementById('logout-btn');
+        const userInfoEl = document.getElementById('user-info');
 
-            const coverDiv = document.createElement('div');
-            coverDiv.className = 'w-full h-24 sm:h-32 bg-[#2a2a2a] rounded-md mb-4 flex items-center justify-center relative overflow-hidden';
-            
-            if (projectData.coverUrl) {
-                coverDiv.style.backgroundImage = `url('${projectData.coverUrl}')`;
-                coverDiv.style.backgroundSize = 'cover';
-                coverDiv.style.backgroundPosition = 'center';
-            } else {
-                const placeholder = document.createElement('span');
-                placeholder.className = 'text-gray-500 text-sm sm:text-base';
-                placeholder.textContent = 'Portada';
-                coverDiv.appendChild(placeholder);
-            }
+        document.addEventListener('DOMContentLoaded', () => {
+            onAuthStateChanged(auth, async (user) => {
+                currentUser = user;
+                if (!currentUser) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+                userInfoEl.textContent = `Bienvenido, ${currentUser.email}`;
 
-            const projectHeaderDiv = document.createElement('div');
-            projectHeaderDiv.className = 'flex justify-between items-start w-full';
+                try {
+                    const projectsRef = collection(db, "users", currentUser.uid, "projects");
+                    const q = query(projectsRef, orderBy("createdAt", "desc"));
+                    
+                    onSnapshot(q, (snapshot) => {
+                        projectsContainer.innerHTML = '';
+                        projectsContainer.appendChild(newProjectCard);
 
-            const projectNameEl = document.createElement('span');
-            projectNameEl.className = 'project-name text-base sm:text-lg font-semibold cursor-pointer max-w-[70%] truncate';
-            projectNameEl.textContent = projectData.name;
-            
-            const actionsDiv = document.createElement('div');
-            actionsDiv.className = 'project-actions flex gap-2 absolute top-2 right-2';
+                        snapshot.forEach((doc) => {
+                            const projectData = doc.data();
+                            projectData.id = doc.id;
+                            createProjectCard(projectData);
+                        });
 
-            const renameBtn = document.createElement('button');
-            renameBtn.innerHTML = `
-                <svg class="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 hover:text-[#88c999]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-            `;
-            renameBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                const newName = prompt("Introduce el nuevo nombre para el tablero:", projectData.name);
-                if (newName && newName.trim() !== '' && newName !== projectData.name) {
-                    updateProjectName(projectId, newName);
+                        if (snapshot.empty) {
+                            noProjectsMessage.style.display = 'block';
+                        } else {
+                            noProjectsMessage.style.display = 'none';
+                        }
+                    }, (error) => {
+                        console.error("Error en el listener de proyectos:", error);
+                        noProjectsMessage.style.display = 'block';
+                        projectsContainer.innerHTML = '';
+                        projectsContainer.appendChild(newProjectCard);
+                    });
+                } catch (error) {
+                    console.error("Error al obtener la colección de proyectos:", error);
+                    noProjectsMessage.style.display = 'block';
+                    projectsContainer.innerHTML = '';
+                    projectsContainer.appendChild(newProjectCard);
                 }
             });
 
-            const deleteBtn = document.createElement('button');
-            deleteBtn.innerHTML = `
-                <svg class="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 hover:text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-            `;
-            deleteBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                if (confirm(`¿Estás seguro de que quieres borrar el tablero "${projectData.name}"? Esta acción no se puede deshacer.`)) {
-                    deleteProject(projectId, projectData.coverUrl);
+            logoutBtn.addEventListener('click', async () => {
+                await signOut(auth);
+                window.location.href = 'index.html';
+            });
+
+            newProjectCard.addEventListener('click', async () => {
+                if (!currentUser) {
+                    Swal.fire('Error', 'Debe iniciar sesión para crear un nuevo tablero.', 'error');
+                    return;
+                }
+                try {
+                    const projectsRef = collection(db, "users", currentUser.uid, "projects");
+                    const newProjectRef = await addDoc(projectsRef, {
+                        nombre: "Nuevo Tablero",
+                        createdAt: new Date(),
+                        coverURL: null
+                    });
+                    window.location.href = `espacio.html?id=${newProjectRef.id}`;
+                } catch (error) {
+                    console.error("Error al crear un nuevo proyecto:", error);
+                    Swal.fire('Error', 'No se pudo crear el tablero. Intente de nuevo.', 'error');
                 }
             });
-            
-            actionsDiv.appendChild(renameBtn);
-            actionsDiv.appendChild(deleteBtn);
-            
-            projectHeaderDiv.appendChild(projectNameEl);
-            projectHeaderDiv.appendChild(actionsDiv);
-
-            projectLink.appendChild(coverDiv);
-            projectLink.appendChild(projectHeaderDiv);
-            projectsContainer.appendChild(projectLink);
-        };
-
-        const createNewProject = async () => {
-            if (!currentUser) return;
-            try {
-                const newProjectDoc = await addDoc(projectsCollectionRef, { 
-                    name: "Nuevo Tablero", 
-                    createdAt: new Date() 
-                });
-                window.location.href = `espacio.html?id=${newProjectDoc.id}`;
-            } catch (error) {
-                console.error("Error al crear el tablero:", error);
-                alert("No se pudo crear un nuevo tablero.");
-            }
-        };
-
-        const updateProjectName = async (projectId, newName) => {
-            try {
-                const projectDocRef = doc(db, "users", currentUser.uid, "projects", projectId);
-                await updateDoc(projectDocRef, { name: newName });
-            } catch (error) {
-                console.error("Error al actualizar el nombre:", error);
-                alert("No se pudo actualizar el nombre del tablero.");
-            }
-        };
-
-        const deleteProject = async (projectId, coverUrl) => {
-            try {
-                if (coverUrl) {
-                    const coverRef = ref(storage, coverUrl);
-                    await deleteObject(coverRef);
-                }
-
-                const projectStorageRef = ref(storage, `${currentUser.uid}/${projectId}`);
-                const filesList = await listAll(projectStorageRef);
-                await Promise.all(filesList.items.map(fileRef => deleteObject(fileRef)));
-
-                const pdfsCollectionRef = collection(db, "users", currentUser.uid, "projects", projectId, "pdfs");
-                const pdfDocsSnapshot = await getDocs(pdfsCollectionRef);
-                await Promise.all(pdfDocsSnapshot.docs.map(pdfDoc => deleteDoc(pdfDoc.ref)));
-
-                const projectDocRef = doc(db, "users", currentUser.uid, "projects", projectId);
-                await deleteDoc(projectDocRef);
-
-            } catch (error) {
-                console.error("Error al borrar el tablero:", error);
-                alert("No se pudo borrar el tablero.");
-            }
-        };
-
-        searchInput.addEventListener('keyup', displayProjects);
-
-        logoutBtn.addEventListener('click', async () => {
-            await signOut(auth);
-            window.location.href = 'index.html';
         });
+        
+        function createProjectCard(project) {
+            const card = document.createElement('div');
+            card.classList.add('project-card', 'bg-[#181818]', 'rounded-lg', 'p-4', 'shadow-lg', 'border', 'border-[#2a2a2a]', 'transition', 'relative', 'overflow-hidden', 'cursor-pointer');
+            
+            let coverHTML = project.coverURL 
+                ? `<div class="absolute inset-0 bg-cover bg-center" style="background-image: url('${project.coverURL}');"></div>`
+                : `<div class="absolute inset-0 bg-[#2a2a2a]"></div>`;
+
+            card.innerHTML = `
+                ${coverHTML}
+                <div class="absolute inset-0 bg-black bg-opacity-70 flex flex-col justify-between p-4 transition-opacity">
+                    <div class="flex items-center justify-between opacity-0 hover:opacity-100 transition-opacity">
+                        <button class="edit-btn text-gray-400 hover:text-white" data-id="${project.id}">
+                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                        </button>
+                        <button class="delete-btn text-gray-400 hover:text-white" data-id="${project.id}">
+                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="text-white text-center">
+                        <p class="font-semibold text-lg truncate">${project.nombre}</p>
+                        <p class="text-gray-400 text-xs mt-1">Última modificación: ${new Date(project.createdAt.seconds * 1000).toLocaleDateString()}</p>
+                    </div>
+                </div>
+            `;
+            
+            card.addEventListener('click', () => {
+                window.location.href = `espacio.html?id=${project.id}`;
+            });
+
+            card.querySelector('.delete-btn').addEventListener('click', async (e) => {
+                e.stopPropagation();
+                Swal.fire({
+                    title: '¿Estás seguro?',
+                    text: "¡No podrás revertir esto!",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#88c999',
+                    cancelButtonColor: '#d33',
+                    confirmButtonText: 'Sí, eliminarlo',
+                    cancelButtonText: 'Cancelar'
+                }).then(async (result) => {
+                    if (result.isConfirmed) {
+                        try {
+                            const projectRef = doc(db, "users", currentUser.uid, "projects", project.id);
+                            await deleteDoc(projectRef);
+                            Swal.fire('¡Eliminado!', 'El tablero ha sido eliminado.', 'success');
+                        } catch (error) {
+                            console.error("Error al eliminar el proyecto:", error);
+                            Swal.fire('Error', 'Error al eliminar el tablero.', 'error');
+                        }
+                    }
+                });
+            });
+
+            projectsContainer.appendChild(card);
+        }
     </script>
 </body>
 </html>
