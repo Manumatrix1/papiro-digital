@@ -1,23 +1,24 @@
 // firebase-config.js
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
 import { getStorage } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
 
-// Tu configuración de Firebase ÚNICA Y CORRECTA
+// TODO: Reemplaza lo siguiente con la configuración de tu proyecto de Firebase
 const firebaseConfig = {
-    apiKey: "AIzaSyDhcJyTriTBrEDftDx_lYAhFgd6Y8Us4dA",
-    authDomain: "papirodigital-1a6c5.firebaseapp.com",
-    projectId: "papirodigital-1a6c5",
-    storageBucket: "papirodigital-1a6c5.firebasestorage.app", // ¡CORREGIDO!
-    messagingSenderId: "274494841235",
-    appId: "1:274494841235:web:99112dde1c6dbd12240866"
+  apiKey: "TU_API_KEY",
+  authDomain: "TU_AUTH_DOMAIN",
+  projectId: "TU_PROJECT_ID",
+  storageBucket: "TU_STORAGE_BUCKET",
+  messagingSenderId: "TU_MESSAGING_SENDER_ID",
+  appId: "TU_APP_ID"
 };
 
-// Inicializa Firebase y exporta los servicios que necesitas
+// Inicializa Firebase
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app);
 
-export { auth, db, storage };
+// Exporta los servicios que usarás
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
