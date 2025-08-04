@@ -96,4 +96,282 @@
         </div>
         
         <div class="flex items-center gap-2 sm:gap-4">
-            <button id="save-
+            <button id="save-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-3 sm:px-4 rounded-lg hover:brightness-110 transition text-sm sm:text-base">Guardar Título</button>
+            <button id="logout-btn" class="text-gray-400 hover:text-white transition text-sm sm:text-base">Cerrar Sesión</button>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col items-center overflow-auto p-4 sm:p-8" id="main-content">
+        <div id="grid-view-container" class="w-full max-w-4xl">
+            <div id="cover-section" class="w-full flex justify-center items-center">
+                <div id="cover-container" class="relative group w-full flex items-center justify-center rounded-lg">
+                    <div class="absolute inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center text-center p-4 transition-opacity">
+                        <span id="cover-placeholder" class="text-xl font-bold text-gray-300 mb-2">Añadir Portada</span>
+                        <p class="text-sm text-gray-400 mb-4">Haz clic para añadir o cambiar la portada.<br>(Recomendado: 1200x400 px)</p>
+                        <button id="upload-cover-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-4 rounded-lg hover:brightness-110 transition text-sm">
+                            Subir Imagen
+                        </button>
+                        <input type="file" id="cover-file-input" class="hidden" accept="image/*">
+                    </div>
+                </div>
+            </div>
+            
+            <div id="pdfs-section" class="w-full max-w-4xl mt-8">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold">Mis PDFs</h2>
+                </div>
+                <div id="pdf-list" class="pdf-grid">
+                    <div class="pdf-list-item flex flex-col items-center justify-center bg-[#181818] rounded-lg p-4 sm:p-6 shadow-lg border border-dashed border-gray-600 transition hover:bg-[#2a2a2a] cursor-pointer" id="visual-upload-btn">
+                        <svg class="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        <span class="mt-4 font-semibold text-gray-400 text-sm sm:text-base">Nuevo PDF</span>
+                    </div>
+                </div>
+                <input type="file" id="pdf-file-input" class="hidden" accept="application/pdf">
+                <div id="no-pdfs-message" class="text-center text-gray-500 text-lg mt-8" style="display: none;">
+                    Aún no hay PDFs en este tablero. ¡Añade uno para empezar!
+                </div>
+            </div>
+        </div>
+
+        <div id="pdf-loader-container" class="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
+            <div class="text-center">
+                <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#88c999]"></div>
+                <p id="pdf-loader-text" class="mt-4 text-xl">Cargando...</p>
+            </div>
+        </div>
+
+        <div id="pdf-viewer-container" class="mt-4 sm:mt-8 relative w-full max-w-4xl">
+            <div id="pages-container" class="w-full h-full overflow-y-auto space-y-4">
+            </div>
+        </div>
+    </main>
+    <div id="page-number-indicator" class="z-50"></div>
+
+    <script type="module">
+        import { auth, db, storage } from './firebase-config.js';
+        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { doc, updateDoc, onSnapshot, collection, addDoc, query, orderBy, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+        let currentProjectRef = null;
+        let currentUser = null;
+        let projectId = null;
+        
+        const pageTitleEl = document.getElementById('page-title');
+        const projectTitleEl = document.getElementById('project-title');
+        const saveBtn = document.getElementById('save-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        const dynamicBackBtn = document.getElementById('dynamic-back-btn');
+        const gridViewContainer = document.getElementById('grid-view-container');
+        
+        const coverContainer = document.getElementById('cover-container');
+        const coverPlaceholder = document.getElementById('cover-placeholder');
+        const uploadCoverBtn = document.getElementById('upload-cover-btn');
+        const coverFileInput = document.getElementById('cover-file-input');
+
+        const pdfList = document.getElementById('pdf-list');
+        const visualUploadBtn = document.getElementById('visual-upload-btn');
+        const pdfFileInput = document.getElementById('pdf-file-input');
+        const noPdfsMessage = document.getElementById('no-pdfs-message');
+
+        const pdfViewerContainer = document.getElementById('pdf-viewer-container');
+        const pagesContainer = document.getElementById('pages-container');
+        const pdfLoaderContainer = document.getElementById('pdf-loader-container');
+        const pdfLoaderText = document.getElementById('pdf-loader-text');
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUser = user;
+                    const urlParams = new URLSearchParams(window.location.search);
+                    projectId = urlParams.get('id');
+                    
+                    if (!projectId) {
+                        window.location.href = 'mi_tablero.html';
+                        return;
+                    }
+                    
+                    currentProjectRef = doc(db, 'users', currentUser.uid, 'projects', projectId);
+                    loadProjectData();
+                    setupEventListeners();
+
+                } else {
+                    window.location.href = 'index.html';
+                }
+            });
+        });
+
+        function loadProjectData() {
+            onSnapshot(currentProjectRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const projectData = docSnap.data();
+                    projectTitleEl.value = projectData.name || 'Proyecto sin título';
+                    pageTitleEl.textContent = projectData.name || 'Proyecto';
+                    if (projectData.coverUrl) {
+                        coverContainer.style.backgroundImage = `url(${projectData.coverUrl})`;
+                        coverPlaceholder.parentElement.style.opacity = 0;
+                    } else {
+                        coverContainer.style.backgroundImage = 'none';
+                        coverPlaceholder.parentElement.style.opacity = 1;
+                    }
+                }
+            });
+
+            const pdfsCollectionRef = collection(currentProjectRef, 'pdfs');
+            const q = query(pdfsCollectionRef, orderBy('createdAt', 'desc'));
+            onSnapshot(q, (snapshot) => {
+                const existingPdfs = pdfList.querySelectorAll('.pdf-item-real');
+                existingPdfs.forEach(el => el.remove());
+
+                if (snapshot.empty) {
+                    noPdfsMessage.style.display = 'block';
+                } else {
+                    noPdfsMessage.style.display = 'none';
+                    snapshot.forEach(doc => {
+                        renderPdfItem(doc.id, doc.data());
+                    });
+                }
+            });
+        }
+
+        function setupEventListeners() {
+            saveBtn.addEventListener('click', async () => {
+                saveBtn.disabled = true;
+                saveBtn.textContent = 'Guardando...';
+                await updateDoc(currentProjectRef, { name: projectTitleEl.value });
+                saveBtn.textContent = 'Guardar Título';
+                saveBtn.disabled = false;
+            });
+            
+            logoutBtn.addEventListener('click', () => signOut(auth));
+
+            dynamicBackBtn.addEventListener('click', () => {
+                if (pdfViewerContainer.style.display === 'block') {
+                    showGridView();
+                } else {
+                    window.location.href = 'mi_tablero.html';
+                }
+            });
+
+            uploadCoverBtn.addEventListener('click', () => coverFileInput.click());
+            coverFileInput.addEventListener('change', handleCoverUpload);
+
+            visualUploadBtn.addEventListener('click', () => pdfFileInput.click());
+            pdfFileInput.addEventListener('change', handlePdfUpload);
+        }
+
+        function renderPdfItem(id, data) {
+            const pdfItem = document.createElement('div');
+            pdfItem.className = 'pdf-list-item pdf-item-real bg-[#181818] rounded-lg shadow-lg flex flex-col justify-between p-3 relative';
+            
+            pdfItem.innerHTML = `
+                <div class="w-full flex-1 cursor-pointer" onclick="window.showPdfViewer('${data.url}')">
+                     <div class="w-full h-full bg-[#2a2a2a] rounded-md flex items-center justify-center text-center p-2">
+                        <span class="text-white font-semibold text-sm break-words">${data.name}</span>
+                     </div>
+                </div>
+                <div class="pdf-list-item-actions">
+                    <button onclick="window.deletePdf('${id}', '${data.storagePath}')" class="bg-red-600 hover:bg-red-700 text-white font-bold p-2 rounded-full transition"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd"></path></svg></button>
+                </div>
+            `;
+            pdfList.insertBefore(pdfItem, visualUploadBtn);
+        }
+        
+        // ---- FUNCIONES COMPLETAS ----
+
+        async function handleFileUpload(file, isCover = false) {
+            if (!file) return;
+
+            pdfLoaderText.textContent = isCover ? 'Subiendo portada...' : 'Subiendo PDF...';
+            pdfLoaderContainer.style.display = 'flex';
+            
+            const storagePath = `users/${currentUser.uid}/projects/${projectId}/${Date.now()}_${file.name}`;
+            const storageRef = ref(storage, storagePath);
+            const uploadTask = uploadBytesResumable(storageRef, file);
+
+            try {
+                await uploadTask;
+                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+
+                if (isCover) {
+                    await updateDoc(currentProjectRef, { coverUrl: downloadURL });
+                } else {
+                    const pdfsCollectionRef = collection(currentProjectRef, 'pdfs');
+                    await addDoc(pdfsCollectionRef, {
+                        name: file.name,
+                        url: downloadURL,
+                        storagePath: storagePath,
+                        createdAt: serverTimestamp(),
+                    });
+                }
+            } catch(error) {
+                console.error("Error al subir archivo:", error);
+                alert("Error al subir el archivo.");
+            } finally {
+                pdfLoaderContainer.style.display = 'none';
+            }
+        }
+
+        function handlePdfUpload(e) {
+            handleFileUpload(e.target.files[0], false);
+        }
+
+        function handleCoverUpload(e) {
+            handleFileUpload(e.target.files[0], true);
+        }
+        
+        window.showPdfViewer = async (pdfUrl) => {
+            gridViewContainer.style.display = 'none';
+            pdfViewerContainer.style.display = 'block';
+            pdfLoaderText.textContent = 'Cargando PDF...';
+            pdfLoaderContainer.style.display = 'flex';
+            pagesContainer.innerHTML = '';
+            dynamicBackBtn.querySelector('span').textContent = 'Volver al tablero';
+
+            try {
+                const pdf = await pdfjsLib.getDocument({ url: pdfUrl, CMapReaderFactory: null, CMapUrl: null }).promise;
+                const numPages = pdf.numPages;
+                for (let i = 1; i <= numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const viewport = page.getViewport({ scale: 1.5 });
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    canvas.className = 'mx-auto rounded-lg shadow-lg';
+                    pagesContainer.appendChild(canvas);
+                    await page.render({ canvasContext: context, viewport: viewport }).promise;
+                }
+            } catch (error) {
+                console.error("Error al renderizar el PDF:", error);
+                pagesContainer.innerHTML = `<p class="text-red-500 text-center">No se pudo cargar el PDF.</p>`;
+            } finally {
+                pdfLoaderContainer.style.display = 'none';
+            }
+        }
+        
+        function showGridView() {
+            pdfViewerContainer.style.display = 'none';
+            gridViewContainer.style.display = 'block';
+            pagesContainer.innerHTML = ''; // Limpiar para liberar memoria
+            dynamicBackBtn.querySelector('span').textContent = 'Mis Tableros';
+        }
+
+        window.deletePdf = async (docId, storagePath) => {
+            if (!confirm("¿Estás seguro de que quieres eliminar este PDF?")) return;
+            try {
+                const pdfDocRef = doc(db, 'users', currentUser.uid, 'projects', projectId, 'pdfs', docId);
+                await deleteDoc(pdfDocRef);
+                const fileRef = ref(storage, storagePath);
+                await deleteObject(fileRef);
+            } catch (error) {
+                console.error("Error al eliminar el PDF: ", error);
+            }
+        };
+    </script>
+</body>
+</html>
