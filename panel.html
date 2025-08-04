@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Papiro Digital - Panel de Administrador</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f0f0f; }
+        .album-card { transition: transform 0.3s ease, box-shadow 0.3s ease; position: relative; overflow: hidden; }
+        .album-card:hover { transform: translateY(-8px); box-shadow: 0 12px 24px rgba(0,0,0,0.3); }
+        .modal-backdrop { background-color: rgba(0,0,0,0.7); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in-card { animation: fadeIn 0.5s ease-out forwards; }
+    </style>
+</head>
+<body class="text-white">
+
+    <header class="bg-[#181818] border-b border-[#2a2a2a] py-4 px-8 flex justify-between items-center">
+        <div class="flex items-center gap-4">
+            <img src="https://i.postimg.cc/g0HxbpQF/PAPIRO-1.png" alt="Logo" class="h-10">
+            <h1 class="text-2xl font-bold">Panel de Administrador</h1>
+        </div>
+        <button id="logout-btn" class="text-gray-300 hover:text-white transition">Cerrar Sesión</button>
+    </header>
+
+    <main class="p-8">
+        <h2 class="text-3xl font-semibold text-white mb-6">Proyectos de Todos los Usuarios</h2>
+        <div id="projects-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            </div>
+    </main>
+
+    <script type="module">
+        import { auth, db } from './firebase-config.js';
+        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        import { collectionGroup, getDocs } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+
+        const projectsGrid = document.getElementById('projects-grid');
+        
+        onAuthStateChanged(auth, user => {
+            if (user) {
+                loadAllProjects();
+            } else {
+                window.location.href = 'admin.html';
+            }
+        });
+
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            signOut(auth).then(() => {
+                window.location.href = 'admin.html';
+            });
+        });
+
+        async function loadAllProjects() {
+            projectsGrid.innerHTML = `<p class="text-gray-400 col-span-full">Cargando todos los proyectos...</p>`;
+            
+            try {
+                // Consulta de grupo para obtener todos los proyectos de todos los usuarios
+                const projectsQuery = collectionGroup(db, 'projects');
+                const querySnapshot = await getDocs(projectsQuery);
+
+                if (querySnapshot.empty) {
+                    projectsGrid.innerHTML = `<p class="text-gray-400 col-span-full">No se encontraron proyectos de ningún usuario.</p>`;
+                    return;
+                }
+
+                projectsGrid.innerHTML = '';
+                querySnapshot.forEach(doc => {
+                    const project = doc.data();
+                    const projectId = doc.id;
+                    const userPath = doc.ref.parent.parent.path;
+                    const userId = userPath.split('/')[1];
+
+                    const card = document.createElement('div');
+                    card.className = 'album-card bg-[#181818] rounded-lg p-4 flex flex-col justify-between border border-[#2a2a2a] fade-in-card';
+                    // Nota: El link a espacio.html no funcionará directamente para un admin si no tiene los permisos
+                    // adecuados, pero lo mantenemos para fines de demostración.
+                    card.innerHTML = `
+                        <div>
+                            <h3 class="font-bold text-lg text-white">${project.name || 'Proyecto sin nombre'}</h3>
+                            <p class="text-sm text-gray-400 truncate">ID Proyecto: ${projectId}</p>
+                            <p class="text-xs text-gray-500 mt-1 truncate">ID Usuario: ${userId}</p>
+                        </div>
+                        <div class="mt-4 flex justify-between items-center">
+                            <span class="text-sm text-gray-500">Proyecto de usuario</span>
+                        </div>
+                    `;
+                    projectsGrid.appendChild(card);
+                });
+
+            } catch (error) {
+                console.error("Error al cargar todos los proyectos: ", error);
+                projectsGrid.innerHTML = `<p class="text-red-400 col-span-full">Error al cargar proyectos. Revisa la consola (F12) y las reglas de seguridad de Firestore.</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
