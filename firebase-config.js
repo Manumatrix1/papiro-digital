@@ -6,12 +6,13 @@ import { getStorage } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-s
 
 // Tu configuración de Firebase ÚNICA Y CORRECTA
 const firebaseConfig = {
-    apiKey: "AIzaSyDhcJyTriTBrEDftDx_lYAhFgd6Y8Us4dA",
-    authDomain: "papirodigital-1a6c5.firebaseapp.com",
-    projectId: "papirodigital-1a6c5",
-    storageBucket: "papirodigital-1a6c5.firebasestorage.app", // ¡CORREGIDO!
-    messagingSenderId: "274494841235",
-    appId: "1:274494841235:web:99112dde1c6dbd12240866"
+    apiKey: "AIzaSyBYVYRdA_DB1Kob9b_wGd5Wd4JsYFMyBRc",
+    authDomain: "papiro2025-d09e0.firebaseapp.com",
+    projectId: "papiro2025-d09e0",
+    storageBucket: "papiro2025-d09e0.firebasestorage.app",
+    messagingSenderId: "1096335704864",
+    appId: "1:1096335704864:web:75f1f27cd920df64554d45",
+    measurementId: "G-03Y1260F1S"
 };
 
 // Inicializa Firebase y exporta los servicios que necesitas
