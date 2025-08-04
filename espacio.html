@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 </head>
 <body>
+
     <header class="header">
         <a href="panel.html" class="logo">PAPIRO</a>
         <nav class="navbar">
@@ -17,28 +18,36 @@
     </header>
 
     <div class="content-container">
-        <h1 id="document-title">Cargando...</h1>
-        <div class="pdf-viewer-container">
-            <div id="pdf-viewer" style="display:none;">
-                <div id="pdf-preview-container">
-                    <canvas id="pdf-canvas"></canvas>
-                </div>
+        <div class="header-content">
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="Buscar...">
+                <button id="search-btn" class="icon-btn"><i class="fas fa-search"></i></button>
             </div>
-            <div id="pdf-loading" style="display:block;">
-                <p>Cargando documento...</p>
-            </div>
-            <div id="pdf-error" style="display:none;">
-                <div class="error-icon">
-                    <i class="fas fa-times-circle"></i>
-                </div>
-                <h2>Error</h2>
-                <p>No se pudo cargar el documento PDF. Intente de nuevo.</p>
-                <button id="error-ok-button">OK</button>
+            <h1 id="document-title">Cargando...</h1>
+            <div class="header-buttons">
+                <button class="action-btn" id="save-note-btn">Guardar Título</button>
+                <button class="action-btn" id="delete-btn">Eliminar</button>
             </div>
         </div>
-        <button class="action-btn" id="save-note-btn">Guardar Título</button>
-        <button class="action-btn" id="delete-btn">Eliminar</button>
-        <button class="action-btn" id="return-btn">Volver al Tablero</button>
+        
+        <div class="pdf-viewer-container" id="pdf-viewer-container">
+            </div>
+
+        <div id="pdf-loading">
+            <p>Cargando documento...</p>
+            <div class="spinner"></div>
+        </div>
+
+        <div id="pdf-error" style="display:none;">
+            <div class="error-icon">
+                <i class="fas fa-times-circle"></i>
+            </div>
+            <h2>Error</h2>
+            <p>No se pudo cargar el documento PDF. Intente de nuevo.</p>
+            <button id="error-ok-button" class="action-btn">OK</button>
+        </div>
+
+        <button class="action-btn return-btn" id="return-btn">Volver al Tablero</button>
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
@@ -50,82 +59,90 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
 
     <script>
-        // --- INICIO DEL CÓDIGO CORREGIDO ---
+        const db = firebase.firestore();
+        let authUser = null;
 
-        // Esperamos a que el estado de autenticación de Firebase cambie
+        // --- CÓDIGO CORREGIDO PARA LA AUTENTICACIÓN Y CARGA DEL PDF ---
+        // Escuchamos el estado de autenticación para saber si hay un usuario logueado
         firebase.auth().onAuthStateChanged(user => {
             if (user) {
-                // EL USUARIO ESTÁ AUTENTICADO. AHORA ES SEGURO CARGAR EL PDF.
+                authUser = user;
+                console.log('Usuario autenticado:', user.uid);
 
-                // Obtenemos los parámetros de la URL
                 const urlParams = new URLSearchParams(window.location.search);
                 const docId = urlParams.get('id');
-                const projectId = urlParams.get('projectId'); // Nota: Asegúrate de pasar este parámetro desde mi_tablero.html
 
-                if (docId && projectId) {
-                    // Preparamos la referencia al archivo en Firebase Storage
-                    // Nota: Asegúrate de que esta ruta coincida exactamente con la ubicación de tu PDF
+                if (docId) {
+                    // Si hay un usuario y un ID, cargamos el visor de PDF
+                    loadPDFViewer(docId);
+                }
+            } else {
+                authUser = null;
+                console.log('Usuario no autenticado. Redirigiendo.');
+                window.location.href = 'index.html';
+            }
+        });
+
+        function loadPDFViewer(docId) {
+            // Obtenemos la referencia al documento en Firestore para obtener el projectId
+            db.collection("proyectos").where("pdfs", "array-contains", docId).get().then(querySnapshot => {
+                if (!querySnapshot.empty) {
+                    const doc = querySnapshot.docs[0];
+                    const projectId = doc.id;
+                    
+                    // Obtenemos la referencia al archivo PDF en Storage
                     const storageRef = firebase.storage().ref();
-                    // Ruta del PDF, por ejemplo: `proyectos/{projectId}/{docId}/pdfs/nombre.pdf`
-                    // La ruta del PDF debe ser dinámica si los nombres cambian
-                    const pdfRef = storageRef.child(`proyectos/${projectId}/${docId}/pdfs/La Realidad Emergente.lucho.bien.pdf`); 
+                    // La ruta debe coincidir con cómo guardas tus archivos en Storage.
+                    // Si el nombre del archivo PDF no es docId.pdf, debes ajustarlo.
+                    const pdfRef = storageRef.child(`proyectos/${projectId}/${docId}/pdfs/${docId}.pdf`); 
 
-                    // Obtenemos la URL de descarga, que ya incluirá el token de autenticación
+                    // Con la referencia, obtenemos la URL de descarga segura
                     pdfRef.getDownloadURL().then(url => {
-                        console.log('URL de descarga obtenida:', url);
-                        
-                        // Ocultamos el mensaje de carga y mostramos el visor
+                        const viewerContainer = document.getElementById('pdf-viewer-container');
+                        viewerContainer.innerHTML = '';
+                        const iframe = document.createElement('iframe');
+                        iframe.src = `https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(url)}`;
+                        iframe.style.width = '100%';
+                        iframe.style.height = '100%';
+                        iframe.style.border = 'none';
+                        viewerContainer.appendChild(iframe);
                         document.getElementById('pdf-loading').style.display = 'none';
-                        document.getElementById('pdf-viewer').style.display = 'block';
-
-                        // Inicializamos y cargamos el PDF con la URL segura
-                        var pdfjsLib = window['pdfjs-dist/build/pdf'];
-                        pdfjsLib.GlobalWorkerOptions.workerSrc = '//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.js';
-                        
-                        var loadingTask = pdfjsLib.getDocument(url);
-                        loadingTask.promise.then(function(pdf) {
-                            pdf.getPage(1).then(function(page) {
-                                var scale = 1.5;
-                                var viewport = page.getViewport({ scale: scale });
-                                var canvas = document.getElementById('pdf-canvas');
-                                var context = canvas.getContext('2d');
-                                canvas.height = viewport.height;
-                                canvas.width = viewport.width;
-
-                                var renderContext = {
-                                    canvasContext: context,
-                                    viewport: viewport
-                                };
-                                page.render(renderContext);
-                            });
-                        }).catch(function(reason) {
-                            console.error('Error al renderizar la vista previa del PDF:', reason);
-                            document.getElementById('pdf-error').style.display = 'block';
-                        });
 
                     }).catch(error => {
                         console.error('Error al obtener la URL de descarga:', error);
-                        // Ocultamos el cargando y mostramos el error
                         document.getElementById('pdf-loading').style.display = 'none';
                         document.getElementById('pdf-error').style.display = 'block';
                     });
+
+                } else {
+                    console.log("Documento no encontrado en Firestore.");
+                    document.getElementById('pdf-loading').style.display = 'none';
+                    document.getElementById('pdf-error').style.display = 'block';
                 }
+            }).catch(error => {
+                console.error("Error buscando el documento:", error);
+                document.getElementById('pdf-loading').style.display = 'none';
+                document.getElementById('pdf-error').style.display = 'block';
             });
-            // ... (código para manejar el botón de cerrar sesión y otros eventos)
-            document.getElementById('return-btn').addEventListener('click', () => {
-                window.location.href = 'mi_tablero.html';
-            });
-            
-            // ... (resto de tu lógica de la página)
-
-        } else {
-            // EL USUARIO NO ESTÁ AUTENTICADO. REDIRIGIMOS AL LOGIN.
-            console.log('Usuario no autenticado, redirigiendo a la página de inicio.');
-            window.location.href = 'index.html';
         }
-    });
+        // --- FIN DEL CÓDIGO CORREGIDO ---
 
-    // --- FIN DEL CÓDIGO CORREGIDO ---
-</script>
+        document.getElementById('return-btn').addEventListener('click', () => {
+            window.location.href = 'mi_tablero.html';
+        });
+
+        document.getElementById('logout-button').addEventListener('click', () => {
+            firebase.auth().signOut().then(() => {
+                window.location.href = 'index.html';
+            }).catch((error) => {
+                console.error('Error al cerrar sesión:', error);
+            });
+        });
+
+        document.getElementById('error-ok-button').addEventListener('click', () => {
+            window.location.href = 'mi_tablero.html';
+        });
+
+    </script>
 </body>
 </html>
