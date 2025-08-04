@@ -189,6 +189,7 @@
         const pageNumberIndicator = document.getElementById('page-number-indicator');
         let scrollTimeout = null;
         let resizeObserver = null;
+        const dynamicBackText = document.getElementById('dynamic-back-text');
 
         document.addEventListener('DOMContentLoaded', () => {
             onAuthStateChanged(auth, async (user) => {
