@@ -175,9 +175,12 @@
                         <i class="fas fa-stop"></i>
                     </button>
                 </div>
-                <div class="relative w-full sm:w-1/2">
+                <div class="relative w-full sm:w-1/2 flex items-center gap-4">
                     <input type="text" id="search-notes-input" placeholder="Buscar notas por etiqueta..." class="w-full bg-[#2a2a2a] text-white placeholder-gray-400 py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#88c999]">
-                    <i class="fas fa-search absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                    <i class="fas fa-search absolute right-16 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                    <button id="open-sidebar-btn" class="bg-[#2a2a2a] text-gray-400 rounded-lg w-10 h-10 flex items-center justify-center shadow-lg hover:text-white transition">
+                        <i class="fas fa-book"></i>
+                    </button>
                 </div>
             </div>
             
@@ -197,9 +200,7 @@
             <p id="no-notes-message" class="text-gray-500 text-center" style="display:none;">No hay notas para este PDF.</p>
         </div>
     </aside>
-    <button id="open-sidebar-btn" class="fixed top-20 right-4 bg-[#88c999] text-[#1C1C1C] rounded-full w-12 h-12 flex items-center justify-center shadow-lg hover:brightness-110 transition z-50">
-        <i class="fas fa-bars"></i>
-    </button>
+    <!-- Se eliminó el botón flotante y se movió a la barra superior -->
     <div id="page-number-indicator" class="z-50"></div>
     
     <script type="module">
@@ -759,27 +760,22 @@
         });
 
         // =======================================================================
-        // INICIO DEL CÓDIGO AÑADIDO PARA NUEVAS FUNCIONALIDADES
+        // CÓDIGO ACTUALIZADO PARA NUEVAS FUNCIONALIDADES
         // =======================================================================
 
-        // Variables para el nuevo cuaderno y la voz
-        let recognition = null;
-        let synthesis = window.speechSynthesis;
-        const playPauseBtn = document.getElementById('play-pause-btn');
-        const stopBtn = document.getElementById('stop-btn');
         let currentUtterance = null;
-        let currentSelection = '';
-
+        let isSpeaking = false;
+        
         // Nueva función para manejar la selección de texto y crear la nota
         function handleTextSelection() {
             const selection = window.getSelection();
             if (selection.toString().length > 0) {
-                currentSelection = selection.toString();
+                const currentSelection = selection.toString();
                 Swal.fire({
                     title: 'Anotación y Memorias',
                     html: `
                         <p class="text-sm text-gray-400 text-left mb-2">Texto seleccionado:</p>
-                        <textarea class="w-full h-24 bg-[#2a2a2a] text-white p-2 rounded-lg" readonly>${currentSelection}</textarea>
+                        <textarea id="selected-text-area" class="w-full h-24 bg-[#2a2a2a] text-white p-2 rounded-lg" readonly>${currentSelection}</textarea>
                         <input id="swal-input1" class="swal2-input w-full bg-[#2a2a2a] text-white placeholder-gray-400" placeholder="Escribe tu nota aquí..." style="border: none;">
                         <input id="swal-input2" class="swal2-input w-full bg-[#2a2a2a] text-white placeholder-gray-400" placeholder="Etiquetas (separadas por comas)" style="border: none;">
                     `,
@@ -793,15 +789,15 @@
                     preConfirm: () => {
                         const noteText = Swal.getPopup().querySelector('#swal-input1').value;
                         const tags = Swal.getPopup().querySelector('#swal-input2').value.split(',').map(tag => tag.trim()).filter(tag => tag);
+                        if (!noteText) {
+                            Swal.showValidationMessage('La nota no puede estar vacía.');
+                            return false;
+                        }
                         return { noteText, tags };
                     }
                 }).then(async (result) => {
                     if (result.isConfirmed) {
                         const { noteText, tags } = result.value;
-                        if (!noteText) {
-                            Swal.showValidationMessage('La nota no puede estar vacía.');
-                            return false;
-                        }
                         const pageNumber = getCurrentPageNumber();
                         try {
                             await addDoc(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "notes"), {
@@ -824,7 +820,7 @@
                 });
             }
         }
-
+        
         // Función para obtener el número de página actual visible
         function getCurrentPageNumber() {
             if (!pdfDocument || pagesHeight.length === 0) return 1;
@@ -841,39 +837,60 @@
             return page;
         }
 
-        // Lógica para el marcador de voz (revisado)
+        // Lógica para el marcador de voz (ahora más robusto)
         function speakText(text) {
-            if (currentUtterance && synthesis.speaking) {
-                synthesis.cancel();
+            // Cancelar cualquier voz anterior
+            if (window.speechSynthesis) {
+                window.speechSynthesis.cancel();
+            } else {
+                Swal.fire('Error', 'La API de voz no está disponible en este navegador.', 'error');
+                return;
             }
+
+            // Crear una nueva instancia de SpeechSynthesisUtterance
             currentUtterance = new SpeechSynthesisUtterance(text);
+            
+            // Asignar los eventos
+            currentUtterance.onstart = () => {
+                isSpeaking = true;
+                playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+            };
             currentUtterance.onend = () => {
                 isSpeaking = false;
                 playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
             };
             currentUtterance.onerror = (event) => {
                 console.error('SpeechSynthesisUtterance.onerror', event);
+                isSpeaking = false;
+                playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+                Swal.fire('Error', 'No se pudo leer el texto. Intenta de nuevo.', 'error');
             };
 
-            synthesis.speak(currentUtterance);
-            isSpeaking = true;
-            playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+            // Iniciar la voz
+            window.speechSynthesis.speak(currentUtterance);
         }
 
         function toggleSpeech() {
+            if (!currentUtterance) {
+                 Swal.fire('Información', 'Por favor, selecciona un texto primero para poder leerlo.', 'info');
+                 return;
+            }
+
             if (isSpeaking) {
-                synthesis.pause();
+                window.speechSynthesis.pause();
                 isSpeaking = false;
                 playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
             } else {
-                synthesis.resume();
+                window.speechSynthesis.resume();
                 isSpeaking = true;
                 playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
             }
         }
 
         function stopSpeech() {
-            synthesis.cancel();
+            if (window.speechSynthesis) {
+                window.speechSynthesis.cancel();
+            }
             isSpeaking = false;
             playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
         }
@@ -883,8 +900,10 @@
 
         // Lógica para el cuaderno de notas desplegable
         openSidebarBtn.addEventListener('click', () => {
-            sidebar.classList.add('open');
-            loadNotes();
+            sidebar.classList.toggle('open');
+            if (sidebar.classList.contains('open')) {
+                loadNotes();
+            }
         });
 
         closeSidebarBtn.addEventListener('click', () => {
@@ -893,7 +912,12 @@
 
         // Cargar las notas de Firebase
         async function loadNotes() {
-            if (!currentPdfId) return;
+            if (!currentPdfId) {
+                noNotesMessage.textContent = 'Selecciona un PDF para ver tus notas.';
+                noNotesMessage.style.display = 'block';
+                return;
+            }
+            
             try {
                 const notesQuery = query(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "notes"));
                 onSnapshot(notesQuery, (snapshot) => {
@@ -915,11 +939,14 @@
                             notesList.appendChild(noteEl);
                         });
                     } else {
+                        noNotesMessage.textContent = 'No hay notas para este PDF.';
                         noNotesMessage.style.display = 'block';
                     }
                 });
             } catch (error) {
                 console.error("Error al cargar las notas:", error);
+                noNotesMessage.textContent = 'Error al cargar las notas. Intenta de nuevo.';
+                noNotesMessage.style.display = 'block';
             }
         }
 
