@@ -174,7 +174,7 @@
         
         let currentProjectRef = null;
         let currentUser = null;
-        let pdfDocument = null; // Cambiado de pdfDoc a pdfDocument para evitar conflictos
+        let pdfDocument = null; 
         let currentPdfId = null;
         let currentPdfRef = null;
         let pagesHeight = [];
@@ -182,6 +182,9 @@
         let pagesRendering = false;
         let timer = null;
         let hasCover = false;
+        let isDragging = false;
+        let startY = 0;
+        let startBgY = 0;
 
         const pageTitleEl = document.getElementById('page-title');
         const projectTitleEl = document.getElementById('project-title');
@@ -198,7 +201,6 @@
         const coverFileInput = document.getElementById('cover-file-input');
         const editCoverBtn = document.getElementById('edit-cover-btn');
         const coverOverlay = document.getElementById('cover-overlay');
-
 
         const pdfsSection = document.getElementById('pdfs-section');
         const pdfList = document.getElementById('pdf-list');
