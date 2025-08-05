@@ -62,7 +62,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { getFirestore, collection, query, orderBy, onSnapshot, addDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { getFirestore, collection, query, orderBy, onSnapshot, addDoc, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
         
         const firebaseConfig = {
             apiKey: "AIzaSyBYVYRdA_DB1Kob9b_wGd5Wd4JsYFMyBRc",
@@ -84,6 +84,7 @@
         const projectSearchInput = document.getElementById('project-search');
         let currentUser;
         let allProjects = [];
+        let timer = null;
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
@@ -118,20 +119,39 @@
                 noProjectsMessage.classList.add('hidden');
                 projectsToRender.forEach(project => {
                     const card = document.createElement('div');
-                    card.className = 'project-card bg-[#181818] rounded-lg p-4 flex flex-col justify-between shadow-lg border border-[#2a2a2a] relative cursor-pointer';
+                    card.className = 'project-card bg-[#181818] rounded-lg shadow-lg border border-[#2a2a2a] relative cursor-pointer flex flex-col justify-between';
                     const coverStyle = project.coverURL ? `background-image: url('${project.coverURL}'); background-size: cover; background-position: center;` : '';
                     
                     card.innerHTML = `
-                        <div class="absolute inset-0 bg-black bg-opacity-50 rounded-lg flex items-center justify-center text-center p-4" style="${coverStyle}">
-                            <h3 class="font-bold text-lg text-white">${project.name || 'Proyecto sin nombre'}</h3>
+                        <div class="h-3/4 w-full bg-[#2a2a2a] rounded-t-lg" style="${coverStyle}">
+                            <div class="absolute inset-x-0 top-0 p-2 flex justify-end">
+                                <button class="text-red-400 hover:text-red-300 transition delete-btn" data-id="${project.id}">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
                         </div>
-                        <button class="absolute top-2 right-2 text-red-400 hover:text-red-300 transition delete-btn" data-id="${project.id}">
-                            <i class="fas fa-trash-alt"></i>
-                        </button>
+                        <div class="h-1/4 p-2 flex items-center justify-center">
+                            <input type="text" class="w-full text-center bg-transparent text-lg font-bold text-white focus:outline-none" value="${project.name || 'Proyecto sin nombre'}" data-id="${project.id}">
+                        </div>
                     `;
                     
+                    const nameInput = card.querySelector('input');
+                    nameInput.addEventListener('input', (e) => {
+                        const newName = e.target.value;
+                        clearTimeout(timer);
+                        timer = setTimeout(async () => {
+                            try {
+                                const projectRef = doc(db, "users", currentUser.uid, "projects", project.id);
+                                await updateDoc(projectRef, { name: newName });
+                                console.log('Título actualizado:', newName);
+                            } catch (error) {
+                                console.error("Error al actualizar el título:", error);
+                            }
+                        }, 1000); // Guardamos 1 segundo después de la última pulsación
+                    });
+
                     card.addEventListener('click', (e) => {
-                        if (!e.target.closest('.delete-btn')) {
+                        if (!e.target.closest('.delete-btn') && e.target.tagName.toLowerCase() !== 'input') {
                             window.location.href = `espacio.html?id=${project.id}`;
                         }
                     });
