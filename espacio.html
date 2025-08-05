@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
@@ -146,20 +147,33 @@
         </div>
 
         <div id="pdf-viewer-container" class="mt-4 sm:mt-8 relative w-full max-w-4xl" style="display: none;">
-            <div id="pages-container" class="w-full h-full overflow-y-auto space-y-4">
+            <div class="flex flex-col sm:flex-row items-center justify-between p-4 bg-[#181818] rounded-lg mb-4">
+                <div class="flex items-center gap-2 mb-2 sm:mb-0 w-full sm:w-auto">
+                    <button id="play-pause-btn" class="text-white hover:text-[#88c999] transition">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <button id="stop-btn" class="text-white hover:text-red-400 transition">
+                        <i class="fas fa-stop"></i>
+                    </button>
                 </div>
+                <div class="relative w-full sm:w-1/2">
+                    <input type="text" id="search-notes-input" placeholder="Buscar notas por etiqueta..." class="w-full bg-[#2a2a2a] text-white placeholder-gray-400 py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#88c999]">
+                    <i class="fas fa-search absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                </div>
+            </div>
+            
+            <div id="pages-container" class="w-full h-full overflow-y-auto space-y-4">
+            </div>
         </div>
     </main>
     <div id="page-number-indicator" class="z-50"></div>
     
-    <!-- Script principal de la aplicación, unificado y con la sintaxis corregida -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
-        import { getFirestore, collection, query, where, getDocs, doc, updateDoc, onSnapshot, deleteDoc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore.js";
+        import { getFirestore, collection, query, where, getDocs, doc, updateDoc, onSnapshot, deleteDoc, setDoc, getDoc, addDoc } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-storage.js";
 
-        // Inicializamos Firebase con tu configuración
         const firebaseConfig = {
             apiKey: "AIzaSyBYVYRdA_DB1Kob9b_wGd5Wd4JsYFMyBRc",
             authDomain: "papiro2025-d09e0.firebaseapp.com",
@@ -222,6 +236,11 @@
         window.pdfjsLib = window['pdfjs-dist/build/pdf'];
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
+        // Lógica para el TTS
+        let utterance = null;
+        let isSpeaking = false;
+        let currentPageNum = 1;
+
         document.addEventListener('DOMContentLoaded', () => {
             onAuthStateChanged(auth, async (user) => {
                 currentUser = user;
@@ -262,17 +281,12 @@
                             uploadCoverBtn.textContent = 'Subir Imagen';
                             hasCover = false;
                         }
-                        
-                        if (currentPdfId) {
-                            loadPDFViewer(currentPdfId);
-                        }
-
                     } else {
                         console.log("No such document!");
                         window.location.href = 'mi_tablero.html';
                     }
                 });
-
+                
                 if (docId) {
                     currentPdfId = docId;
                     loadPDFViewer(docId);
