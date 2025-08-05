@@ -124,7 +124,7 @@
                     <h2 class="text-lg font-semibold">Mis PDFs</h2>
                 </div>
                 <div id="pdf-list" class="pdf-grid">
-                    <div class="pdf-list-item flex flex-col items-center justify-center bg-[#181818] rounded-lg p-4 sm:p-6 shadow-lg border border-dashed border-gray-600 transition hover:bg-[#2a2a2a] cursor-pointer" id="visual-upload-btn">
+                    <div class="pdf-list-item flex flex-col items-center justify-center bg-[#181818] rounded-lg p-4 sm:p-6 shadow-lg border border-dashed border-gray-600 transition hover:bg-[#2a2a2a] cursor-pointer" id="visual-upload-btn" style="aspect-ratio: 1 / 1;">
                         <svg class="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                         </svg>
@@ -280,7 +280,7 @@
 
                 const pdfsQuery = query(collection(db, "users", currentUser.uid, "projects", projectId, "pdfs"));
                 onSnapshot(pdfsQuery, (snapshot) => {
-                    pdfList.innerHTML = `<div class="pdf-list-item flex flex-col items-center justify-center bg-[#181818] rounded-lg p-4 sm:p-6 shadow-lg border border-dashed border-gray-600 transition hover:bg-[#2a2a2a] cursor-pointer" id="visual-upload-btn">
+                    pdfList.innerHTML = `<div class="pdf-list-item flex flex-col items-center justify-center bg-[#181818] rounded-lg p-4 sm:p-6 shadow-lg border border-dashed border-gray-600 transition hover:bg-[#2a2a2a] cursor-pointer" id="visual-upload-btn" style="aspect-ratio: 1 / 1;">
                                             <svg class="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                             </svg>
@@ -610,10 +610,6 @@
             coverContainer.style.backgroundPosition = `center ${bgY}%`;
         }
 
-        function endDrag() {
-            isDragging = false;
-        }
-
         async function saveCoverPosition() {
             try {
                 await updateDoc(currentProjectRef, {
@@ -630,7 +626,7 @@
                 Swal.fire('Error', 'Error al guardar la posición de la portada.', 'error');
             }
         }
-
+        
         function editCover() {
             if (hasCover) {
                 coverContainer.style.cursor = 'grab';
@@ -649,7 +645,11 @@
                 coverContainer.addEventListener('touchend', endDrag);
             }
         }
-        
+
+        function endDrag() {
+            isDragging = false;
+        }
+
         coverFileInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) {
