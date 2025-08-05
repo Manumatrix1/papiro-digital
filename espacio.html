@@ -243,6 +243,11 @@
         let startY = 0;
         let startBgY = 0;
         let bgY = 0;
+        
+        // Se declaran las variables para voz en un único lugar para evitar errores de sintaxis
+        const synthesis = window.speechSynthesis;
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const stopBtn = document.getElementById('stop-btn');
         let currentUtterance = null;
         let isSpeaking = false;
         let currentPageNum = 1;
@@ -766,9 +771,10 @@
 
         // =======================================================================
         // CÓDIGO ACTUALIZADO PARA NUEVAS FUNCIONALIDADES
+        // Se han consolidado las declaraciones de variables para evitar errores de sintaxis
         // =======================================================================
         
-        // Ahora se declaran las variables aquí, en un único lugar
+        // Variables para la voz, ahora en un único lugar
         const synthesis = window.speechSynthesis;
         const playPauseBtn = document.getElementById('play-pause-btn');
         const stopBtn = document.getElementById('stop-btn');
