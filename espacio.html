@@ -148,10 +148,10 @@
     
     <!-- Script principal de la aplicación, unificado y con la sintaxis corregida -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { getFirestore, collection, query, where, getDocs, doc, updateDoc, onSnapshot, deleteDoc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
-        import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
+        import { getFirestore, collection, query, where, getDocs, doc, updateDoc, onSnapshot, deleteDoc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-storage.js";
 
         // Inicializamos Firebase con tu configuración
         const firebaseConfig = {
@@ -170,12 +170,13 @@
         
         let currentProjectRef = null;
         let currentUser = null;
-        let pdfDocument = null; // Cambiado de pdfDoc a pdfDocument para evitar conflictos
+        let pdfDocument = null; 
         let currentPdfId = null;
         let currentPdfRef = null;
         let pagesHeight = [];
         let renderPagePending = false;
         let pagesRendering = false;
+        let timer = null; // Variable para el temporizador de guardado
 
         const pageTitleEl = document.getElementById('page-title');
         const projectTitleEl = document.getElementById('project-title');
@@ -205,11 +206,9 @@
         let scrollTimeout = null;
         let resizeObserver = null;
         
-        // Importamos pdf.js y lo asignamos a la ventana global para que esté disponible
         window.pdfjsLib = window['pdfjs-dist/build/pdf'];
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-        // --- CÓDIGO CORREGIDO PARA LA AUTENTICACIÓN Y CARGA DEL PDF ---
         document.addEventListener('DOMContentLoaded', () => {
             onAuthStateChanged(auth, async (user) => {
                 currentUser = user;
@@ -220,7 +219,7 @@
 
                 const urlParams = new URLSearchParams(window.location.search);
                 const projectId = urlParams.get('id');
-                const docId = urlParams.get('docId'); // Corregido: Obtenemos el docId de la URL
+                const docId = urlParams.get('docId');
 
                 if (!projectId) {
                     window.location.href = 'mi_tablero.html';
@@ -241,7 +240,6 @@
                             coverPlaceholder.style.display = 'block';
                         }
                         
-                        // Si hay un PDF seleccionado, lo cargamos
                         if (currentPdfId) {
                             loadPDFViewer(currentPdfId);
                         }
@@ -252,7 +250,6 @@
                     }
                 });
 
-                // Nueva lógica para cargar el PDF si se accede a través de un enlace directo
                 if (docId) {
                     currentPdfId = docId;
                     loadPDFViewer(docId);
@@ -281,13 +278,11 @@
         
         async function loadPDFViewer(docId) {
             try {
-                // Ocultamos la vista de cuadrícula y mostramos el cargador
                 gridViewContainer.style.display = 'none';
                 pdfViewerContainer.style.display = 'block';
                 pdfLoaderText.textContent = 'Cargando PDF...';
                 showLoader();
 
-                // Obtiene la referencia al documento del PDF para obtener el nombre del archivo
                 const pdfDocumentRef = doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", docId);
                 const pdfDocSnapshot = await getDoc(pdfDocumentRef);
                 
@@ -298,7 +293,6 @@
                 const pdfFileName = pdfData.fileName;
                 projectTitleEl.value = pdfData.name;
                 
-                // Verificamos que haya un usuario autenticado.
                 const user = auth.currentUser;
                 if (!user) {
                     console.error("No hay usuario autenticado. No se puede cargar el PDF.");
@@ -306,15 +300,12 @@
                     return;
                 }
                 
-                // Obtenemos la referencia al archivo PDF en Storage.
                 const pdfRef = ref(storage, `proyectos/${currentUser.uid}/${currentProjectRef.id}/pdfs/${pdfFileName}`);
-
-                // Con la referencia, obtenemos la URL de descarga segura que incluye un token válido.
                 const url = await getDownloadURL(pdfRef);
 
                 const loadingTask = pdfjsLib.getDocument({ url: url });
-                const loadedPdfDoc = await loadingTask.promise; // Usamos una variable local
-                pdfDocument = loadedPdfDoc; // Asignamos a la variable global
+                const loadedPdfDoc = await loadingTask.promise;
+                pdfDocument = loadedPdfDoc;
                 
                 const numPages = pdfDocument.numPages;
                 pagesContainer.innerHTML = '';
@@ -364,27 +355,49 @@
             const pdfData = pdfDoc.data();
             const card = document.createElement('div');
             card.className = 'pdf-list-item bg-[#181818] rounded-lg p-4 flex flex-col justify-between shadow-lg border border-[#2a2a2a] transition relative cursor-pointer';
-            card.innerHTML = `
-                <div>
-                    <h3 class="font-bold text-lg text-white">${pdfData.name || 'PDF sin título'}</h3>
-                    <p class="text-sm text-gray-400 truncate">${pdfData.fileName}</p>
-                </div>
-                <div class="mt-4 flex justify-end items-center pdf-list-item-actions">
-                    <button class="text-red-400 hover:text-red-300 transition delete-pdf-btn" data-id="${pdfDoc.id}">
-                        <i class="fas fa-trash-alt"></i>
-                    </button>
-                </div>
-            `;
+            
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.className = 'w-full bg-transparent text-lg font-bold text-white focus:outline-none truncate mb-2';
+            nameInput.value = pdfData.name || 'PDF sin título';
+            nameInput.dataset.id = pdfDoc.id;
+
+            nameInput.addEventListener('input', (e) => {
+                const newName = e.target.value;
+                clearTimeout(timer);
+                timer = setTimeout(async () => {
+                    try {
+                        const pdfRef = doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", pdfDoc.id);
+                        await updateDoc(pdfRef, { name: newName });
+                        console.log('Nombre de PDF actualizado:', newName);
+                    } catch (error) {
+                        console.error("Error al actualizar el nombre del PDF:", error);
+                    }
+                }, 1000); 
+            });
+
+            const fileNameEl = document.createElement('p');
+            fileNameEl.className = 'text-sm text-gray-400 truncate';
+            fileNameEl.textContent = pdfData.fileName;
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'absolute top-2 right-2 text-red-400 hover:text-red-300 transition delete-pdf-btn';
+            deleteBtn.dataset.id = pdfDoc.id;
+            deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+
+            card.appendChild(deleteBtn);
+            card.appendChild(nameInput);
+            card.appendChild(fileNameEl);
             
             card.addEventListener('click', (e) => {
-                if (!e.target.closest('.delete-pdf-btn')) {
+                if (!e.target.closest('.delete-pdf-btn') && e.target.tagName.toLowerCase() !== 'input') {
                     currentPdfId = pdfDoc.id;
                     currentPdfRef = doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId);
                     loadPDFViewer(pdfDoc.id);
                 }
             });
 
-            card.querySelector('.delete-pdf-btn').addEventListener('click', async (e) => {
+            deleteBtn.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 const pdfId = e.currentTarget.dataset.id;
                 Swal.fire({
