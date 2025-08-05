@@ -572,7 +572,7 @@
                 coverFileInput.click();
             }
         });
-
+        
         editCoverBtn.addEventListener('click', () => {
             if (hasCover) {
                 coverContainer.style.cursor = 'grab';
@@ -630,6 +630,25 @@
                 Swal.fire('Error', 'Error al guardar la posición de la portada.', 'error');
             }
         }
+
+        function editCover() {
+            if (hasCover) {
+                coverContainer.style.cursor = 'grab';
+                editCoverBtn.textContent = 'Guardar';
+                coverOverlay.style.display = 'flex';
+                editCoverBtn.removeEventListener('click', editCover);
+                editCoverBtn.addEventListener('click', saveCoverPosition);
+                
+                coverContainer.addEventListener('mousedown', startDrag);
+                coverContainer.addEventListener('mousemove', drag);
+                coverContainer.addEventListener('mouseup', endDrag);
+                coverContainer.addEventListener('mouseleave', endDrag);
+                
+                coverContainer.addEventListener('touchstart', startDrag);
+                coverContainer.addEventListener('touchmove', drag);
+                coverContainer.addEventListener('touchend', endDrag);
+            }
+        }
         
         coverFileInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
@@ -670,7 +689,6 @@
                 }
             );
         });
-
     </script>
 </body>
 </html>
