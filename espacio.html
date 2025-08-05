@@ -238,7 +238,7 @@
         let startY = 0;
         let startBgY = 0;
         let bgY = 0;
-        let utterance = null;
+        let currentUtterance = null;
         let isSpeaking = false;
         let currentPageNum = 1;
 
@@ -282,7 +282,6 @@
         window.pdfjsLib = window['pdfjs-dist/build/pdf'];
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-        // Lógica para el TTS
         document.addEventListener('DOMContentLoaded', () => {
             onAuthStateChanged(auth, async (user) => {
                 currentUser = user;
@@ -762,7 +761,11 @@
         // =======================================================================
         // CÓDIGO ACTUALIZADO PARA NUEVAS FUNCIONALIDADES
         // =======================================================================
-
+        
+        // Ahora se declaran las variables aquí, en un único lugar
+        const synthesis = window.speechSynthesis;
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const stopBtn = document.getElementById('stop-btn');
         let currentUtterance = null;
         let isSpeaking = false;
         
@@ -840,8 +843,8 @@
         // Lógica para el marcador de voz (ahora más robusto)
         function speakText(text) {
             // Cancelar cualquier voz anterior
-            if (window.speechSynthesis) {
-                window.speechSynthesis.cancel();
+            if (synthesis) {
+                synthesis.cancel();
             } else {
                 Swal.fire('Error', 'La API de voz no está disponible en este navegador.', 'error');
                 return;
@@ -867,35 +870,36 @@
             };
 
             // Iniciar la voz
-            window.speechSynthesis.speak(currentUtterance);
+            synthesis.speak(currentUtterance);
         }
 
         function toggleSpeech() {
-            if (!currentUtterance) {
-                 Swal.fire('Información', 'Por favor, selecciona un texto primero para poder leerlo.', 'info');
-                 return;
-            }
-
             if (isSpeaking) {
-                window.speechSynthesis.pause();
+                synthesis.pause();
                 isSpeaking = false;
                 playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
             } else {
-                window.speechSynthesis.resume();
+                synthesis.resume();
                 isSpeaking = true;
                 playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
             }
         }
 
         function stopSpeech() {
-            if (window.speechSynthesis) {
-                window.speechSynthesis.cancel();
+            if (synthesis) {
+                synthesis.cancel();
             }
             isSpeaking = false;
             playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
         }
 
-        playPauseBtn.addEventListener('click', toggleSpeech);
+        playPauseBtn.addEventListener('click', () => {
+            if (!currentUtterance) {
+                 Swal.fire('Información', 'Por favor, selecciona un texto primero para poder leerlo.', 'info');
+                 return;
+            }
+            toggleSpeech();
+        });
         stopBtn.addEventListener('click', stopSpeech);
 
         // Lógica para el cuaderno de notas desplegable
@@ -915,6 +919,7 @@
             if (!currentPdfId) {
                 noNotesMessage.textContent = 'Selecciona un PDF para ver tus notas.';
                 noNotesMessage.style.display = 'block';
+                notesList.innerHTML = '';
                 return;
             }
             
