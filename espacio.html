@@ -509,7 +509,49 @@
             // Implementa tu lógica de indicador de página aquí
         }
 
-        // Más listeners para otros botones...
+        // --- Lógica para subir portada ---
+        uploadCoverBtn.addEventListener('click', () => {
+            coverFileInput.click();
+        });
+
+        coverFileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) {
+                return;
+            }
+
+            if (!file.type.startsWith('image/')) {
+                Swal.fire('Error', 'El archivo debe ser una imagen.', 'error');
+                return;
+            }
+
+            pdfLoaderText.textContent = "Subiendo portada...";
+            showLoader();
+
+            const storageRef = ref(storage, `proyectos/${currentUser.uid}/${currentProjectRef.id}/cover/${file.name}`);
+            const uploadTask = uploadBytesResumable(storageRef, file);
+
+            uploadTask.on('state_changed',
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    pdfLoaderText.textContent = `Subiendo portada: ${Math.round(progress)}%`;
+                },
+                (error) => {
+                    console.error("Error al subir portada:", error);
+                    hideLoader();
+                    Swal.fire('Error', 'Error al subir la portada.', 'error');
+                },
+                () => {
+                    getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
+                        await updateDoc(currentProjectRef, {
+                            coverURL: downloadURL,
+                        });
+                        hideLoader();
+                        Swal.fire('Éxito', 'Portada actualizada.', 'success');
+                    });
+                }
+            );
+        });
 
     </script>
 </body>
