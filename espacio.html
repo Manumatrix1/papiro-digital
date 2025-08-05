@@ -327,8 +327,9 @@
     <script type="module">
         // Importaciones de Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        // Se corrigió la importación de 'getDoc' para asegurar que esté disponible.
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, collection, query, where, getDocs, doc, updateDoc, onSnapshot, deleteDoc, setDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, collection, query, where, getDocs, doc, updateDoc, onSnapshot, deleteDoc, setDoc, addDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
         // Configuración de Firebase (reemplazar con su configuración real si es diferente)
@@ -1007,7 +1008,7 @@
                 coverContainer.addEventListener('touchmove', drag);
                 coverContainer.addEventListener('touchend', endDrag);
             }
-        }
+        });
 
         // Listener para la subida de archivos de portada
         coverFileInput.addEventListener('change', async (e) => {
