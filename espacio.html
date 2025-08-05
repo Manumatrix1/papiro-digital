@@ -610,10 +610,6 @@
             coverContainer.style.backgroundPosition = `center ${bgY}%`;
         }
 
-        function endDrag() {
-            isDragging = false;
-        }
-
         async function saveCoverPosition() {
             try {
                 await updateDoc(currentProjectRef, {
