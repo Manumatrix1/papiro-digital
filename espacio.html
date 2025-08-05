@@ -100,17 +100,22 @@
 
     <main class="flex-1 flex flex-col items-center overflow-auto p-4 sm:p-8" id="main-content">
         <div id="grid-view-container" class="w-full max-w-4xl">
-            <div id="cover-section" class="w-full flex justify-center items-center">
-                <div id="cover-container" class="relative group w-full flex items-center justify-center rounded-lg">
-                    <div class="absolute inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center text-center p-4 transition-opacity">
+            <div id="cover-section" class="w-full flex flex-col items-center">
+                <div id="cover-container" class="relative group w-full flex items-center justify-center rounded-lg h-48 sm:h-64">
+                    <div class="absolute inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center text-center p-4 transition-opacity" id="cover-overlay">
                         <span id="cover-placeholder" class="text-xl font-bold text-gray-300 mb-2">Añadir Portada</span>
                         <p class="text-sm text-gray-400 mb-4">Haz clic para añadir o cambiar la portada.<br>(Recomendado: 1200x400 px)</p>
-                        <button id="upload-cover-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-4 rounded-lg hover:brightness-110 transition text-sm">
-                            Subir Imagen
-                        </button>
-                        <input type="file" id="cover-file-input" class="hidden" accept="image/*">
                     </div>
                 </div>
+                <div id="cover-buttons" class="mt-4 flex gap-4">
+                    <button id="upload-cover-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-4 rounded-lg hover:brightness-110 transition text-sm">
+                        Subir Imagen
+                    </button>
+                    <button id="edit-cover-btn" class="bg-[#2a2a2a] text-gray-400 font-bold py-2 px-4 rounded-lg hover:text-white transition text-sm hidden">
+                        Editar
+                    </button>
+                </div>
+                <input type="file" id="cover-file-input" class="hidden" accept="image/*">
             </div>
             
             <div id="pdfs-section" class="w-full max-w-4xl mt-8">
@@ -170,13 +175,12 @@
         
         let currentProjectRef = null;
         let currentUser = null;
-        let pdfDocument = null; 
+        let pdfDocument = null; // Cambiado de pdfDoc a pdfDocument para evitar conflictos
         let currentPdfId = null;
         let currentPdfRef = null;
         let pagesHeight = [];
         let renderPagePending = false;
         let pagesRendering = false;
-        let timer = null; // Variable para el temporizador de guardado
 
         const pageTitleEl = document.getElementById('page-title');
         const projectTitleEl = document.getElementById('project-title');
@@ -191,6 +195,7 @@
         const coverPlaceholder = document.getElementById('cover-placeholder');
         const uploadCoverBtn = document.getElementById('upload-cover-btn');
         const coverFileInput = document.getElementById('cover-file-input');
+        const editCoverBtn = document.getElementById('edit-cover-btn');
 
         const pdfsSection = document.getElementById('pdfs-section');
         const pdfList = document.getElementById('pdf-list');
@@ -235,9 +240,13 @@
                         if (projectData.coverURL) {
                             coverContainer.style.backgroundImage = `url(${projectData.coverURL})`;
                             coverPlaceholder.style.display = 'none';
+                            editCoverBtn.style.display = 'block';
+                            uploadCoverBtn.textContent = 'Cambiar';
                         } else {
                             coverContainer.style.backgroundImage = 'none';
                             coverPlaceholder.style.display = 'block';
+                            editCoverBtn.style.display = 'none';
+                            uploadCoverBtn.textContent = 'Subir Imagen';
                         }
                         
                         if (currentPdfId) {
@@ -565,7 +574,6 @@
                 }
             );
         });
-
     </script>
 </body>
 </html>
