@@ -132,14 +132,14 @@
             </div>
         </div>
 
-        <div id="pdf-loader-container" class="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
+        <div id="pdf-loader-container" class="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50" style="display: none;">
             <div class="text-center">
                 <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#88c999]"></div>
                 <p id="pdf-loader-text" class="mt-4 text-xl">Cargando PDF...</p>
             </div>
         </div>
 
-        <div id="pdf-viewer-container" class="mt-4 sm:mt-8 relative w-full max-w-4xl">
+        <div id="pdf-viewer-container" class="mt-4 sm:mt-8 relative w-full max-w-4xl" style="display: none;">
             <div id="pages-container" class="w-full h-full overflow-y-auto space-y-4">
                 </div>
         </div>
@@ -220,7 +220,7 @@
 
                 const urlParams = new URLSearchParams(window.location.search);
                 const projectId = urlParams.get('id');
-                const docId = urlParams.get('docId');
+                const docId = urlParams.get('docId'); // Corregido: Obtenemos el docId de la URL
 
                 if (!projectId) {
                     window.location.href = 'mi_tablero.html';
@@ -281,6 +281,12 @@
         
         async function loadPDFViewer(docId) {
             try {
+                // Ocultamos la vista de cuadrícula y mostramos el cargador
+                gridViewContainer.style.display = 'none';
+                pdfViewerContainer.style.display = 'block';
+                pdfLoaderText.textContent = 'Cargando PDF...';
+                showLoader();
+
                 // Obtiene la referencia al documento del PDF para obtener el nombre del archivo
                 const pdfDocument = await getDoc(doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", docId));
                 if (!pdfDocument.exists()) {
@@ -303,12 +309,11 @@
 
                 // Con la referencia, obtenemos la URL de descarga segura que incluye un token válido.
                 const url = await getDownloadURL(pdfRef);
-
-                pdfLoaderText.textContent = 'Cargando PDF...';
-                showLoader();
                 
                 const loadingTask = pdfjsLib.getDocument({ url: url });
-                let pdfDoc = await loadingTask.promise; // CORREGIDO: Se usa 'let' para permitir la reasignación
+                let loadedPdfDoc = await loadingTask.promise; // CORREGIDO: Usamos una variable local para evitar el error de asignación
+                pdfDoc = loadedPdfDoc; // Asignamos a la variable global
+                
                 const numPages = pdfDoc.numPages;
                 pagesContainer.innerHTML = '';
                 pagesHeight = [];
