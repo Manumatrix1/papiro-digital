@@ -208,6 +208,7 @@
         import { getFirestore, collection, query, where, getDocs, doc, updateDoc, onSnapshot, deleteDoc, setDoc, getDoc, addDoc } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-storage.js";
 
+        // Inicializamos Firebase con tu configuración
         const firebaseConfig = {
             apiKey: "AIzaSyBYVYRdA_DB1Kob9b_wGd5Wd4JsYFMyBRc",
             authDomain: "papiro2025-d09e0.firebaseapp.com",
@@ -236,6 +237,9 @@
         let startY = 0;
         let startBgY = 0;
         let bgY = 0;
+        let utterance = null;
+        let isSpeaking = false;
+        let currentPageNum = 1;
 
         const pageTitleEl = document.getElementById('page-title');
         const projectTitleEl = document.getElementById('project-title');
@@ -278,10 +282,6 @@
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
         // Lógica para el TTS
-        let utterance = null;
-        let isSpeaking = false;
-        let currentPageNum = 1;
-
         document.addEventListener('DOMContentLoaded', () => {
             onAuthStateChanged(auth, async (user) => {
                 currentUser = user;
@@ -740,89 +740,6 @@
                 }
             );
         });
-        
-        // Lógica para el TTS
-        let utterance = null;
-        let isSpeaking = false;
-        let currentPageNum = 1;
-
-        document.getElementById('play-pause-btn').addEventListener('click', async () => {
-            if (isSpeaking) {
-                window.speechSynthesis.pause();
-                isSpeaking = false;
-                document.getElementById('play-pause-btn').innerHTML = '<i class="fas fa-play"></i>';
-            } else {
-                if (!utterance || window.speechSynthesis.paused) {
-                    if (window.speechSynthesis.speaking) {
-                        window.speechSynthesis.resume();
-                    } else {
-                        await readCurrentPage();
-                    }
-                } else {
-                    window.speechSynthesis.resume();
-                }
-                isSpeaking = true;
-                document.getElementById('play-pause-btn').innerHTML = '<i class="fas fa-pause"></i>';
-            }
-        });
-        
-        document.getElementById('stop-btn').addEventListener('click', () => {
-            window.speechSynthesis.cancel();
-            isSpeaking = false;
-            utterance = null;
-            document.getElementById('play-pause-btn').innerHTML = '<i class="fas fa-play"></i>';
-        });
-
-        async function readCurrentPage() {
-            if (!pdfDocument) return;
-        
-            const page = await pdfDocument.getPage(currentPageNum);
-            const textContent = await page.getTextContent();
-            const text = textContent.items.map(s => s.str).join(' ');
-
-            if (text) {
-                utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'es-ES';
-                
-                utterance.onend = () => {
-                    isSpeaking = false;
-                    document.getElementById('play-pause-btn').innerHTML = '<i class="fas fa-play"></i>';
-                };
-                
-                window.speechSynthesis.speak(utterance);
-                isSpeaking = true;
-                document.getElementById('play-pause-btn').innerHTML = '<i class="fas fa-pause"></i>';
-            }
-        }
-        
-        document.getElementById('search-notes-input').addEventListener('keyup', async (e) => {
-            const searchText = e.target.value.toLowerCase();
-            if (searchText.length > 0) {
-                const notesQuery = query(collection(db, `users/${currentUser.uid}/projects/${currentProjectRef.id}/pdfs/${currentPdfId}/notes`), where('tags', 'array-contains', searchText));
-                const notesSnapshot = await getDocs(notesQuery);
-                let notesHtml = '';
-                notesSnapshot.forEach(noteDoc => {
-                    const noteData = noteDoc.data();
-                    notesHtml += `<div class="bg-[#2a2a2a] p-4 rounded-lg mb-2">
-                                    <p class="text-sm text-gray-300">Página ${noteData.page}</p>
-                                    <p class="text-lg font-semibold">${noteData.text}</p>
-                                    <p class="text-xs text-gray-500">Etiquetas: ${noteData.tags.join(', ')}</p>
-                                  </div>`;
-                });
-                if (notesHtml) {
-                    Swal.fire({
-                        title: 'Resultados de la búsqueda',
-                        html: notesHtml,
-                        background: '#181818',
-                        color: '#fff',
-                        customClass: 'swal2-dark'
-                    });
-                } else {
-                    Swal.fire('No se encontraron notas.', '', 'info');
-                }
-            }
-        });
-        
     </script>
 </body>
 </html>
