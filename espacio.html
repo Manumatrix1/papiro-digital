@@ -610,6 +610,10 @@
             coverContainer.style.backgroundPosition = `center ${bgY}%`;
         }
 
+        function endDrag() {
+            isDragging = false;
+        }
+
         async function saveCoverPosition() {
             try {
                 await updateDoc(currentProjectRef, {
@@ -644,10 +648,6 @@
                 coverContainer.addEventListener('touchmove', drag);
                 coverContainer.addEventListener('touchend', endDrag);
             }
-        }
-
-        function endDrag() {
-            isDragging = false;
         }
 
         coverFileInput.addEventListener('change', async (e) => {
