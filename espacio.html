@@ -766,8 +766,7 @@
         const synthesis = window.speechSynthesis;
         const playPauseBtn = document.getElementById('play-pause-btn');
         const stopBtn = document.getElementById('stop-btn');
-        let currentUtterance = null;
-        let isSpeaking = false;
+        // Las variables currentUtterance y isSpeaking ya no se duplican
         
         // Nueva función para manejar la selección de texto y crear la nota
         function handleTextSelection() {
