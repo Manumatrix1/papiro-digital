@@ -170,7 +170,7 @@
         
         let currentProjectRef = null;
         let currentUser = null;
-        let pdfDoc = null;
+        let pdfDocument = null; // Cambiado de pdfDoc a pdfDocument para evitar conflictos
         let currentPdfId = null;
         let currentPdfRef = null;
         let pagesHeight = [];
@@ -288,11 +288,13 @@
                 showLoader();
 
                 // Obtiene la referencia al documento del PDF para obtener el nombre del archivo
-                const pdfDocument = await getDoc(doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", docId));
-                if (!pdfDocument.exists()) {
+                const pdfDocumentRef = doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", docId);
+                const pdfDocSnapshot = await getDoc(pdfDocumentRef);
+                
+                if (!pdfDocSnapshot.exists()) {
                     throw new Error("Documento PDF no encontrado en Firestore");
                 }
-                const pdfData = pdfDocument.data();
+                const pdfData = pdfDocSnapshot.data();
                 const pdfFileName = pdfData.fileName;
                 projectTitleEl.value = pdfData.name;
                 
@@ -309,17 +311,17 @@
 
                 // Con la referencia, obtenemos la URL de descarga segura que incluye un token válido.
                 const url = await getDownloadURL(pdfRef);
-                
+
                 const loadingTask = pdfjsLib.getDocument({ url: url });
-                let loadedPdfDoc = await loadingTask.promise; // CORREGIDO: Usamos una variable local para evitar el error de asignación
-                pdfDoc = loadedPdfDoc; // Asignamos a la variable global
+                const loadedPdfDoc = await loadingTask.promise; // Usamos una variable local
+                pdfDocument = loadedPdfDoc; // Asignamos a la variable global
                 
-                const numPages = pdfDoc.numPages;
+                const numPages = pdfDocument.numPages;
                 pagesContainer.innerHTML = '';
                 pagesHeight = [];
                 
                 for (let i = 1; i <= numPages; i++) {
-                    const page = await pdfDoc.getPage(i);
+                    const page = await pdfDocument.getPage(i);
                     const viewport = page.getViewport({ scale: 1.5 });
                     const pageDiv = document.createElement('div');
                     pageDiv.className = 'pdf-page-container w-full h-auto';
@@ -496,7 +498,7 @@
         
         function resetViewer() {
             pagesContainer.innerHTML = '';
-            pdfDoc = null;
+            pdfDocument = null;
             currentPdfId = null;
             if (resizeObserver) resizeObserver.disconnect();
             pagesHeight = [];
