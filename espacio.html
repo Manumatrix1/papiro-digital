@@ -102,9 +102,8 @@
         <div id="grid-view-container" class="w-full max-w-4xl">
             <div id="cover-section" class="w-full flex flex-col items-center">
                 <div id="cover-container" class="relative group w-full flex items-center justify-center rounded-lg h-48 sm:h-64">
-                    <div class="absolute inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center text-center p-4 transition-opacity" id="cover-overlay">
+                    <div class="absolute inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center text-center p-4 transition-opacity" id="cover-overlay" style="display: none;">
                         <span id="cover-placeholder" class="text-xl font-bold text-gray-300 mb-2">Añadir Portada</span>
-                        <p class="text-sm text-gray-400 mb-4">Haz clic para añadir o cambiar la portada.<br>(Recomendado: 1200x400 px)</p>
                     </div>
                 </div>
                 <div id="cover-buttons" class="mt-4 flex gap-4">
@@ -181,6 +180,8 @@
         let pagesHeight = [];
         let renderPagePending = false;
         let pagesRendering = false;
+        let timer = null;
+        let hasCover = false;
 
         const pageTitleEl = document.getElementById('page-title');
         const projectTitleEl = document.getElementById('project-title');
@@ -196,6 +197,8 @@
         const uploadCoverBtn = document.getElementById('upload-cover-btn');
         const coverFileInput = document.getElementById('cover-file-input');
         const editCoverBtn = document.getElementById('edit-cover-btn');
+        const coverOverlay = document.getElementById('cover-overlay');
+
 
         const pdfsSection = document.getElementById('pdfs-section');
         const pdfList = document.getElementById('pdf-list');
@@ -242,11 +245,13 @@
                             coverPlaceholder.style.display = 'none';
                             editCoverBtn.style.display = 'block';
                             uploadCoverBtn.textContent = 'Cambiar';
+                            hasCover = true;
                         } else {
                             coverContainer.style.backgroundImage = 'none';
                             coverPlaceholder.style.display = 'block';
                             editCoverBtn.style.display = 'none';
                             uploadCoverBtn.textContent = 'Subir Imagen';
+                            hasCover = false;
                         }
                         
                         if (currentPdfId) {
@@ -533,7 +538,23 @@
 
         // --- Lógica para subir portada ---
         uploadCoverBtn.addEventListener('click', () => {
-            coverFileInput.click();
+            if (!hasCover) {
+                Swal.fire({
+                    title: 'Añadir Portada',
+                    html: 'Haz clic para añadir una portada.<br>(Recomendado: 1200x400 px)',
+                    icon: 'info',
+                    showCancelButton: true,
+                    confirmButtonText: 'Subir Imagen',
+                    cancelButtonText: 'Cancelar',
+                    background: '#181818',
+                    color: '#fff',
+                    preConfirm: () => {
+                        coverFileInput.click();
+                    }
+                });
+            } else {
+                coverFileInput.click();
+            }
         });
 
         coverFileInput.addEventListener('change', async (e) => {
@@ -574,6 +595,7 @@
                 }
             );
         });
+
     </script>
 </body>
 </html>
