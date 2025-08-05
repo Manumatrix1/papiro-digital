@@ -245,13 +245,13 @@
         let bgY = 0;
         let currentPageNum = 1;
 
+        // Variables del DOM
         const pageTitleEl = document.getElementById('page-title');
         const projectTitleEl = document.getElementById('project-title');
         const pdfLoaderContainer = document.getElementById('pdf-loader-container');
         const pdfLoaderText = document.getElementById('pdf-loader-text');
         const saveBtn = document.getElementById('save-btn');
         const logoutBtn = document.getElementById('logout-btn');
-
         const gridViewContainer = document.getElementById('grid-view-container');
         const coverSection = document.getElementById('cover-section');
         const coverContainer = document.getElementById('cover-container');
@@ -260,21 +260,15 @@
         const coverFileInput = document.getElementById('cover-file-input');
         const editCoverBtn = document.getElementById('edit-cover-btn');
         const coverOverlay = document.getElementById('cover-overlay');
-
         const pdfsSection = document.getElementById('pdfs-section');
         const pdfList = document.getElementById('pdf-list');
         const visualUploadBtn = document.getElementById('visual-upload-btn');
         const pdfFileInput = document.getElementById('pdf-file-input');
         const noPdfsMessage = document.getElementById('no-pdfs-message');
-        
         const pdfViewerContainer = document.getElementById('pdf-viewer-container');
         const dynamicBackBtn = document.getElementById('dynamic-back-btn');
         const pagesContainer = document.getElementById('pages-container');
-
         const pageNumberIndicator = document.getElementById('page-number-indicator');
-        let scrollTimeout = null;
-        let resizeObserver = null;
-        
         const sidebar = document.getElementById('sidebar');
         const openSidebarBtn = document.getElementById('open-sidebar-btn');
         const closeSidebarBtn = document.getElementById('close-sidebar-btn');
@@ -282,6 +276,17 @@
         const noNotesMessage = document.getElementById('no-notes-message');
         const searchNotesInput = document.getElementById('search-notes-input');
         const addNoteBtn = document.getElementById('add-note-btn');
+
+        // Variables para la voz, ahora en un único lugar para evitar errores de sintaxis
+        const synthesis = window.speechSynthesis;
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        let currentUtterance = null;
+        let isSpeaking = false;
+        
+        let scrollTimeout = null;
+        let resizeObserver = null;
+
 
         window.pdfjsLib = window['pdfjs-dist/build/pdf'];
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
@@ -413,6 +418,8 @@
                     await page.render(renderContext).promise;
                     pagesHeight.push(canvas.offsetHeight);
                 }
+                
+                stopSpeech();
 
                 pagesContainer.addEventListener('scroll', updatePageNumberIndicator);
                 resizeObserver = new ResizeObserver(() => updatePageNumberIndicator());
@@ -597,6 +604,8 @@
             if (resizeObserver) resizeObserver.disconnect();
             pagesHeight = [];
             pagesContainer.removeEventListener('scroll', updatePageNumberIndicator);
+            // Asegurarse de que el cuaderno se cierra al volver a la vista de cuadrícula
+            sidebar.classList.remove('open');
         }
         
         function updatePageNumberIndicator() {
@@ -764,7 +773,6 @@
 
         // =======================================================================
         // CÓDIGO ACTUALIZADO PARA NUEVAS FUNCIONALIDADES
-        // Se han consolidado las declaraciones de variables para evitar errores de sintaxis
         // =======================================================================
         
         // Variables para la voz, ahora en un único lugar
@@ -845,22 +853,31 @@
         }
         
         // Lógica para el marcador de voz (mejorado)
-        async function speakText(text) {
-            // Si no hay texto seleccionado, leer la página completa
+        async function speakText(text, pageNum) {
+            // Cancelar cualquier voz anterior
+            if (synthesis && synthesis.speaking) {
+                synthesis.cancel();
+            }
+            
+            // Si no hay texto, obtener el texto de la página actual o de la página especificada
             if (!text && pdfDocument) {
-                const pageNumber = getCurrentPageNumber();
-                const page = await pdfDocument.getPage(pageNumber);
-                const textContent = await page.getTextContent();
-                text = textContent.items.map(item => item.str).join(' ');
+                const pageNumberToRead = pageNum || getCurrentPageNumber();
+                try {
+                    const page = await pdfDocument.getPage(pageNumberToRead);
+                    const textContent = await page.getTextContent();
+                    text = textContent.items.map(item => item.str).join(' ');
+                } catch (error) {
+                    console.error("Error al obtener el texto de la página:", error);
+                    Swal.fire('Error', 'No se pudo obtener el texto de la página.', 'error');
+                    return;
+                }
             } else if (!text) {
                  Swal.fire('Información', 'No hay texto para leer.', 'info');
                  return;
             }
 
-            // Cancelar cualquier voz anterior
-            if (synthesis) {
-                synthesis.cancel();
-            } else {
+            // Comprobar la disponibilidad de la API de voz
+            if (!synthesis) {
                 Swal.fire('Error', 'La API de voz no está disponible en este navegador.', 'error');
                 return;
             }
@@ -868,7 +885,7 @@
             // Crear una nueva instancia de SpeechSynthesisUtterance
             currentUtterance = new SpeechSynthesisUtterance(text);
             
-            // Asignar los eventos
+            // Asignar los eventos para manejar la reproducción
             currentUtterance.onstart = () => {
                 isSpeaking = true;
                 playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
@@ -881,7 +898,6 @@
                 console.error('SpeechSynthesisUtterance.onerror', event);
                 isSpeaking = false;
                 playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-                Swal.fire('Error', 'No se pudo leer el texto. Intenta de nuevo.', 'error');
             };
 
             // Iniciar la voz
@@ -906,17 +922,23 @@
             }
             isSpeaking = false;
             playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+            currentUtterance = null;
         }
         
         playPauseBtn.addEventListener('click', async () => {
             if (isSpeaking) {
                 toggleSpeech();
             } else {
-                const selection = window.getSelection().toString();
-                if (selection) {
-                    await speakText(selection);
+                // Si ya hay un utterance en pausa, lo reanudamos
+                if (currentUtterance) {
+                    toggleSpeech();
                 } else {
-                    await speakText(); // Lee la página completa si no hay selección
+                    const selection = window.getSelection().toString();
+                    if (selection) {
+                        await speakText(selection);
+                    } else {
+                        await speakText(); // Lee la página completa si no hay selección
+                    }
                 }
             }
         });
@@ -924,6 +946,10 @@
 
         // Lógica para el cuaderno de notas desplegable
         openSidebarBtn.addEventListener('click', () => {
+            if (!currentPdfId) {
+                Swal.fire('Error', 'Primero debes seleccionar un PDF para abrir el cuaderno.', 'error');
+                return;
+            }
             sidebar.classList.toggle('open');
             if (sidebar.classList.contains('open')) {
                 loadNotes();
@@ -990,9 +1016,9 @@
                 }
             });
         });
-        
-        // Ahora la selección de texto en el PDF no activa la función de anotación.
-        // La anotación se hace a través del botón "Añadir Anotación" en la sidebar.
+
+        // La selección de texto en el PDF ya no activa la función de anotación,
+        // ya que la funcionalidad de selección no está disponible en el canvas.
         // pagesContainer.addEventListener('mouseup', handleTextSelection);
 
         // =======================================================================
@@ -1001,3 +1027,4 @@
     </script>
 </body>
 </html>
+
