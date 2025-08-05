@@ -8,11 +8,15 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #0f0f0f; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f0f0f;
+        }
         .project-card {
             transition: transform 0.2s ease-in-out;
-            aspect-ratio: 16 / 9;
+            aspect-ratio: 1 / 1;
         }
         .project-card:hover {
             transform: translateY(-5px);
@@ -20,168 +24,186 @@
     </style>
 </head>
 <body class="text-white flex flex-col min-h-screen">
-    <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-4 sm:px-8 flex justify-between items-center sticky top-0 z-10">
+    <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-4 sm:px-8 flex flex-col sm:flex-row justify-between items-center sticky top-0 z-10 gap-4 sm:gap-0">
         <h1 class="text-xl sm:text-2xl font-bold">Mis Tableros</h1>
-        <div class="flex items-center gap-4">
-            <span id="user-info" class="text-gray-400 text-sm hidden sm:inline">Cargando...</span>
-            <button id="logout-btn" class="text-gray-400 hover:text-white transition text-sm sm:text-base">Cerrar Sesión</button>
+        <div class="flex items-center gap-4 w-full sm:w-auto">
+            <div class="relative w-full">
+                <input type="text" id="project-search" placeholder="Buscar tableros..." class="w-full bg-[#2a2a2a] text-white placeholder-gray-400 py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#88c999]">
+                <i class="fas fa-search absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+            </div>
+            <button id="logout-btn" class="text-gray-400 hover:text-white transition">Cerrar Sesión</button>
         </div>
     </header>
 
-    <main class="flex-1 overflow-auto p-4 sm:p-8">
-        <div id="projects-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 w-full max-w-7xl mx-auto">
-            <div class="project-card flex flex-col items-center justify-center bg-[#181818] rounded-lg p-6 shadow-lg border border-dashed border-gray-600 transition hover:bg-[#2a2a2a] cursor-pointer" id="new-project-card">
-                <svg class="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                <span class="mt-4 font-semibold text-gray-400 text-sm sm:text-base">Crear nuevo tablero</span>
+    <main class="flex-1 p-4 sm:p-8">
+        <div class="w-full max-w-4xl mx-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-lg font-semibold">Tus Proyectos</h2>
+                <button id="add-project-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-4 rounded-lg hover:brightness-110 transition text-sm flex items-center gap-2">
+                    <i class="fas fa-plus"></i>
+                    Nuevo Tablero
+                </button>
             </div>
-        </div>
-        <div id="no-projects-message" class="text-gray-500 text-center mt-8 text-xl" style="display: none;">
-            No hay tableros creados. Crea uno para comenzar.
+            <div id="projects-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                <!-- Las tarjetas de proyecto se renderizarán aquí -->
+            </div>
+            <div id="no-projects-message" class="text-gray-400 text-center mt-8 hidden">
+                <p>No tienes tableros aún. ¡Crea uno para empezar!</p>
+            </div>
         </div>
     </main>
 
+    <!-- Firebase SDKs versión 9 -->
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js"></script>
+
     <script type="module">
-        import { auth, db } from './firebase-config.js';
-        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { collection, addDoc, onSnapshot, query, orderBy, doc, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
-
-        let currentUser = null;
-        const projectsContainer = document.getElementById('projects-container');
-        const newProjectCard = document.getElementById('new-project-card');
-        const noProjectsMessage = document.getElementById('no-projects-message');
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        import { getFirestore, collection, query, orderBy, onSnapshot, addDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        
+        const firebaseConfig = {
+            apiKey: "AIzaSyBYVYRdA_DB1Kob9b_wGd5Wd4JsYFMyBRc",
+            authDomain: "papiro2025-d09e0.firebaseapp.com",
+            projectId: "papiro2025-d09e0",
+            storageBucket: "papiro2025-d09e0.firebasestorage.app",
+            messagingSenderId: "1096335704864",
+            appId: "1:1096335704864:web:75f1f27cd920df64554d45",
+            measurementId: "G-03Y1260F1S"
+        };
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        const projectsGrid = document.getElementById('projects-grid');
+        const addProjectBtn = document.getElementById('add-project-btn');
         const logoutBtn = document.getElementById('logout-btn');
-        const userInfoEl = document.getElementById('user-info');
+        const noProjectsMessage = document.getElementById('no-projects-message');
+        const projectSearchInput = document.getElementById('project-search');
+        let currentUser;
+        let allProjects = [];
 
-        document.addEventListener('DOMContentLoaded', () => {
-            onAuthStateChanged(auth, async (user) => {
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
                 currentUser = user;
-                if (!currentUser) {
-                    window.location.href = 'index.html';
-                    return;
-                }
-                userInfoEl.textContent = `Bienvenido, ${currentUser.email}`;
+                loadProjects();
+            } else {
+                window.location.href = 'index.html';
+            }
+        });
 
-                try {
-                    const projectsRef = collection(db, "users", currentUser.uid, "projects");
-                    const q = query(projectsRef, orderBy("createdAt", "desc"));
+        // Agregamos un event listener para el buscador
+        projectSearchInput.addEventListener('keyup', (e) => {
+            const searchText = e.target.value.toLowerCase();
+            const filteredProjects = allProjects.filter(project => {
+                return project.name.toLowerCase().includes(searchText);
+            });
+            renderProjects(filteredProjects);
+        });
+
+        async function loadProjects() {
+            const q = query(collection(db, "users", currentUser.uid, "projects"));
+            
+            onSnapshot(q, (snapshot) => {
+                allProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderProjects(allProjects);
+            });
+        }
+        
+        function renderProjects(projectsToRender) {
+            projectsGrid.innerHTML = ''; // Limpiamos la cuadrícula antes de renderizar
+            if (projectsToRender.length > 0) {
+                noProjectsMessage.classList.add('hidden');
+                projectsToRender.forEach(project => {
+                    const card = document.createElement('div');
+                    card.className = 'project-card bg-[#181818] rounded-lg p-4 flex flex-col justify-between shadow-lg border border-[#2a2a2a] relative cursor-pointer';
+                    const coverStyle = project.coverURL ? `background-image: url('${project.coverURL}'); background-size: cover; background-position: center;` : '';
                     
-                    onSnapshot(q, (snapshot) => {
-                        projectsContainer.innerHTML = '';
-                        projectsContainer.appendChild(newProjectCard);
-
-                        snapshot.forEach((doc) => {
-                            const projectData = doc.data();
-                            projectData.id = doc.id;
-                            createProjectCard(projectData);
-                        });
-
-                        if (snapshot.empty) {
-                            noProjectsMessage.style.display = 'block';
-                        } else {
-                            noProjectsMessage.style.display = 'none';
+                    card.innerHTML = `
+                        <div class="absolute inset-0 bg-black bg-opacity-50 rounded-lg flex items-center justify-center text-center p-4" style="${coverStyle}">
+                            <h3 class="font-bold text-lg text-white">${project.name || 'Proyecto sin nombre'}</h3>
+                        </div>
+                        <button class="absolute top-2 right-2 text-red-400 hover:text-red-300 transition delete-btn" data-id="${project.id}">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    `;
+                    
+                    card.addEventListener('click', (e) => {
+                        if (!e.target.closest('.delete-btn')) {
+                            window.location.href = `espacio.html?id=${project.id}`;
                         }
-                    }, (error) => {
-                        console.error("Error en el listener de proyectos:", error);
-                        noProjectsMessage.style.display = 'block';
-                        projectsContainer.innerHTML = '';
-                        projectsContainer.appendChild(newProjectCard);
                     });
-                } catch (error) {
-                    console.error("Error al obtener la colección de proyectos:", error);
-                    noProjectsMessage.style.display = 'block';
-                    projectsContainer.innerHTML = '';
-                    projectsContainer.appendChild(newProjectCard);
-                }
+
+                    card.querySelector('.delete-btn').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        Swal.fire({
+                            title: '¿Estás seguro?',
+                            text: "¡No podrás revertir esto!",
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#88c999',
+                            cancelButtonColor: '#d33',
+                            confirmButtonText: 'Sí, eliminarlo',
+                            cancelButtonText: 'Cancelar'
+                        }).then(async (result) => {
+                            if (result.isConfirmed) {
+                                try {
+                                    const projectRef = doc(db, "users", currentUser.uid, "projects", project.id);
+                                    await deleteDoc(projectRef);
+                                    Swal.fire('¡Eliminado!', 'El tablero ha sido eliminado.', 'success');
+                                } catch (error) {
+                                    console.error("Error al eliminar el proyecto:", error);
+                                    Swal.fire('Error', 'Error al eliminar el tablero.', 'error');
+                                }
+                            }
+                        });
+                    });
+
+                    projectsGrid.appendChild(card);
+                });
+            } else {
+                noProjectsMessage.classList.remove('hidden');
+            }
+        }
+
+        addProjectBtn.addEventListener('click', async () => {
+            const { value: projectName } = await Swal.fire({
+                title: 'Nombre del nuevo tablero',
+                input: 'text',
+                inputPlaceholder: 'Ej: Tesis de Diseño Gráfico',
+                showCancelButton: true,
+                confirmButtonText: 'Crear',
+                confirmButtonColor: '#88c999',
+                cancelButtonText: 'Cancelar',
+                background: '#181818',
+                color: '#fff'
             });
 
-            logoutBtn.addEventListener('click', async () => {
+            if (projectName) {
+                try {
+                    const newProjectRef = await addDoc(collection(db, "users", currentUser.uid, "projects"), {
+                        name: projectName,
+                        createdAt: new Date(),
+                        pdfs: []
+                    });
+                    Swal.fire('¡Creado!', `El tablero "${projectName}" ha sido creado.`, 'success');
+                } catch (error) {
+                    console.error("Error al crear el proyecto:", error);
+                    Swal.fire('Error', 'Error al crear el tablero.', 'error');
+                }
+            }
+        });
+
+        logoutBtn.addEventListener('click', async () => {
+            try {
                 await signOut(auth);
                 window.location.href = 'index.html';
-            });
-
-            newProjectCard.addEventListener('click', async () => {
-                if (!currentUser) {
-                    Swal.fire('Error', 'Debe iniciar sesión para crear un nuevo tablero.', 'error');
-                    return;
-                }
-                try {
-                    const projectsRef = collection(db, "users", currentUser.uid, "projects");
-                    const newProjectRef = await addDoc(projectsRef, {
-                        nombre: "Nuevo Tablero",
-                        createdAt: new Date(),
-                        coverURL: null
-                    });
-                    window.location.href = `espacio.html?id=${newProjectRef.id}`;
-                } catch (error) {
-                    console.error("Error al crear un nuevo proyecto:", error);
-                    Swal.fire('Error', 'No se pudo crear el tablero. Intente de nuevo.', 'error');
-                }
-            });
+            } catch (error) {
+                console.error("Error al cerrar sesión:", error);
+            }
         });
-        
-        function createProjectCard(project) {
-            const card = document.createElement('div');
-            card.classList.add('project-card', 'bg-[#181818]', 'rounded-lg', 'p-4', 'shadow-lg', 'border', 'border-[#2a2a2a]', 'transition', 'relative', 'overflow-hidden', 'cursor-pointer');
-            
-            let coverHTML = project.coverURL 
-                ? `<div class="absolute inset-0 bg-cover bg-center" style="background-image: url('${project.coverURL}');"></div>`
-                : `<div class="absolute inset-0 bg-[#2a2a2a]"></div>`;
-
-            card.innerHTML = `
-                ${coverHTML}
-                <div class="absolute inset-0 bg-black bg-opacity-70 flex flex-col justify-between p-4 transition-opacity">
-                    <div class="flex items-center justify-between opacity-0 hover:opacity-100 transition-opacity">
-                        <button class="edit-btn text-gray-400 hover:text-white" data-id="${project.id}">
-                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                            </svg>
-                        </button>
-                        <button class="delete-btn text-gray-400 hover:text-white" data-id="${project.id}">
-                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                        </button>
-                    </div>
-                    <div class="text-white text-center">
-                        <p class="font-semibold text-lg truncate">${project.nombre}</p>
-                        <p class="text-gray-400 text-xs mt-1">Última modificación: ${new Date(project.createdAt.seconds * 1000).toLocaleDateString()}</p>
-                    </div>
-                </div>
-            `;
-            
-            card.addEventListener('click', () => {
-                window.location.href = `espacio.html?id=${project.id}`;
-            });
-
-            card.querySelector('.delete-btn').addEventListener('click', async (e) => {
-                e.stopPropagation();
-                Swal.fire({
-                    title: '¿Estás seguro?',
-                    text: "¡No podrás revertir esto!",
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#88c999',
-                    cancelButtonColor: '#d33',
-                    confirmButtonText: 'Sí, eliminarlo',
-                    cancelButtonText: 'Cancelar'
-                }).then(async (result) => {
-                    if (result.isConfirmed) {
-                        try {
-                            const projectRef = doc(db, "users", currentUser.uid, "projects", project.id);
-                            await deleteDoc(projectRef);
-                            Swal.fire('¡Eliminado!', 'El tablero ha sido eliminado.', 'success');
-                        } catch (error) {
-                            console.error("Error al eliminar el proyecto:", error);
-                            Swal.fire('Error', 'Error al eliminar el tablero.', 'error');
-                        }
-                    }
-                });
-            });
-
-            projectsContainer.appendChild(card);
-        }
     </script>
 </body>
 </html>
