@@ -583,7 +583,7 @@
                 if (!e.target.closest('.delete-pdf-btn') && e.target.tagName.toLowerCase() !== 'input') {
                     currentPdfId = pdfDoc.id;
                     currentPdfRef = doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId);
-                    loadPDFViewer(docId); // Usar docId para cargar el PDF
+                    loadPDFViewer(pdfDoc.id); // Corregido: pasar pdfDoc.id
                 }
             });
 
