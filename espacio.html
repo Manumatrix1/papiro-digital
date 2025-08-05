@@ -89,7 +89,7 @@
             position: absolute;
             top: 0;
             left: 0;
-            pointer-events: none; /* Permite interactuar con el PDF que está debajo */
+            pointer-events: none;
             z-index: 10;
         }
         #sidebar {
@@ -244,10 +244,10 @@
     <div id="page-number-indicator" class="z-50"></div>
     
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
-        import { getFirestore, collection, query, where, getDocs, doc, updateDoc, onSnapshot, deleteDoc, setDoc, getDoc, addDoc } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore.js";
-        import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-storage.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, query, where, getDocs, doc, updateDoc, onSnapshot, deleteDoc, setDoc, getDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
         // Inicializamos Firebase con tu configuración
         const firebaseConfig = {
@@ -930,7 +930,7 @@
             e.preventDefault();
             const pageDiv = e.target.closest('.pdf-page-container');
             if (!pageDiv || !isDrawingMode) return;
-            pageDiv.style.pointerEvents = 'auto'; // Permitir el dibujo en el canvas
+            pageDiv.style.pointerEvents = 'auto';
             e.stopPropagation();
 
             const rect = pageDiv.getBoundingClientRect();
