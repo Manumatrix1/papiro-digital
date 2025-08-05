@@ -81,6 +81,25 @@
             overflow-y: auto;
             scroll-behavior: smooth;
         }
+        #sidebar {
+            position: fixed;
+            top: 0;
+            right: -100%;
+            width: 100%;
+            max-width: 350px;
+            height: 100%;
+            background-color: #181818;
+            border-left: 1px solid #2a2a2a;
+            box-shadow: -4px 0 12px rgba(0,0,0,0.3);
+            transition: right 0.3s ease-in-out;
+            z-index: 60;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+        }
+        #sidebar.open {
+            right: 0;
+        }
     </style>
 </head>
 <body class="text-white flex flex-col min-h-screen">
@@ -166,6 +185,21 @@
             </div>
         </div>
     </main>
+    <aside id="sidebar" class="bg-[#181818] text-white fixed top-0 right-0 w-80 h-full transform translate-x-full transition-transform duration-300 z-50 p-4 overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold">Notas</h3>
+            <button id="close-sidebar-btn" class="text-gray-400 hover:text-white">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div id="notes-list" class="space-y-4">
+            <!-- Las notas se cargarán aquí -->
+            <p id="no-notes-message" class="text-gray-500 text-center" style="display:none;">No hay notas para este PDF.</p>
+        </div>
+    </aside>
+    <button id="open-sidebar-btn" class="fixed top-20 right-4 bg-[#88c999] text-[#1C1C1C] rounded-full w-12 h-12 flex items-center justify-center shadow-lg hover:brightness-110 transition z-50">
+        <i class="fas fa-bars"></i>
+    </button>
     <div id="page-number-indicator" class="z-50"></div>
     
     <script type="module">
@@ -233,6 +267,13 @@
         let scrollTimeout = null;
         let resizeObserver = null;
         
+        const sidebar = document.getElementById('sidebar');
+        const openSidebarBtn = document.getElementById('open-sidebar-btn');
+        const closeSidebarBtn = document.getElementById('close-sidebar-btn');
+        const notesList = document.getElementById('notes-list');
+        const noNotesMessage = document.getElementById('no-notes-message');
+        const searchNotesInput = document.getElementById('search-notes-input');
+
         window.pdfjsLib = window['pdfjs-dist/build/pdf'];
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
@@ -315,6 +356,7 @@
         
         async function loadPDFViewer(docId) {
             try {
+                // Ocultamos la vista de cuadrícula y mostramos el cargador
                 gridViewContainer.style.display = 'none';
                 pdfViewerContainer.style.display = 'block';
                 pdfLoaderText.textContent = 'Cargando PDF...';
@@ -699,6 +741,89 @@
                 }
             );
         });
+        
+        // Lógica para el TTS
+        let utterance = null;
+        let isSpeaking = false;
+        let currentPageNum = 1;
+
+        document.getElementById('play-pause-btn').addEventListener('click', async () => {
+            if (isSpeaking) {
+                window.speechSynthesis.pause();
+                isSpeaking = false;
+                document.getElementById('play-pause-btn').innerHTML = '<i class="fas fa-play"></i>';
+            } else {
+                if (!utterance || window.speechSynthesis.paused) {
+                    if (window.speechSynthesis.speaking) {
+                        window.speechSynthesis.resume();
+                    } else {
+                        await readCurrentPage();
+                    }
+                } else {
+                    window.speechSynthesis.resume();
+                }
+                isSpeaking = true;
+                document.getElementById('play-pause-btn').innerHTML = '<i class="fas fa-pause"></i>';
+            }
+        });
+        
+        document.getElementById('stop-btn').addEventListener('click', () => {
+            window.speechSynthesis.cancel();
+            isSpeaking = false;
+            utterance = null;
+            document.getElementById('play-pause-btn').innerHTML = '<i class="fas fa-play"></i>';
+        });
+
+        async function readCurrentPage() {
+            if (!pdfDocument) return;
+        
+            const page = await pdfDocument.getPage(currentPageNum);
+            const textContent = await page.getTextContent();
+            const text = textContent.items.map(s => s.str).join(' ');
+
+            if (text) {
+                utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'es-ES';
+                
+                utterance.onend = () => {
+                    isSpeaking = false;
+                    document.getElementById('play-pause-btn').innerHTML = '<i class="fas fa-play"></i>';
+                };
+                
+                window.speechSynthesis.speak(utterance);
+                isSpeaking = true;
+                document.getElementById('play-pause-btn').innerHTML = '<i class="fas fa-pause"></i>';
+            }
+        }
+        
+        document.getElementById('search-notes-input').addEventListener('keyup', async (e) => {
+            const searchText = e.target.value.toLowerCase();
+            if (searchText.length > 0) {
+                const notesQuery = query(collection(db, `users/${currentUser.uid}/projects/${currentProjectRef.id}/pdfs/${currentPdfId}/notes`), where('tags', 'array-contains', searchText));
+                const notesSnapshot = await getDocs(notesQuery);
+                let notesHtml = '';
+                notesSnapshot.forEach(noteDoc => {
+                    const noteData = noteDoc.data();
+                    notesHtml += `<div class="bg-[#2a2a2a] p-4 rounded-lg mb-2">
+                                    <p class="text-sm text-gray-300">Página ${noteData.page}</p>
+                                    <p class="text-lg font-semibold">${noteData.text}</p>
+                                    <p class="text-xs text-gray-500">Etiquetas: ${noteData.tags.join(', ')}</p>
+                                  </div>`;
+                });
+                if (notesHtml) {
+                    Swal.fire({
+                        title: 'Resultados de la búsqueda',
+                        html: notesHtml,
+                        background: '#181818',
+                        color: '#fff',
+                        customClass: 'swal2-dark'
+                    });
+                } else {
+                    Swal.fire('No se encontraron notas.', '', 'info');
+                }
+            }
+        });
+        
     </script>
 </body>
 </html>
