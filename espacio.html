@@ -467,8 +467,6 @@
                 }
                 
                 stopSpeech();
-                // No entrar en fullscreen automáticamente, se deja al usuario.
-                // enterFullscreen();
 
                 pagesContainer.addEventListener('scroll', updatePageNumberIndicator);
                 if (resizeObserver) resizeObserver.disconnect();
@@ -486,7 +484,6 @@
                     resetViewer();
                 };
 
-                // Cargar y dibujar las anotaciones existentes
                 loadAndDrawAnnotations();
 
             } catch (reason) {
@@ -498,7 +495,6 @@
             }
         }
 
-        // Función para obtener el número de página actual visible
         function getCurrentPageNumber() {
             if (!pdfDocument || pagesHeight.length === 0) return 1;
             let scrollTop = pagesContainer.scrollTop;
@@ -514,25 +510,23 @@
             return page;
         }
 
-        // Función para entrar en pantalla completa
         function enterFullscreen() {
             const element = document.documentElement;
             if (element.requestFullscreen) {
                 element.requestFullscreen();
-            } else if (element.webkitRequestFullscreen) { /* Safari */
+            } else if (element.webkitRequestFullscreen) {
                 element.webkitRequestFullscreen();
-            } else if (element.msRequestFullscreen) { /* IE11 */
+            } else if (element.msRequestFullscreen) {
                 element.msRequestFullscreen();
             }
         }
 
-        // Función para salir de pantalla completa
         function exitFullscreen() {
             if (document.exitFullscreen) {
                 document.exitFullscreen();
-            } else if (document.webkitExitFullscreen) { /* Safari */
+            } else if (document.webkitExitFullscreen) {
                 document.webkitExitFullscreen();
-            } else if (document.msExitFullscreen) { /* IE11 */
+            } else if (document.msExitFullscreen) {
                 document.msExitFullscreen();
             }
         }
@@ -587,7 +581,7 @@
                 if (!e.target.closest('.delete-pdf-btn') && e.target.tagName.toLowerCase() !== 'input') {
                     currentPdfId = pdfDoc.id;
                     currentPdfRef = doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId);
-                    loadPDFViewer(pdfDoc.id); // Corregido: pasar pdfDoc.id
+                    loadPDFViewer(pdfDoc.id);
                 }
             });
 
@@ -682,7 +676,6 @@
             );
         });
 
-        // Event listener para el botón de cerrar sesión
         logoutBtn.addEventListener('click', async () => {
             try {
                 await signOut(auth);
@@ -692,7 +685,6 @@
             }
         });
 
-        // Event listener para el botón de volver
         dynamicBackBtn.addEventListener('click', () => {
             if (pdfViewerContainer.style.display === 'flex') {
                 exitFullscreen();
@@ -712,7 +704,7 @@
             pagesHeight = [];
             pagesContainer.removeEventListener('scroll', updatePageNumberIndicator);
             sidebar.classList.remove('open');
-            stopSpeech(); // Detener cualquier lectura en curso
+            stopSpeech();
         }
         
         function updatePageNumberIndicator() {
@@ -736,15 +728,13 @@
             
             pageNumberIndicator.textContent = `${currentPageNum} / ${pdfDocument.numPages}`;
             
-            // Animación de desvanecimiento
             pageNumberIndicator.style.opacity = '1';
             clearTimeout(scrollTimeout);
             scrollTimeout = setTimeout(() => {
                 pageNumberIndicator.style.opacity = '0';
-            }, 1500); // Muestra el número por 1.5 segundos
+            }, 1500);
         }
 
-        // --- Lógica para subir portada ---
         uploadCoverBtn.addEventListener('click', () => {
             if (!hasCover) {
                 Swal.fire({
@@ -883,7 +873,6 @@
         // CÓDIGO ACTUALIZADO PARA NUEVAS FUNCIONALIDADES
         // =======================================================================
         
-        // Lógica para el modo de dibujo
         drawingModeBtn.addEventListener('click', () => {
             if (!currentPdfId) {
                 Swal.fire('Error', 'Primero debes seleccionar un PDF.', 'error');
@@ -930,7 +919,6 @@
         });
 
         function startDrawing(e) {
-            // Asegurarse de que el evento se maneje solo en el canvas o en el contenedor de la página, no en el overlay de anotación
             const isOverlay = e.target.classList.contains('annotation-overlay');
             if (!isDrawingMode || isOverlay) return;
 
@@ -943,7 +931,6 @@
             startDrawingY = e.clientY - rect.top;
             isDrawing = true;
 
-            // Crear un div temporal para previsualizar el recuadro
             const tempRect = document.createElement('div');
             tempRect.id = 'temp-drawing-rect';
             tempRect.style.position = 'absolute';
@@ -951,7 +938,7 @@
             tempRect.style.pointerEvents = 'none';
             tempRect.style.left = `${startDrawingX}px`;
             tempRect.style.top = `${startDrawingY}px`;
-            tempRect.style.zIndex = '20'; // Asegurar que el recuadro temporal esté por encima de todo
+            tempRect.style.zIndex = '20'; 
             pageDiv.appendChild(tempRect);
         }
 
@@ -999,7 +986,7 @@
             const width = Math.abs(endDrawingX - startDrawingX);
             const height = Math.abs(endDrawingY - startDrawingY);
 
-            if (width < 5 || height < 5) return; // Ignorar clics accidentales
+            if (width < 5 || height < 5) return;
 
             const page = await pdfDocument.getPage(pageNumber);
             const viewport = page.getViewport({ scale: 1.5 });
@@ -1058,7 +1045,6 @@
             try {
                 const notesQuery = query(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "notes"));
                 onSnapshot(notesQuery, (snapshot) => {
-                    // Limpiar anotaciones y notas de la sidebar existentes antes de redibujar
                     pagesContainer.querySelectorAll('.annotation-overlay').forEach(overlay => overlay.remove());
                     notesList.innerHTML = '';
                     
@@ -1067,12 +1053,9 @@
                         snapshot.forEach((noteDoc) => {
                             const noteData = noteDoc.data();
                             
-                            // 1. Dibujar el recuadro en el PDF
                             const pageDiv = pagesContainer.querySelector(`.pdf-page-container[data-page-number="${noteData.page}"]`);
                             if (pageDiv && noteData.rectangle) {
                                 const canvas = pageDiv.querySelector('canvas');
-                                const rect = canvas.getBoundingClientRect(); // Usar el canvas para obtener las dimensiones
-                                const pageRatio = canvas.offsetWidth / noteData.rectangle.width;
                                 const scale = canvas.offsetWidth / canvas.width;
 
                                 const annotationOverlay = document.createElement('div');
@@ -1092,7 +1075,6 @@
                                 pageDiv.appendChild(annotationOverlay);
                             }
 
-                            // 2. Crear elemento de nota en la sidebar
                             const noteEl = createSidebarNoteElement(noteDoc.id, noteData);
                             notesList.appendChild(noteEl);
                         });
@@ -1108,7 +1090,6 @@
             }
         }
 
-        // Función para mostrar el modal de edición/eliminación de notas
         function showNoteEditor(noteId, noteData) {
             Swal.fire({
                 title: 'Anotación en la página ' + noteData.page,
@@ -1136,7 +1117,6 @@
                         Swal.fire('Error', 'No se pudo actualizar la nota.', 'error');
                     }
                 } else if (editResult.isDismissed && editResult.dismiss === Swal.DismissReason.cancel) {
-                    // Si el usuario hizo clic en "Eliminar"
                     Swal.fire({
                         title: '¿Estás seguro?',
                         text: "¡No podrás revertir esto!",
@@ -1161,7 +1141,6 @@
             });
         }
 
-        // Función para crear el elemento de la sidebar
         function createSidebarNoteElement(noteId, noteData) {
             const noteEl = document.createElement('div');
             noteEl.className = 'bg-[#2a2a2a] p-3 rounded-lg shadow-md flex items-start gap-3';
@@ -1184,7 +1163,6 @@
                 const pageDivToScroll = pagesContainer.querySelector(`.pdf-page-container[data-page-number="${pageNumber}"]`);
                 if (pageDivToScroll) {
                     pageDivToScroll.scrollIntoView({ behavior: 'smooth' });
-                    // Resaltar el recuadro correspondiente
                     const targetOverlay = pageDivToScroll.querySelector(`.annotation-overlay[data-note-id="${noteId}"]`);
                     if (targetOverlay) {
                         targetOverlay.style.boxShadow = `0 0 15px 5px ${noteData.color}`;
@@ -1204,7 +1182,6 @@
             const querySnapshot = await getDocs(notesQuery);
             const notes = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-            // Eliminar todos los overlays existentes
             pagesContainer.querySelectorAll('.annotation-overlay').forEach(overlay => overlay.remove());
 
             for (let i = 1; i <= pdfDocument.numPages; i++) {
@@ -1215,7 +1192,6 @@
                         const canvas = pageDiv.querySelector('canvas');
                         if (!canvas) continue;
                         
-                        // Recalcular la escala en base al nuevo tamaño del canvas
                         const page = await pdfDocument.getPage(i);
                         const viewport = page.getViewport({ scale: 1.5 });
                         const scale = canvas.offsetWidth / viewport.width;
@@ -1236,7 +1212,6 @@
                                 showNoteEditor(note.id, note);
                             });
                             
-                            // Reajustar el pointer-events si el modo de dibujo está activo
                             if (isDrawingMode) {
                                 annotationOverlay.style.pointerEvents = 'none';
                             }
@@ -1328,7 +1303,7 @@
                  if (selection) {
                      await speakText(selection);
                  } else {
-                     await speakText(); // Lee la página completa si no hay selección
+                     await speakText();
                  }
             }
         });
@@ -1342,7 +1317,7 @@
             }
             sidebar.classList.toggle('open');
             if (sidebar.classList.contains('open')) {
-                loadAndDrawAnnotations(); // Recargar las notas cuando se abre la sidebar
+                loadAndDrawAnnotations();
             }
         });
 
