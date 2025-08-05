@@ -264,7 +264,7 @@
         const db = getFirestore(app);
         const storage = getStorage(app);
         
-        // Declaración de variables globales
+        // Declaración de variables globales - CONSOLIDADAS PARA EVITAR REDECLARACIONES
         let currentProjectRef = null;
         let currentUser = null;
         let pdfDocument = null; 
@@ -283,7 +283,7 @@
         let scrollTimeout = null;
         let resizeObserver = null;
 
-        // Variables del DOM
+        // Variables del DOM - CONSOLIDADAS
         const pageTitleEl = document.getElementById('page-title');
         const projectTitleEl = document.getElementById('project-title');
         const pdfLoaderContainer = document.getElementById('pdf-loader-container');
@@ -315,7 +315,7 @@
         const searchNotesInput = document.getElementById('search-notes-input');
         const mainContent = document.getElementById('main-content');
         
-        // Variables para la voz y el dibujo
+        // Variables para la voz y el dibujo - CONSOLIDADAS
         const synthesis = window.speechSynthesis;
         const playPauseBtn = document.getElementById('play-pause-btn');
         const stopBtn = document.getElementById('stop-btn');
@@ -759,7 +759,7 @@
                 
                 coverContainer.addEventListener('touchstart', startDrag);
                 coverContainer.addEventListener('touchmove', drag);
-                coverContainer.addEventListener('touchend', endDrag);
+                coverContainer.addEventListener('touchend', endDrawing);
             }
         });
 
@@ -860,41 +860,6 @@
         // =======================================================================
         // CÓDIGO ACTUALIZADO PARA NUEVAS FUNCIONALIDADES
         // =======================================================================
-        
-        const synthesis = window.speechSynthesis;
-        const playPauseBtn = document.getElementById('play-pause-btn');
-        const stopBtn = document.getElementById('stop-btn');
-        let currentUtterance = null;
-        let isSpeaking = false;
-        
-        const mainContent = document.getElementById('main-content');
-        const fullscreenBtn = document.getElementById('fullscreen-btn');
-        const drawingModeBtn = document.getElementById('drawing-mode-btn');
-        const drawingTools = document.getElementById('drawing-tools');
-        const colorPalette = document.getElementById('color-palette');
-        let isDrawingMode = false;
-        let isDrawing = false;
-        let startDrawingX = 0;
-        let startDrawingY = 0;
-        let endDrawingX = 0;
-        let endDrawingY = 0;
-        let currentColor = '#ef4444'; // Color por defecto
-
-        fullscreenBtn.addEventListener('click', () => {
-            if (!document.fullscreenElement) {
-                enterFullscreen();
-            } else {
-                exitFullscreen();
-            }
-        });
-
-        document.addEventListener('fullscreenchange', (event) => {
-            if (document.fullscreenElement) {
-                fullscreenBtn.innerHTML = '<i class="fas fa-compress"></i>';
-            } else {
-                fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i>';
-            }
-        });
         
         // Lógica para el modo de dibujo
         drawingModeBtn.addEventListener('click', () => {
