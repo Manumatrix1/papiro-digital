@@ -214,11 +214,9 @@
             </button>
         </div>
         <div id="notes-list" class="space-y-4">
-            <!-- Las notas se cargarán aquí -->
             <p id="no-notes-message" class="text-gray-500 text-center" style="display:none;">No hay notas para este PDF.</p>
         </div>
     </aside>
-    <!-- Se eliminó el botón flotante y se movió a la barra superior -->
     <div id="page-number-indicator" class="z-50"></div>
     
     <script type="module">
@@ -227,12 +225,13 @@
         import { getFirestore, collection, query, where, getDocs, doc, updateDoc, onSnapshot, deleteDoc, setDoc, getDoc, addDoc } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-storage.js";
 
-        // Inicializamos Firebase con tu configuración
+        // ¡ATENCIÓN! Exponer tus claves de Firebase aquí es un riesgo de seguridad.
+        // Considera usar Firebase App Check o un backend para protegerlas.
         const firebaseConfig = {
             apiKey: "AIzaSyBYVYRdA_DB1Kob9b_wGd5Wd4JsYFMyBRc",
             authDomain: "papiro2025-d09e0.firebaseapp.com",
             projectId: "papiro2025-d09e0",
-            storageBucket: "papiro2025-d09e0.firebasestorage.app",
+            storageBucket: "papiro2025-d09e0.appspot.com",
             messagingSenderId: "1096335704864",
             appId: "1:1096335704864:web:75f1f27cd920df64554d45",
             measurementId: "G-03Y1260F1S"
@@ -292,7 +291,7 @@
         const addNoteBtn = document.getElementById('add-note-btn');
         const mainContent = document.getElementById('main-content');
         
-        // Variables para la voz
+        // Variables para la voz (declaradas una sola vez)
         const synthesis = window.speechSynthesis;
         const playPauseBtn = document.getElementById('play-pause-btn');
         const stopBtn = document.getElementById('stop-btn');
@@ -815,12 +814,9 @@
         // CÓDIGO ACTUALIZADO PARA NUEVAS FUNCIONALIDADES
         // =======================================================================
         
-        // Variables para la voz, ahora en un único lugar
-        const synthesis = window.speechSynthesis;
-        const playPauseBtn = document.getElementById('play-pause-btn');
-        const stopBtn = document.getElementById('stop-btn');
-        let currentUtterance = null;
-        let isSpeaking = false;
+        // --- BLOQUE DE CÓDIGO DUPLICADO ELIMINADO ---
+        // El error 'synthesis has already been declared' ocurría porque las
+        // variables de voz se declaraban aquí de nuevo. Ya se han eliminado.
         
         // Nueva función para manejar la selección de texto y crear la nota
         async function handleNewNote() {
