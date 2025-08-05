@@ -95,21 +95,21 @@
         #sidebar {
             position: fixed;
             top: 0;
-            right: -100%;
+            left: -100%; /* Cambiado de right a left */
             width: 100%;
             max-width: 350px;
             height: 100%;
             background-color: #181818;
-            border-left: 1px solid #2a2a2a;
-            box-shadow: -4px 0 12px rgba(0,0,0,0.3);
-            transition: right 0.3s ease-in-out;
+            border-right: 1px solid #2a2a2a; /* Cambiado de border-left a border-right */
+            box-shadow: 4px 0 12px rgba(0,0,0,0.3); /* Sombra ajustada para el lado izquierdo */
+            transition: left 0.3s ease-in-out; /* Cambiado de right a left */
             z-index: 60;
             padding: 1.5rem;
             display: flex;
             flex-direction: column;
         }
         #sidebar.open {
-            right: 0;
+            left: 0; /* Cambiado de right a left */
         }
         #fullscreen-btn {
             background-color: #2a2a2a;
@@ -226,7 +226,7 @@
             </div>
         </div>
     </main>
-    <aside id="sidebar" class="bg-[#181818] text-white fixed top-0 right-0 w-80 h-full transform translate-x-full transition-transform duration-300 z-50 p-4 overflow-y-auto">
+    <aside id="sidebar" class="bg-[#181818] text-white fixed top-0 left-[-100%] w-80 h-full transform transition-transform duration-300 z-50 p-4 overflow-y-auto">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-xl font-bold">Notas</h3>
             <button id="close-sidebar-btn" class="text-gray-400 hover:text-white">
@@ -494,6 +494,22 @@
             }
         }
 
+        // Función para obtener el número de página actual visible
+        function getCurrentPageNumber() {
+            if (!pdfDocument || pagesHeight.length === 0) return 1;
+            let scrollTop = pagesContainer.scrollTop;
+            let page = 1;
+            let totalHeight = 0;
+            for (let i = 0; i < pagesHeight.length; i++) {
+                totalHeight += pagesHeight[i];
+                if (scrollTop < totalHeight) {
+                    page = i + 1;
+                    break;
+                }
+            }
+            return page;
+        }
+
         // Función para entrar en pantalla completa
         function enterFullscreen() {
             const element = document.documentElement;
@@ -567,7 +583,7 @@
                 if (!e.target.closest('.delete-pdf-btn') && e.target.tagName.toLowerCase() !== 'input') {
                     currentPdfId = pdfDoc.id;
                     currentPdfRef = doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId);
-                    loadPDFViewer(pdfDoc.id);
+                    loadPDFViewer(docId); // Usar docId para cargar el PDF
                 }
             });
 
@@ -759,7 +775,7 @@
                 
                 coverContainer.addEventListener('touchstart', startDrag);
                 coverContainer.addEventListener('touchmove', drag);
-                coverContainer.addEventListener('touchend', endDrawing);
+                coverContainer.addEventListener('touchend', endDrag);
             }
         });
 
@@ -792,7 +808,8 @@
                 coverOverlay.style.display = 'none';
                 editCoverBtn.removeEventListener('click', saveCoverPosition);
                 editCoverBtn.addEventListener('click', editCover);
-            } catch (error) {
+            }
+             catch (error) {
                 console.error("Error al guardar la posición de la portada:", error);
                 Swal.fire('Error', 'Error al guardar la posición de la portada.', 'error');
             }
