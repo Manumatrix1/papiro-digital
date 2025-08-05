@@ -85,12 +85,12 @@
         .pdf-page-container {
             position: relative;
         }
-        .annotation-canvas {
+        .annotation-overlay {
             position: absolute;
-            top: 0;
-            left: 0;
-            pointer-events: none;
-            z-index: 10;
+            border: 2px solid;
+            pointer-events: auto; /* Permitir interacción con el overlay */
+            cursor: pointer;
+            z-index: 15; /* Por encima del canvas del PDF */
         }
         #sidebar {
             position: fixed;
@@ -889,15 +889,20 @@
             if (isDrawingMode) {
                 pagesContainer.style.cursor = 'crosshair';
                 drawingTools.style.display = 'flex';
-                pagesContainer.addEventListener('mousedown', startDrawing);
-                pagesContainer.addEventListener('mousemove', drawRect);
-                pagesContainer.addEventListener('mouseup', stopDrawing);
+                // Añadir listeners para cada canvas de página
+                pagesContainer.querySelectorAll('.pdf-page-container').forEach(pageDiv => {
+                    pageDiv.addEventListener('mousedown', startDrawing);
+                    pageDiv.addEventListener('mousemove', drawRect);
+                    pageDiv.addEventListener('mouseup', stopDrawing);
+                });
             } else {
                 pagesContainer.style.cursor = 'default';
                 drawingTools.style.display = 'none';
-                pagesContainer.removeEventListener('mousedown', startDrawing);
-                pagesContainer.removeEventListener('mousemove', drawRect);
-                pagesContainer.removeEventListener('mouseup', stopDrawing);
+                pagesContainer.querySelectorAll('.pdf-page-container').forEach(pageDiv => {
+                    pageDiv.removeEventListener('mousedown', startDrawing);
+                    pageDiv.removeEventListener('mousemove', drawRect);
+                    pageDiv.removeEventListener('mouseup', stopDrawing);
+                });
             }
         });
         
@@ -909,27 +914,27 @@
         });
 
         function startDrawing(e) {
+            // Asegurarse de que el evento se maneje solo en el contenedor de la página, no en el canvas de anotación
+            if (e.target.classList.contains('annotation-overlay')) return;
+
             e.preventDefault();
             const pageDiv = e.target.closest('.pdf-page-container');
             if (!pageDiv || !isDrawingMode) return;
-            pageDiv.style.pointerEvents = 'auto';
-            e.stopPropagation();
-
+            
             const rect = pageDiv.getBoundingClientRect();
             startDrawingX = e.clientX - rect.left;
             startDrawingY = e.clientY - rect.top;
             isDrawing = true;
-            
-            let annotationCanvas = pageDiv.querySelector('.annotation-canvas');
-            if (!annotationCanvas) {
-                annotationCanvas = document.createElement('canvas');
-                annotationCanvas.className = 'annotation-canvas';
-                annotationCanvas.width = pageDiv.offsetWidth;
-                annotationCanvas.height = pageDiv.offsetHeight;
-                pageDiv.appendChild(annotationCanvas);
-            }
-            const ctx = annotationCanvas.getContext('2d');
-            ctx.clearRect(0, 0, annotationCanvas.width, annotationCanvas.height);
+
+            // Crear un div temporal para previsualizar el recuadro
+            const tempRect = document.createElement('div');
+            tempRect.id = 'temp-drawing-rect';
+            tempRect.style.position = 'absolute';
+            tempRect.style.border = `2px solid ${currentColor}`;
+            tempRect.style.pointerEvents = 'none';
+            tempRect.style.left = `${startDrawingX}px`;
+            tempRect.style.top = `${startDrawingY}px`;
+            pageDiv.appendChild(tempRect);
         }
 
         function drawRect(e) {
@@ -941,16 +946,17 @@
             endDrawingX = e.clientX - rect.left;
             endDrawingY = e.clientY - rect.top;
 
-            const annotationCanvas = pageDiv.querySelector('.annotation-canvas');
-            if (!annotationCanvas) return;
-            const ctx = annotationCanvas.getContext('2d');
-            ctx.clearRect(0, 0, annotationCanvas.width, annotationCanvas.height);
-            
-            ctx.strokeStyle = currentColor;
-            ctx.lineWidth = 2;
-            const width = endDrawingX - startDrawingX;
-            const height = endDrawingY - startDrawingY;
-            ctx.strokeRect(startDrawingX, startDrawingY, width, height);
+            const tempRect = pageDiv.querySelector('#temp-drawing-rect');
+            if (tempRect) {
+                const x = Math.min(startDrawingX, endDrawingX);
+                const y = Math.min(startDrawingY, endDrawingY);
+                const width = Math.abs(endDrawingX - startDrawingX);
+                const height = Math.abs(endDrawingY - startDrawingY);
+                tempRect.style.left = `${x}px`;
+                tempRect.style.top = `${y}px`;
+                tempRect.style.width = `${width}px`;
+                tempRect.style.height = `${height}px`;
+            }
         }
 
         async function stopDrawing(e) {
@@ -960,7 +966,11 @@
             const pageDiv = e.target.closest('.pdf-page-container');
             if (!pageDiv) return;
             const pageNumber = Array.from(pagesContainer.children).indexOf(pageDiv) + 1;
-            pageDiv.style.pointerEvents = 'none';
+
+            const tempRect = pageDiv.querySelector('#temp-drawing-rect');
+            if (tempRect) {
+                pageDiv.removeChild(tempRect);
+            }
 
             const rect = pageDiv.getBoundingClientRect();
             endDrawingX = e.clientX - rect.left;
@@ -971,7 +981,7 @@
             const width = Math.abs(endDrawingX - startDrawingX);
             const height = Math.abs(endDrawingY - startDrawingY);
 
-            if (width < 5 || height < 5) return;
+            if (width < 5 || height < 5) return; // Ignorar clics accidentales
 
             const page = await pdfDocument.getPage(pageNumber);
             const viewport = page.getViewport({ scale: 1.5 });
@@ -984,6 +994,12 @@
             const scaledHeight = height / scaleY;
 
             await saveAnnotation({x: scaledX, y: scaledY, width: scaledWidth, height: scaledHeight, color: currentColor, page: pageNumber});
+            
+            // No desactivar el modo de dibujo, para permitir múltiples anotaciones
+            // isDrawingMode = false;
+            // drawingModeBtn.classList.remove('text-[#88c999]');
+            // pagesContainer.style.cursor = 'default';
+            // drawingTools.style.display = 'none';
         }
         
         async function saveAnnotation({x, y, width, height, color, page}) {
@@ -1030,17 +1046,98 @@
             try {
                 const notesQuery = query(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "notes"));
                 onSnapshot(notesQuery, (snapshot) => {
-                    redrawAllAnnotations();
+                    // Limpiar anotaciones existentes antes de redibujar
+                    pagesContainer.querySelectorAll('.annotation-overlay').forEach(overlay => overlay.remove());
+                    
                     notesList.innerHTML = '';
                     if (snapshot.docs.length > 0) {
                         noNotesMessage.style.display = 'none';
                         snapshot.forEach((noteDoc) => {
                             const noteData = noteDoc.data();
+                            
+                            // Dibujar el recuadro en el PDF
+                            const pageDiv = pagesContainer.querySelector(`.pdf-page-container:nth-child(${noteData.page})`);
+                            if (pageDiv && noteData.rectangle) {
+                                const page = pdfDocument._pdfInfo.numPages >= noteData.page ? pdfDocument.getPage(noteData.page) : null;
+                                if (page) {
+                                    page.then(p => {
+                                        const viewport = p.getViewport({ scale: 1.5 });
+                                        const scaleX = pageDiv.offsetWidth / viewport.width;
+                                        const scaleY = pageDiv.offsetHeight / viewport.height;
+
+                                        const annotationOverlay = document.createElement('div');
+                                        annotationOverlay.className = 'annotation-overlay';
+                                        annotationOverlay.style.borderColor = noteData.color;
+                                        annotationOverlay.style.left = `${noteData.rectangle.x * scaleX}px`;
+                                        annotationOverlay.style.top = `${noteData.rectangle.y * scaleY}px`;
+                                        annotationOverlay.style.width = `${noteData.rectangle.width * scaleX}px`;
+                                        annotationOverlay.style.height = `${noteData.rectangle.height * scaleY}px`;
+                                        annotationOverlay.dataset.noteId = noteDoc.id; // Guardar el ID de la nota
+                                        annotationOverlay.dataset.page = noteData.page; // Guardar la página para el scroll
+
+                                        annotationOverlay.addEventListener('click', (e) => {
+                                            e.stopPropagation(); // Evitar que el clic en el overlay active el modo de dibujo
+                                            Swal.fire({
+                                                title: 'Anotación en la página ' + noteData.page,
+                                                html: `<textarea class="w-full h-24 bg-[#2a2a2a] text-white p-2 rounded-lg">${noteData.note}</textarea>`,
+                                                background: '#181818',
+                                                color: '#fff',
+                                                showCancelButton: true,
+                                                confirmButtonText: 'Editar',
+                                                cancelButtonText: 'Eliminar',
+                                                showDenyButton: true,
+                                                denyButtonText: 'Cerrar',
+                                                preConfirm: () => {
+                                                    const updatedNoteText = Swal.getPopup().querySelector('textarea').value;
+                                                    return updatedNoteText;
+                                                }
+                                            }).then(async (editResult) => {
+                                                if (editResult.isConfirmed) {
+                                                    try {
+                                                        await updateDoc(doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "notes", noteDoc.id), {
+                                                            note: editResult.value
+                                                        });
+                                                        Swal.fire('Actualizado!', 'La nota ha sido actualizada.', 'success');
+                                                    } catch (error) {
+                                                        console.error("Error al actualizar la nota:", error);
+                                                        Swal.fire('Error', 'No se pudo actualizar la nota.', 'error');
+                                                    }
+                                                } else if (editResult.isDismissed && editResult.dismiss === Swal.DismissReason.cancel) {
+                                                    // Si el usuario hizo clic en "Eliminar"
+                                                    Swal.fire({
+                                                        title: '¿Estás seguro?',
+                                                        text: "¡No podrás revertir esto!",
+                                                        icon: 'warning',
+                                                        showCancelButton: true,
+                                                        confirmButtonColor: '#d33',
+                                                        cancelButtonColor: '#88c999',
+                                                        confirmButtonText: 'Sí, eliminar',
+                                                        cancelButtonText: 'Cancelar'
+                                                    }).then(async (deleteResult) => {
+                                                        if (deleteResult.isConfirmed) {
+                                                            try {
+                                                                await deleteDoc(doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "notes", noteDoc.id));
+                                                                Swal.fire('Eliminado!', 'La nota ha sido eliminada.', 'success');
+                                                            } catch (error) {
+                                                                console.error("Error al eliminar la nota:", error);
+                                                                Swal.fire('Error', 'No se pudo eliminar la nota.', 'error');
+                                                            }
+                                                        }
+                                                    });
+                                                }
+                                            });
+                                        });
+                                        pageDiv.appendChild(annotationOverlay);
+                                    });
+                                }
+                            }
+
+                            // Crear elemento de nota en la sidebar
                             const noteEl = document.createElement('div');
                             noteEl.className = 'bg-[#2a2a2a] p-3 rounded-lg shadow-md flex items-start gap-3';
                             noteEl.style.cursor = 'pointer';
                             noteEl.dataset.page = noteData.page;
-                            noteEl.dataset.y = noteData.rectangle.y;
+                            noteEl.dataset.noteId = noteDoc.id; // Para vincular con el overlay
                             noteEl.innerHTML = `
                                 <div class="w-1 h-full rounded-full" style="background-color: ${noteData.color}; min-height: 50px;"></div>
                                 <div>
@@ -1053,9 +1150,18 @@
                             `;
                             noteEl.addEventListener('click', (e) => {
                                 const pageNumber = parseInt(e.currentTarget.dataset.page);
-                                const pageDiv = pagesContainer.querySelector(`.pdf-page-container:nth-child(${pageNumber})`);
-                                if (pageDiv) {
-                                    pageDiv.scrollIntoView({ behavior: 'smooth' });
+                                const noteId = e.currentTarget.dataset.noteId;
+                                const pageDivToScroll = pagesContainer.querySelector(`.pdf-page-container:nth-child(${pageNumber})`);
+                                if (pageDivToScroll) {
+                                    pageDivToScroll.scrollIntoView({ behavior: 'smooth' });
+                                    // Opcional: resaltar el recuadro correspondiente
+                                    const targetOverlay = pageDivToScroll.querySelector(`.annotation-overlay[data-note-id="${noteId}"]`);
+                                    if (targetOverlay) {
+                                        targetOverlay.style.boxShadow = `0 0 15px 5px ${noteData.color}`;
+                                        setTimeout(() => {
+                                            targetOverlay.style.boxShadow = 'none';
+                                        }, 1500);
+                                    }
                                 }
                             });
                             notesList.appendChild(noteEl);
@@ -1072,39 +1178,92 @@
             }
         }
         
+        // Redibujar todas las anotaciones (útil en resize o cambios)
         async function redrawAllAnnotations() {
             if (!pdfDocument) return;
 
+            // Eliminar todos los overlays existentes
+            pagesContainer.querySelectorAll('.annotation-overlay').forEach(overlay => overlay.remove());
+
             const notesQuery = query(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "notes"));
             const querySnapshot = await getDocs(notesQuery);
-            const notes = querySnapshot.docs.map(doc => doc.data());
+            const notes = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
             for (let i = 1; i <= pdfDocument.numPages; i++) {
                 const pageDiv = pagesContainer.querySelector(`.pdf-page-container:nth-child(${i})`);
                 if (pageDiv) {
-                    let annotationCanvas = pageDiv.querySelector('.annotation-canvas');
-                    if (!annotationCanvas) {
-                        annotationCanvas = document.createElement('canvas');
-                        annotationCanvas.className = 'annotation-canvas';
-                        annotationCanvas.width = pageDiv.offsetWidth;
-                        annotationCanvas.height = pageDiv.offsetHeight;
-                        pageDiv.appendChild(annotationCanvas);
-                    }
-                    const ctx = annotationCanvas.getContext('2d');
-                    ctx.clearRect(0, 0, annotationCanvas.width, annotationCanvas.height);
-
                     const pageNotes = notes.filter(note => note.page === i);
-                    pageNotes.forEach(note => {
-                        const pageRect = pagesContainer.querySelector(`.pdf-page-container:nth-child(${i})`).getBoundingClientRect();
-                        const canvasRect = annotationCanvas.getBoundingClientRect();
-                        const scaleX = canvasRect.width / pageRect.width;
-                        const scaleY = canvasRect.height / pageRect.height;
-                        
-                        const { x, y, width, height } = note.rectangle;
-                        ctx.strokeStyle = note.color;
-                        ctx.lineWidth = 2;
-                        ctx.strokeRect(x * scaleX, y * scaleY, width * scaleX, height * scaleY);
-                    });
+                    if (pageNotes.length > 0) {
+                        const page = await pdfDocument.getPage(i);
+                        const viewport = page.getViewport({ scale: 1.5 });
+                        const scaleX = pageDiv.offsetWidth / viewport.width;
+                        const scaleY = pageDiv.offsetHeight / viewport.height;
+
+                        pageNotes.forEach(note => {
+                            const annotationOverlay = document.createElement('div');
+                            annotationOverlay.className = 'annotation-overlay';
+                            annotationOverlay.style.borderColor = note.color;
+                            annotationOverlay.style.left = `${note.rectangle.x * scaleX}px`;
+                            annotationOverlay.style.top = `${note.rectangle.y * scaleY}px`;
+                            annotationOverlay.style.width = `${note.rectangle.width * scaleX}px`;
+                            annotationOverlay.style.height = `${note.rectangle.height * scaleY}px`;
+                            annotationOverlay.dataset.noteId = note.id;
+                            annotationOverlay.dataset.page = note.page;
+
+                            annotationOverlay.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                Swal.fire({
+                                    title: 'Anotación en la página ' + note.page,
+                                    html: `<textarea class="w-full h-24 bg-[#2a2a2a] text-white p-2 rounded-lg">${note.note}</textarea>`,
+                                    background: '#181818',
+                                    color: '#fff',
+                                    showCancelButton: true,
+                                    confirmButtonText: 'Editar',
+                                    cancelButtonText: 'Eliminar',
+                                    showDenyButton: true,
+                                    denyButtonText: 'Cerrar',
+                                    preConfirm: () => {
+                                        const updatedNoteText = Swal.getPopup().querySelector('textarea').value;
+                                        return updatedNoteText;
+                                    }
+                                }).then(async (editResult) => {
+                                    if (editResult.isConfirmed) {
+                                        try {
+                                            await updateDoc(doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "notes", note.id), {
+                                                note: editResult.value
+                                            });
+                                            Swal.fire('Actualizado!', 'La nota ha sido actualizada.', 'success');
+                                        } catch (error) {
+                                            console.error("Error al actualizar la nota:", error);
+                                            Swal.fire('Error', 'No se pudo actualizar la nota.', 'error');
+                                        }
+                                    } else if (editResult.isDismissed && editResult.dismiss === Swal.DismissReason.cancel) {
+                                        Swal.fire({
+                                            title: '¿Estás seguro?',
+                                            text: "¡No podrás revertir esto!",
+                                            icon: 'warning',
+                                            showCancelButton: true,
+                                            confirmButtonColor: '#d33',
+                                            cancelButtonColor: '#88c999',
+                                            confirmButtonText: 'Sí, eliminar',
+                                            cancelButtonText: 'Cancelar'
+                                        }).then(async (deleteResult) => {
+                                            if (deleteResult.isConfirmed) {
+                                                try {
+                                                    await deleteDoc(doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "notes", note.id));
+                                                    Swal.fire('Eliminado!', 'La nota ha sido eliminada.', 'success');
+                                                } catch (error) {
+                                                    console.error("Error al eliminar la nota:", error);
+                                                    Swal.fire('Error', 'No se pudo eliminar la nota.', 'error');
+                                                }
+                                            }
+                                        });
+                                    }
+                                });
+                            });
+                            pageDiv.appendChild(annotationOverlay);
+                        });
+                    }
                 }
             }
         }
