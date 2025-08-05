@@ -100,19 +100,6 @@
         #sidebar.open {
             right: 0;
         }
-        #fullscreen-btn {
-            background-color: #2a2a2a;
-            color: #ccc;
-            border: none;
-            border-radius: 8px;
-            padding: 0.5rem;
-            cursor: pointer;
-            transition: background-color 0.2s, color 0.2s;
-        }
-        #fullscreen-btn:hover {
-            background-color: #3a3a3a;
-            color: #fff;
-        }
     </style>
 </head>
 <body class="text-white flex flex-col min-h-screen">
@@ -214,9 +201,11 @@
             </button>
         </div>
         <div id="notes-list" class="space-y-4">
+            <!-- Las notas se cargarán aquí -->
             <p id="no-notes-message" class="text-gray-500 text-center" style="display:none;">No hay notas para este PDF.</p>
         </div>
     </aside>
+    <!-- Se eliminó el botón flotante y se movió a la barra superior -->
     <div id="page-number-indicator" class="z-50"></div>
     
     <script type="module">
@@ -225,13 +214,12 @@
         import { getFirestore, collection, query, where, getDocs, doc, updateDoc, onSnapshot, deleteDoc, setDoc, getDoc, addDoc } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-storage.js";
 
-        // ¡ATENCIÓN! Exponer tus claves de Firebase aquí es un riesgo de seguridad.
-        // Considera usar Firebase App Check o un backend para protegerlas.
+        // Inicializamos Firebase con tu configuración
         const firebaseConfig = {
             apiKey: "AIzaSyBYVYRdA_DB1Kob9b_wGd5Wd4JsYFMyBRc",
             authDomain: "papiro2025-d09e0.firebaseapp.com",
             projectId: "papiro2025-d09e0",
-            storageBucket: "papiro2025-d09e0.appspot.com",
+            storageBucket: "papiro2025-d09e0.firebasestorage.app",
             messagingSenderId: "1096335704864",
             appId: "1:1096335704864:web:75f1f27cd920df64554d45",
             measurementId: "G-03Y1260F1S"
@@ -241,7 +229,6 @@
         const db = getFirestore(app);
         const storage = getStorage(app);
         
-        // Declaración de variables globales
         let currentProjectRef = null;
         let currentUser = null;
         let pdfDocument = null; 
@@ -258,13 +245,13 @@
         let bgY = 0;
         let currentPageNum = 1;
 
-        // Variables del DOM
         const pageTitleEl = document.getElementById('page-title');
         const projectTitleEl = document.getElementById('project-title');
         const pdfLoaderContainer = document.getElementById('pdf-loader-container');
         const pdfLoaderText = document.getElementById('pdf-loader-text');
         const saveBtn = document.getElementById('save-btn');
         const logoutBtn = document.getElementById('logout-btn');
+
         const gridViewContainer = document.getElementById('grid-view-container');
         const coverSection = document.getElementById('cover-section');
         const coverContainer = document.getElementById('cover-container');
@@ -273,15 +260,21 @@
         const coverFileInput = document.getElementById('cover-file-input');
         const editCoverBtn = document.getElementById('edit-cover-btn');
         const coverOverlay = document.getElementById('cover-overlay');
+
         const pdfsSection = document.getElementById('pdfs-section');
         const pdfList = document.getElementById('pdf-list');
         const visualUploadBtn = document.getElementById('visual-upload-btn');
         const pdfFileInput = document.getElementById('pdf-file-input');
         const noPdfsMessage = document.getElementById('no-pdfs-message');
+        
         const pdfViewerContainer = document.getElementById('pdf-viewer-container');
         const dynamicBackBtn = document.getElementById('dynamic-back-btn');
         const pagesContainer = document.getElementById('pages-container');
+
         const pageNumberIndicator = document.getElementById('page-number-indicator');
+        let scrollTimeout = null;
+        let resizeObserver = null;
+        
         const sidebar = document.getElementById('sidebar');
         const openSidebarBtn = document.getElementById('open-sidebar-btn');
         const closeSidebarBtn = document.getElementById('close-sidebar-btn');
@@ -289,18 +282,6 @@
         const noNotesMessage = document.getElementById('no-notes-message');
         const searchNotesInput = document.getElementById('search-notes-input');
         const addNoteBtn = document.getElementById('add-note-btn');
-        const mainContent = document.getElementById('main-content');
-        
-        // Variables para la voz (declaradas una sola vez)
-        const synthesis = window.speechSynthesis;
-        const playPauseBtn = document.getElementById('play-pause-btn');
-        const stopBtn = document.getElementById('stop-btn');
-        let currentUtterance = null;
-        let isSpeaking = false;
-        
-        let scrollTimeout = null;
-        let resizeObserver = null;
-
 
         window.pdfjsLib = window['pdfjs-dist/build/pdf'];
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
@@ -432,17 +413,12 @@
                     await page.render(renderContext).promise;
                     pagesHeight.push(canvas.offsetHeight);
                 }
-                
-                stopSpeech();
-                // Ahora, una vez que el PDF está cargado, ponemos la página en pantalla completa
-                enterFullscreen();
 
                 pagesContainer.addEventListener('scroll', updatePageNumberIndicator);
                 resizeObserver = new ResizeObserver(() => updatePageNumberIndicator());
                 resizeObserver.observe(pagesContainer);
                 updatePageNumberIndicator();
                 dynamicBackBtn.onclick = () => {
-                    exitFullscreen();
                     pdfViewerContainer.style.display = 'none';
                     gridViewContainer.style.display = 'block';
                     resetViewer();
@@ -453,28 +429,6 @@
                 resetViewer();
             } finally {
                 hideLoader();
-            }
-        }
-
-        // Función para entrar en pantalla completa
-        function enterFullscreen() {
-            if (mainContent.requestFullscreen) {
-                mainContent.requestFullscreen();
-            } else if (mainContent.webkitRequestFullscreen) { /* Safari */
-                mainContent.webkitRequestFullscreen();
-            } else if (mainContent.msRequestFullscreen) { /* IE11 */
-                mainContent.msRequestFullscreen();
-            }
-        }
-        
-        // Función para salir de pantalla completa
-        function exitFullscreen() {
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            } else if (document.webkitExitFullscreen) { /* Safari */
-                document.webkitExitFullscreen();
-            } else if (document.msExitFullscreen) { /* IE11 */
-                document.msExitFullscreen();
             }
         }
         
@@ -628,7 +582,6 @@
         // Event listener para el botón de volver
         dynamicBackBtn.addEventListener('click', () => {
             if (pdfViewerContainer.style.display === 'flex') {
-                exitFullscreen();
                 pdfViewerContainer.style.display = 'none';
                 gridViewContainer.style.display = 'block';
                 resetViewer();
@@ -644,7 +597,6 @@
             if (resizeObserver) resizeObserver.disconnect();
             pagesHeight = [];
             pagesContainer.removeEventListener('scroll', updatePageNumberIndicator);
-            sidebar.classList.remove('open');
         }
         
         function updatePageNumberIndicator() {
@@ -812,19 +764,18 @@
 
         // =======================================================================
         // CÓDIGO ACTUALIZADO PARA NUEVAS FUNCIONALIDADES
+        // Se han consolidado las declaraciones de variables para evitar errores de sintaxis
         // =======================================================================
         
-        // --- BLOQUE DE CÓDIGO DUPLICADO ELIMINADO ---
-        // El error 'synthesis has already been declared' ocurría porque las
-        // variables de voz se declaraban aquí de nuevo. Ya se han eliminado.
+        // Variables para la voz, ahora en un único lugar
+        const synthesis = window.speechSynthesis;
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        let currentUtterance = null;
+        let isSpeaking = false;
         
         // Nueva función para manejar la selección de texto y crear la nota
         async function handleNewNote() {
-            if (!pdfDocument) {
-                 Swal.fire('Error', 'Primero carga un PDF para poder añadir notas.', 'error');
-                 return;
-            }
-            
             const pageNumber = getCurrentPageNumber();
             const page = await pdfDocument.getPage(pageNumber);
             const textContent = await page.getTextContent();
@@ -889,31 +840,22 @@
         }
         
         // Lógica para el marcador de voz (mejorado)
-        async function speakText(text, pageNum) {
-            // Cancelar cualquier voz anterior
-            if (synthesis && synthesis.speaking) {
-                synthesis.cancel();
-            }
-            
-            // Si no hay texto, obtener el texto de la página actual o de la página especificada
+        async function speakText(text) {
+            // Si no hay texto seleccionado, leer la página completa
             if (!text && pdfDocument) {
-                const pageNumberToRead = pageNum || getCurrentPageNumber();
-                try {
-                    const page = await pdfDocument.getPage(pageNumberToRead);
-                    const textContent = await page.getTextContent();
-                    text = textContent.items.map(item => item.str).join(' ');
-                } catch (error) {
-                    console.error("Error al obtener el texto de la página:", error);
-                    Swal.fire('Error', 'No se pudo obtener el texto de la página.', 'error');
-                    return;
-                }
+                const pageNumber = getCurrentPageNumber();
+                const page = await pdfDocument.getPage(pageNumber);
+                const textContent = await page.getTextContent();
+                text = textContent.items.map(item => item.str).join(' ');
             } else if (!text) {
                  Swal.fire('Información', 'No hay texto para leer.', 'info');
                  return;
             }
 
-            // Comprobar la disponibilidad de la API de voz
-            if (!synthesis) {
+            // Cancelar cualquier voz anterior
+            if (synthesis) {
+                synthesis.cancel();
+            } else {
                 Swal.fire('Error', 'La API de voz no está disponible en este navegador.', 'error');
                 return;
             }
@@ -921,7 +863,7 @@
             // Crear una nueva instancia de SpeechSynthesisUtterance
             currentUtterance = new SpeechSynthesisUtterance(text);
             
-            // Asignar los eventos para manejar la reproducción
+            // Asignar los eventos
             currentUtterance.onstart = () => {
                 isSpeaking = true;
                 playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
@@ -934,6 +876,7 @@
                 console.error('SpeechSynthesisUtterance.onerror', event);
                 isSpeaking = false;
                 playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+                Swal.fire('Error', 'No se pudo leer el texto. Intenta de nuevo.', 'error');
             };
 
             // Iniciar la voz
@@ -958,23 +901,17 @@
             }
             isSpeaking = false;
             playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-            currentUtterance = null;
         }
         
         playPauseBtn.addEventListener('click', async () => {
             if (isSpeaking) {
                 toggleSpeech();
             } else {
-                // Si ya hay un utterance en pausa, lo reanudamos
-                if (currentUtterance) {
-                    toggleSpeech();
+                const selection = window.getSelection().toString();
+                if (selection) {
+                    await speakText(selection);
                 } else {
-                    const selection = window.getSelection().toString();
-                    if (selection) {
-                        await speakText(selection);
-                    } else {
-                        await speakText(); // Lee la página completa si no hay selección
-                    }
+                    await speakText(); // Lee la página completa si no hay selección
                 }
             }
         });
@@ -982,10 +919,6 @@
 
         // Lógica para el cuaderno de notas desplegable
         openSidebarBtn.addEventListener('click', () => {
-            if (!currentPdfId) {
-                Swal.fire('Error', 'Primero debes seleccionar un PDF para abrir el cuaderno.', 'error');
-                return;
-            }
             sidebar.classList.toggle('open');
             if (sidebar.classList.contains('open')) {
                 loadNotes();
@@ -1052,9 +985,9 @@
                 }
             });
         });
-
-        // La selección de texto en el PDF ya no activa la función de anotación,
-        // ya que la funcionalidad de selección no está disponible en el canvas.
+        
+        // Ahora la selección de texto en el PDF no activa la función de anotación.
+        // La anotación se hace a través del botón "Añadir Anotación" en la sidebar.
         // pagesContainer.addEventListener('mouseup', handleTextSelection);
 
         // =======================================================================
@@ -1063,3 +996,4 @@
     </script>
 </body>
 </html>
+
