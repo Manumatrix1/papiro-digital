@@ -220,7 +220,7 @@
 
                 const urlParams = new URLSearchParams(window.location.search);
                 const projectId = urlParams.get('id');
-                const docId = urlParams.get('docId'); // Corregido: Obtenemos el docId de la URL
+                const docId = urlParams.get('docId');
 
                 if (!projectId) {
                     window.location.href = 'mi_tablero.html';
@@ -282,11 +282,11 @@
         async function loadPDFViewer(docId) {
             try {
                 // Obtiene la referencia al documento del PDF para obtener el nombre del archivo
-                const pdfDoc = await getDoc(doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", docId));
-                if (!pdfDoc.exists()) {
+                const pdfDocument = await getDoc(doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", docId));
+                if (!pdfDocument.exists()) {
                     throw new Error("Documento PDF no encontrado en Firestore");
                 }
-                const pdfData = pdfDoc.data();
+                const pdfData = pdfDocument.data();
                 const pdfFileName = pdfData.fileName;
                 projectTitleEl.value = pdfData.name;
                 
@@ -308,7 +308,7 @@
                 showLoader();
                 
                 const loadingTask = pdfjsLib.getDocument({ url: url });
-                pdfDoc = await loadingTask.promise;
+                let pdfDoc = await loadingTask.promise; // CORREGIDO: Se usa 'let' para permitir la reasignación
                 const numPages = pdfDoc.numPages;
                 pagesContainer.innerHTML = '';
                 pagesHeight = [];
