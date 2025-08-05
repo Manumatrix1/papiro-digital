@@ -776,6 +776,11 @@
         
         // Nueva función para manejar la selección de texto y crear la nota
         async function handleNewNote() {
+            if (!pdfDocument) {
+                 Swal.fire('Error', 'Primero carga un PDF para poder añadir notas.', 'error');
+                 return;
+            }
+            
             const pageNumber = getCurrentPageNumber();
             const page = await pdfDocument.getPage(pageNumber);
             const textContent = await page.getTextContent();
