@@ -80,6 +80,17 @@
             max-height: calc(100vh - 8rem);
             overflow-y: auto;
             scroll-behavior: smooth;
+            position: relative;
+        }
+        .pdf-page-container {
+            position: relative;
+        }
+        .annotation-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none; /* Permite interactuar con el PDF que está debajo */
+            z-index: 10;
         }
         #sidebar {
             position: fixed;
@@ -99,6 +110,19 @@
         }
         #sidebar.open {
             right: 0;
+        }
+        #fullscreen-btn {
+            background-color: #2a2a2a;
+            color: #ccc;
+            border: none;
+            border-radius: 8px;
+            padding: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        #fullscreen-btn:hover {
+            background-color: #3a3a3a;
+            color: #fff;
         }
     </style>
 </head>
@@ -174,6 +198,20 @@
                     <button id="stop-btn" class="text-white hover:text-red-400 transition">
                         <i class="fas fa-stop"></i>
                     </button>
+                    <button id="fullscreen-btn" class="text-white hover:text-[#88c999] transition">
+                        <i class="fas fa-expand"></i>
+                    </button>
+                    <button id="drawing-mode-btn" class="text-white hover:text-[#88c999] transition">
+                        <i class="fas fa-pen"></i>
+                    </button>
+                </div>
+                <div id="drawing-tools" class="flex items-center gap-2 mb-2 sm:mb-0" style="display: none;">
+                    <div id="color-palette" class="flex gap-2">
+                        <button class="w-6 h-6 rounded-full bg-red-500 border-2 border-transparent hover:border-white transition" data-color="#ef4444"></button>
+                        <button class="w-6 h-6 rounded-full bg-blue-500 border-2 border-transparent hover:border-white transition" data-color="#3b82f6"></button>
+                        <button class="w-6 h-6 rounded-full bg-green-500 border-2 border-transparent hover:border-white transition" data-color="#22c55e"></button>
+                        <button class="w-6 h-6 rounded-full bg-yellow-400 border-2 border-transparent hover:border-white transition" data-color="#facc15"></button>
+                    </div>
                 </div>
                 <div class="relative w-full sm:w-1/2 flex items-center gap-4">
                     <input type="text" id="search-notes-input" placeholder="Buscar notas por etiqueta..." class="w-full bg-[#2a2a2a] text-white placeholder-gray-400 py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#88c999]">
@@ -196,16 +234,13 @@
             </button>
         </div>
         <div class="mb-4">
-            <button id="add-note-btn" class="w-full bg-[#88c999] text-[#1C1C1C] font-bold py-2 rounded-lg hover:brightness-110 transition">
-                Añadir Anotación
-            </button>
+            <p class="text-xs text-gray-400">Haz clic y arrastra en el PDF para crear un recuadro de anotación.</p>
         </div>
         <div id="notes-list" class="space-y-4">
             <!-- Las notas se cargarán aquí -->
             <p id="no-notes-message" class="text-gray-500 text-center" style="display:none;">No hay notas para este PDF.</p>
         </div>
     </aside>
-    <!-- Se eliminó el botón flotante y se movió a la barra superior -->
     <div id="page-number-indicator" class="z-50"></div>
     
     <script type="module">
@@ -229,6 +264,7 @@
         const db = getFirestore(app);
         const storage = getStorage(app);
         
+        // Declaración de variables globales
         let currentProjectRef = null;
         let currentUser = null;
         let pdfDocument = null; 
@@ -244,14 +280,16 @@
         let startBgY = 0;
         let bgY = 0;
         let currentPageNum = 1;
+        let scrollTimeout = null;
+        let resizeObserver = null;
 
+        // Variables del DOM
         const pageTitleEl = document.getElementById('page-title');
         const projectTitleEl = document.getElementById('project-title');
         const pdfLoaderContainer = document.getElementById('pdf-loader-container');
         const pdfLoaderText = document.getElementById('pdf-loader-text');
         const saveBtn = document.getElementById('save-btn');
         const logoutBtn = document.getElementById('logout-btn');
-
         const gridViewContainer = document.getElementById('grid-view-container');
         const coverSection = document.getElementById('cover-section');
         const coverContainer = document.getElementById('cover-container');
@@ -260,28 +298,41 @@
         const coverFileInput = document.getElementById('cover-file-input');
         const editCoverBtn = document.getElementById('edit-cover-btn');
         const coverOverlay = document.getElementById('cover-overlay');
-
         const pdfsSection = document.getElementById('pdfs-section');
         const pdfList = document.getElementById('pdf-list');
         const visualUploadBtn = document.getElementById('visual-upload-btn');
         const pdfFileInput = document.getElementById('pdf-file-input');
         const noPdfsMessage = document.getElementById('no-pdfs-message');
-        
         const pdfViewerContainer = document.getElementById('pdf-viewer-container');
         const dynamicBackBtn = document.getElementById('dynamic-back-btn');
         const pagesContainer = document.getElementById('pages-container');
-
         const pageNumberIndicator = document.getElementById('page-number-indicator');
-        let scrollTimeout = null;
-        let resizeObserver = null;
-        
         const sidebar = document.getElementById('sidebar');
         const openSidebarBtn = document.getElementById('open-sidebar-btn');
         const closeSidebarBtn = document.getElementById('close-sidebar-btn');
         const notesList = document.getElementById('notes-list');
         const noNotesMessage = document.getElementById('no-notes-message');
         const searchNotesInput = document.getElementById('search-notes-input');
-        const addNoteBtn = document.getElementById('add-note-btn');
+        const mainContent = document.getElementById('main-content');
+        
+        // Variables para la voz y el dibujo
+        const synthesis = window.speechSynthesis;
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        let currentUtterance = null;
+        let isSpeaking = false;
+        
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+        const drawingModeBtn = document.getElementById('drawing-mode-btn');
+        const drawingTools = document.getElementById('drawing-tools');
+        const colorPalette = document.getElementById('color-palette');
+        let isDrawingMode = false;
+        let isDrawing = false;
+        let startDrawingX = 0;
+        let startDrawingY = 0;
+        let endDrawingX = 0;
+        let endDrawingY = 0;
+        let currentColor = '#ef4444'; // Color por defecto
 
         window.pdfjsLib = window['pdfjs-dist/build/pdf'];
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
@@ -397,7 +448,7 @@
                     const page = await pdfDocument.getPage(i);
                     const viewport = page.getViewport({ scale: 1.5 });
                     const pageDiv = document.createElement('div');
-                    pageDiv.className = 'pdf-page-container w-full h-auto';
+                    pageDiv.className = 'pdf-page-container w-full h-auto relative';
                     const canvas = document.createElement('canvas');
                     canvas.id = `page-${i}`;
                     canvas.className = 'w-full h-auto shadow-lg bg-[#121212] mb-8';
@@ -413,16 +464,27 @@
                     await page.render(renderContext).promise;
                     pagesHeight.push(canvas.offsetHeight);
                 }
+                
+                stopSpeech();
+                enterFullscreen();
 
                 pagesContainer.addEventListener('scroll', updatePageNumberIndicator);
-                resizeObserver = new ResizeObserver(() => updatePageNumberIndicator());
+                resizeObserver = new ResizeObserver(() => {
+                    updatePageNumberIndicator();
+                    redrawAllAnnotations();
+                });
                 resizeObserver.observe(pagesContainer);
                 updatePageNumberIndicator();
                 dynamicBackBtn.onclick = () => {
+                    exitFullscreen();
                     pdfViewerContainer.style.display = 'none';
                     gridViewContainer.style.display = 'block';
                     resetViewer();
                 };
+
+                // Cargar y dibujar las anotaciones existentes
+                loadAndDrawAnnotations();
+
             } catch (reason) {
                 console.error("Error al renderizar la vista previa del PDF:", reason);
                 Swal.fire('Error', 'No se pudo cargar el documento PDF. Intente de nuevo.', 'error');
@@ -431,6 +493,37 @@
                 hideLoader();
             }
         }
+
+        // Función para entrar en pantalla completa
+        function enterFullscreen() {
+            const element = document.documentElement;
+            if (element.requestFullscreen) {
+                element.requestFullscreen();
+            } else if (element.webkitRequestFullscreen) { /* Safari */
+                element.webkitRequestFullscreen();
+            } else if (element.msRequestFullscreen) { /* IE11 */
+                element.msRequestFullscreen();
+            }
+        }
+
+        // Función para salir de pantalla completa
+        function exitFullscreen() {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) { /* Safari */
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) { /* IE11 */
+                document.msExitFullscreen();
+            }
+        }
+
+        document.addEventListener('fullscreenchange', (event) => {
+            if (document.fullscreenElement) {
+                fullscreenBtn.innerHTML = '<i class="fas fa-compress"></i>';
+            } else {
+                fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i>';
+            }
+        });
         
         function createPdfCard(pdfDoc) {
             const pdfData = pdfDoc.data();
@@ -582,6 +675,7 @@
         // Event listener para el botón de volver
         dynamicBackBtn.addEventListener('click', () => {
             if (pdfViewerContainer.style.display === 'flex') {
+                exitFullscreen();
                 pdfViewerContainer.style.display = 'none';
                 gridViewContainer.style.display = 'block';
                 resetViewer();
@@ -597,6 +691,7 @@
             if (resizeObserver) resizeObserver.disconnect();
             pagesHeight = [];
             pagesContainer.removeEventListener('scroll', updatePageNumberIndicator);
+            sidebar.classList.remove('open');
         }
         
         function updatePageNumberIndicator() {
@@ -764,54 +859,178 @@
 
         // =======================================================================
         // CÓDIGO ACTUALIZADO PARA NUEVAS FUNCIONALIDADES
-        // Se han consolidado las declaraciones de variables para evitar errores de sintaxis
         // =======================================================================
         
-        // Variables para la voz, ahora en un único lugar
         const synthesis = window.speechSynthesis;
         const playPauseBtn = document.getElementById('play-pause-btn');
         const stopBtn = document.getElementById('stop-btn');
         let currentUtterance = null;
         let isSpeaking = false;
         
-        // Nueva función para manejar la selección de texto y crear la nota
-        async function handleNewNote() {
-            const pageNumber = getCurrentPageNumber();
-            const page = await pdfDocument.getPage(pageNumber);
-            const textContent = await page.getTextContent();
-            const pageText = textContent.items.map(item => item.str).join(' ');
+        const mainContent = document.getElementById('main-content');
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+        const drawingModeBtn = document.getElementById('drawing-mode-btn');
+        const drawingTools = document.getElementById('drawing-tools');
+        const colorPalette = document.getElementById('color-palette');
+        let isDrawingMode = false;
+        let isDrawing = false;
+        let startDrawingX = 0;
+        let startDrawingY = 0;
+        let endDrawingX = 0;
+        let endDrawingY = 0;
+        let currentColor = '#ef4444'; // Color por defecto
 
+        fullscreenBtn.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                enterFullscreen();
+            } else {
+                exitFullscreen();
+            }
+        });
+
+        document.addEventListener('fullscreenchange', (event) => {
+            if (document.fullscreenElement) {
+                fullscreenBtn.innerHTML = '<i class="fas fa-compress"></i>';
+            } else {
+                fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i>';
+            }
+        });
+        
+        // Lógica para el modo de dibujo
+        drawingModeBtn.addEventListener('click', () => {
+            if (!currentPdfId) {
+                Swal.fire('Error', 'Primero debes seleccionar un PDF.', 'error');
+                return;
+            }
+            isDrawingMode = !isDrawingMode;
+            drawingModeBtn.classList.toggle('text-[#88c999]');
+            if (isDrawingMode) {
+                pagesContainer.style.cursor = 'crosshair';
+                drawingTools.style.display = 'flex';
+                pagesContainer.addEventListener('mousedown', startDrawing);
+                pagesContainer.addEventListener('mousemove', drawRect);
+                pagesContainer.addEventListener('mouseup', stopDrawing);
+            } else {
+                pagesContainer.style.cursor = 'default';
+                drawingTools.style.display = 'none';
+                pagesContainer.removeEventListener('mousedown', startDrawing);
+                pagesContainer.removeEventListener('mousemove', drawRect);
+                pagesContainer.removeEventListener('mouseup', stopDrawing);
+            }
+        });
+        
+        colorPalette.addEventListener('click', (e) => {
+            const newColor = e.target.dataset.color;
+            if (newColor) {
+                currentColor = newColor;
+            }
+        });
+
+        function startDrawing(e) {
+            e.preventDefault();
+            const pageDiv = e.target.closest('.pdf-page-container');
+            if (!pageDiv || !isDrawingMode) return;
+            pageDiv.style.pointerEvents = 'auto'; // Permitir el dibujo en el canvas
+            e.stopPropagation();
+
+            const rect = pageDiv.getBoundingClientRect();
+            startDrawingX = e.clientX - rect.left;
+            startDrawingY = e.clientY - rect.top;
+            isDrawing = true;
+            
+            let annotationCanvas = pageDiv.querySelector('.annotation-canvas');
+            if (!annotationCanvas) {
+                annotationCanvas = document.createElement('canvas');
+                annotationCanvas.className = 'annotation-canvas';
+                annotationCanvas.width = pageDiv.offsetWidth;
+                annotationCanvas.height = pageDiv.offsetHeight;
+                pageDiv.appendChild(annotationCanvas);
+            }
+            const ctx = annotationCanvas.getContext('2d');
+            ctx.clearRect(0, 0, annotationCanvas.width, annotationCanvas.height);
+        }
+
+        function drawRect(e) {
+            if (!isDrawing || !isDrawingMode) return;
+            const pageDiv = e.target.closest('.pdf-page-container');
+            if (!pageDiv) return;
+
+            const rect = pageDiv.getBoundingClientRect();
+            endDrawingX = e.clientX - rect.left;
+            endDrawingY = e.clientY - rect.top;
+
+            const annotationCanvas = pageDiv.querySelector('.annotation-canvas');
+            if (!annotationCanvas) return;
+            const ctx = annotationCanvas.getContext('2d');
+            ctx.clearRect(0, 0, annotationCanvas.width, annotationCanvas.height);
+            
+            ctx.strokeStyle = currentColor;
+            ctx.lineWidth = 2;
+            const width = endDrawingX - startDrawingX;
+            const height = endDrawingY - startDrawingY;
+            ctx.strokeRect(startDrawingX, startDrawingY, width, height);
+        }
+
+        async function stopDrawing(e) {
+            if (!isDrawing || !isDrawingMode) return;
+            isDrawing = false;
+            
+            const pageDiv = e.target.closest('.pdf-page-container');
+            if (!pageDiv) return;
+            const pageNumber = Array.from(pagesContainer.children).indexOf(pageDiv) + 1;
+            pageDiv.style.pointerEvents = 'none';
+
+            const rect = pageDiv.getBoundingClientRect();
+            endDrawingX = e.clientX - rect.left;
+            endDrawingY = e.clientY - rect.top;
+            
+            const x = Math.min(startDrawingX, endDrawingX);
+            const y = Math.min(startDrawingY, endDrawingY);
+            const width = Math.abs(endDrawingX - startDrawingX);
+            const height = Math.abs(endDrawingY - startDrawingY);
+
+            if (width < 5 || height < 5) return;
+
+            const page = await pdfDocument.getPage(pageNumber);
+            const viewport = page.getViewport({ scale: 1.5 });
+            const scaleX = pageDiv.offsetWidth / viewport.width;
+            const scaleY = pageDiv.offsetHeight / viewport.height;
+
+            const scaledX = x / scaleX;
+            const scaledY = y / scaleY;
+            const scaledWidth = width / scaleX;
+            const scaledHeight = height / scaleY;
+
+            await saveAnnotation({x: scaledX, y: scaledY, width: scaledWidth, height: scaledHeight, color: currentColor, page: pageNumber});
+        }
+        
+        async function saveAnnotation({x, y, width, height, color, page}) {
             Swal.fire({
-                title: 'Anotación en la página ' + pageNumber,
-                html: `
-                    <p class="text-sm text-gray-400 text-left mb-2">Texto de la página:</p>
-                    <textarea class="w-full h-24 bg-[#2a2a2a] text-white p-2 rounded-lg" readonly>${pageText.substring(0, 500)}...</textarea>
-                    <input id="swal-input1" class="swal2-input w-full bg-[#2a2a2a] text-white placeholder-gray-400" placeholder="Escribe tu nota aquí..." style="border: none;">
-                    <input id="swal-input2" class="swal2-input w-full bg-[#2a2a2a] text-white placeholder-gray-400" placeholder="Etiquetas (separadas por comas)" style="border: none;">
-                `,
+                title: 'Añadir Anotación',
+                html: `<input id="swal-input1" class="swal2-input w-full bg-[#2a2a2a] text-white placeholder-gray-400" placeholder="Escribe tu nota aquí..." style="border: none;">`,
                 background: '#181818',
                 color: '#fff',
                 showCancelButton: true,
-                confirmButtonText: 'Guardar Nota',
+                confirmButtonText: 'Guardar',
                 cancelButtonText: 'Cancelar',
                 preConfirm: () => {
                     const noteText = Swal.getPopup().querySelector('#swal-input1').value;
-                    const tags = Swal.getPopup().querySelector('#swal-input2').value.split(',').map(tag => tag.trim()).filter(tag => tag);
                     if (!noteText) {
                         Swal.showValidationMessage('La nota no puede estar vacía.');
                         return false;
                     }
-                    return { noteText, tags };
+                    return noteText;
                 }
             }).then(async (result) => {
                 if (result.isConfirmed) {
-                    const { noteText, tags } = result.value;
+                    const noteText = result.value;
                     try {
                         await addDoc(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "notes"), {
-                            text: pageText,
                             note: noteText,
-                            tags: tags,
-                            page: pageNumber,
+                            tags: [],
+                            page: page,
+                            rectangle: { x, y, width, height },
+                            color: color,
                             createdAt: new Date()
                         });
                         Swal.fire('Guardado!', 'Tu nota ha sido guardada.', 'success');
@@ -823,47 +1042,119 @@
             });
         }
         
-        // Función para obtener el número de página actual visible
-        function getCurrentPageNumber() {
-            if (!pdfDocument || pagesHeight.length === 0) return 1;
-            let scrollTop = pagesContainer.scrollTop;
-            let page = 1;
-            let totalHeight = 0;
-            for (let i = 0; i < pagesHeight.length; i++) {
-                totalHeight += pagesHeight[i];
-                if (scrollTop < totalHeight) {
-                    page = i + 1;
-                    break;
-                }
+        async function loadAndDrawAnnotations() {
+            if (!currentPdfId) return;
+
+            try {
+                const notesQuery = query(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "notes"));
+                onSnapshot(notesQuery, (snapshot) => {
+                    redrawAllAnnotations();
+                    notesList.innerHTML = '';
+                    if (snapshot.docs.length > 0) {
+                        noNotesMessage.style.display = 'none';
+                        snapshot.forEach((noteDoc) => {
+                            const noteData = noteDoc.data();
+                            const noteEl = document.createElement('div');
+                            noteEl.className = 'bg-[#2a2a2a] p-3 rounded-lg shadow-md flex items-start gap-3';
+                            noteEl.style.cursor = 'pointer';
+                            noteEl.dataset.page = noteData.page;
+                            noteEl.dataset.y = noteData.rectangle.y;
+                            noteEl.innerHTML = `
+                                <div class="w-1 h-full rounded-full" style="background-color: ${noteData.color}; min-height: 50px;"></div>
+                                <div>
+                                    <p class="text-xs text-gray-400">Página: ${noteData.page}</p>
+                                    <p class="font-semibold text-sm mb-1 line-clamp-2">${noteData.note}</p>
+                                    <div class="mt-2 flex flex-wrap gap-1">
+                                        ${noteData.tags.map(tag => `<span class="bg-[#88c999] text-[#1C1C1C] text-xs font-bold px-2 py-1 rounded-full">${tag}</span>`).join('')}
+                                    </div>
+                                </div>
+                            `;
+                            noteEl.addEventListener('click', (e) => {
+                                const pageNumber = parseInt(e.currentTarget.dataset.page);
+                                const pageDiv = pagesContainer.querySelector(`.pdf-page-container:nth-child(${pageNumber})`);
+                                if (pageDiv) {
+                                    pageDiv.scrollIntoView({ behavior: 'smooth' });
+                                }
+                            });
+                            notesList.appendChild(noteEl);
+                        });
+                    } else {
+                        noNotesMessage.textContent = 'No hay notas para este PDF.';
+                        noNotesMessage.style.display = 'block';
+                    }
+                });
+            } catch (error) {
+                console.error("Error al cargar las anotaciones:", error);
+                noNotesMessage.textContent = 'Error al cargar las anotaciones. Intenta de nuevo.';
+                noNotesMessage.style.display = 'block';
             }
-            return page;
         }
         
-        // Lógica para el marcador de voz (mejorado)
-        async function speakText(text) {
-            // Si no hay texto seleccionado, leer la página completa
+        async function redrawAllAnnotations() {
+            if (!pdfDocument) return;
+
+            const notesQuery = query(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "notes"));
+            const querySnapshot = await getDocs(notesQuery);
+            const notes = querySnapshot.docs.map(doc => doc.data());
+
+            for (let i = 1; i <= pdfDocument.numPages; i++) {
+                const pageDiv = pagesContainer.querySelector(`.pdf-page-container:nth-child(${i})`);
+                if (pageDiv) {
+                    let annotationCanvas = pageDiv.querySelector('.annotation-canvas');
+                    if (!annotationCanvas) {
+                        annotationCanvas = document.createElement('canvas');
+                        annotationCanvas.className = 'annotation-canvas';
+                        annotationCanvas.width = pageDiv.offsetWidth;
+                        annotationCanvas.height = pageDiv.offsetHeight;
+                        pageDiv.appendChild(annotationCanvas);
+                    }
+                    const ctx = annotationCanvas.getContext('2d');
+                    ctx.clearRect(0, 0, annotationCanvas.width, annotationCanvas.height);
+
+                    const pageNotes = notes.filter(note => note.page === i);
+                    pageNotes.forEach(note => {
+                        const pageRect = pagesContainer.querySelector(`.pdf-page-container:nth-child(${i})`).getBoundingClientRect();
+                        const canvasRect = annotationCanvas.getBoundingClientRect();
+                        const scaleX = canvasRect.width / pageRect.width;
+                        const scaleY = canvasRect.height / pageRect.height;
+                        
+                        const { x, y, width, height } = note.rectangle;
+                        ctx.strokeStyle = note.color;
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(x * scaleX, y * scaleY, width * scaleX, height * scaleY);
+                    });
+                }
+            }
+        }
+
+        async function speakText(text, pageNum) {
+            if (synthesis && synthesis.speaking) {
+                synthesis.cancel();
+            }
+            
             if (!text && pdfDocument) {
-                const pageNumber = getCurrentPageNumber();
-                const page = await pdfDocument.getPage(pageNumber);
-                const textContent = await page.getTextContent();
-                text = textContent.items.map(item => item.str).join(' ');
+                const pageNumberToRead = pageNum || getCurrentPageNumber();
+                try {
+                    const page = await pdfDocument.getPage(pageNumberToRead);
+                    const textContent = await page.getTextContent();
+                    text = textContent.items.map(item => item.str).join(' ');
+                } catch (error) {
+                    console.error("Error al obtener el texto de la página:", error);
+                    Swal.fire('Error', 'No se pudo obtener el texto de la página.', 'error');
+                    return;
+                }
             } else if (!text) {
                  Swal.fire('Información', 'No hay texto para leer.', 'info');
                  return;
             }
 
-            // Cancelar cualquier voz anterior
-            if (synthesis) {
-                synthesis.cancel();
-            } else {
+            if (!synthesis) {
                 Swal.fire('Error', 'La API de voz no está disponible en este navegador.', 'error');
                 return;
             }
 
-            // Crear una nueva instancia de SpeechSynthesisUtterance
             currentUtterance = new SpeechSynthesisUtterance(text);
             
-            // Asignar los eventos
             currentUtterance.onstart = () => {
                 isSpeaking = true;
                 playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
@@ -876,10 +1167,8 @@
                 console.error('SpeechSynthesisUtterance.onerror', event);
                 isSpeaking = false;
                 playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-                Swal.fire('Error', 'No se pudo leer el texto. Intenta de nuevo.', 'error');
             };
 
-            // Iniciar la voz
             synthesis.speak(currentUtterance);
         }
 
@@ -901,24 +1190,32 @@
             }
             isSpeaking = false;
             playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+            currentUtterance = null;
         }
         
         playPauseBtn.addEventListener('click', async () => {
             if (isSpeaking) {
                 toggleSpeech();
             } else {
-                const selection = window.getSelection().toString();
-                if (selection) {
-                    await speakText(selection);
+                if (currentUtterance) {
+                    toggleSpeech();
                 } else {
-                    await speakText(); // Lee la página completa si no hay selección
+                    const selection = window.getSelection().toString();
+                    if (selection) {
+                        await speakText(selection);
+                    } else {
+                        await speakText(); // Lee la página completa si no hay selección
+                    }
                 }
             }
         });
         stopBtn.addEventListener('click', stopSpeech);
 
-        // Lógica para el cuaderno de notas desplegable
         openSidebarBtn.addEventListener('click', () => {
+            if (!currentPdfId) {
+                Swal.fire('Error', 'Primero debes seleccionar un PDF para abrir el cuaderno.', 'error');
+                return;
+            }
             sidebar.classList.toggle('open');
             if (sidebar.classList.contains('open')) {
                 loadNotes();
@@ -929,71 +1226,19 @@
             sidebar.classList.remove('open');
         });
 
-        addNoteBtn.addEventListener('click', handleNewNote);
-
-        // Cargar las notas de Firebase
-        async function loadNotes() {
-            if (!currentPdfId) {
-                noNotesMessage.textContent = 'Selecciona un PDF para ver tus notas.';
-                noNotesMessage.style.display = 'block';
-                notesList.innerHTML = '';
-                return;
-            }
-            
-            try {
-                const notesQuery = query(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "notes"));
-                onSnapshot(notesQuery, (snapshot) => {
-                    notesList.innerHTML = '';
-                    if (snapshot.docs.length > 0) {
-                        noNotesMessage.style.display = 'none';
-                        snapshot.forEach((noteDoc) => {
-                            const noteData = noteDoc.data();
-                            const noteEl = document.createElement('div');
-                            noteEl.className = 'bg-[#2a2a2a] p-3 rounded-lg shadow-md';
-                            noteEl.innerHTML = `
-                                <p class="text-xs text-gray-400">Página: ${noteData.page}</p>
-                                <p class="font-semibold text-sm mb-1 line-clamp-2">${noteData.text}</p>
-                                <p class="text-sm text-gray-300 line-clamp-3">${noteData.note}</p>
-                                <div class="mt-2 flex flex-wrap gap-1">
-                                    ${noteData.tags.map(tag => `<span class="bg-[#88c999] text-[#1C1C1C] text-xs font-bold px-2 py-1 rounded-full">${tag}</span>`).join('')}
-                                </div>
-                            `;
-                            notesList.appendChild(noteEl);
-                        });
-                    } else {
-                        noNotesMessage.textContent = 'No hay notas para este PDF.';
-                        noNotesMessage.style.display = 'block';
-                    }
-                });
-            } catch (error) {
-                console.error("Error al cargar las notas:", error);
-                noNotesMessage.textContent = 'Error al cargar las notas. Intenta de nuevo.';
-                noNotesMessage.style.display = 'block';
-            }
-        }
-
-        // Lógica para la búsqueda de notas
         searchNotesInput.addEventListener('input', () => {
             const searchTerm = searchNotesInput.value.toLowerCase();
             const notes = notesList.querySelectorAll('.bg-[#2a2a2a]');
             notes.forEach(note => {
                 const noteText = note.textContent.toLowerCase();
                 if (noteText.includes(searchTerm)) {
-                    note.style.display = 'block';
+                    note.style.display = 'flex';
                 } else {
                     note.style.display = 'none';
                 }
             });
         });
         
-        // Ahora la selección de texto en el PDF no activa la función de anotación.
-        // La anotación se hace a través del botón "Añadir Anotación" en la sidebar.
-        // pagesContainer.addEventListener('mouseup', handleTextSelection);
-
-        // =======================================================================
-        // FIN DEL CÓDIGO AÑADIDO PARA NUEVAS FUNCIONALIDADES
-        // =======================================================================
     </script>
 </body>
 </html>
-
