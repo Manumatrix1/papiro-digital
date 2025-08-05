@@ -100,6 +100,19 @@
         #sidebar.open {
             right: 0;
         }
+        #fullscreen-btn {
+            background-color: #2a2a2a;
+            color: #ccc;
+            border: none;
+            border-radius: 8px;
+            padding: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        #fullscreen-btn:hover {
+            background-color: #3a3a3a;
+            color: #fff;
+        }
     </style>
 </head>
 <body class="text-white flex flex-col min-h-screen">
@@ -229,6 +242,7 @@
         const db = getFirestore(app);
         const storage = getStorage(app);
         
+        // Declaración de variables globales
         let currentProjectRef = null;
         let currentUser = null;
         let pdfDocument = null; 
@@ -276,8 +290,9 @@
         const noNotesMessage = document.getElementById('no-notes-message');
         const searchNotesInput = document.getElementById('search-notes-input');
         const addNoteBtn = document.getElementById('add-note-btn');
-
-        // Variables para la voz, ahora en un único lugar para evitar errores de sintaxis
+        const mainContent = document.getElementById('main-content');
+        
+        // Variables para la voz
         const synthesis = window.speechSynthesis;
         const playPauseBtn = document.getElementById('play-pause-btn');
         const stopBtn = document.getElementById('stop-btn');
@@ -420,12 +435,15 @@
                 }
                 
                 stopSpeech();
+                // Ahora, una vez que el PDF está cargado, ponemos la página en pantalla completa
+                enterFullscreen();
 
                 pagesContainer.addEventListener('scroll', updatePageNumberIndicator);
                 resizeObserver = new ResizeObserver(() => updatePageNumberIndicator());
                 resizeObserver.observe(pagesContainer);
                 updatePageNumberIndicator();
                 dynamicBackBtn.onclick = () => {
+                    exitFullscreen();
                     pdfViewerContainer.style.display = 'none';
                     gridViewContainer.style.display = 'block';
                     resetViewer();
@@ -436,6 +454,28 @@
                 resetViewer();
             } finally {
                 hideLoader();
+            }
+        }
+
+        // Función para entrar en pantalla completa
+        function enterFullscreen() {
+            if (mainContent.requestFullscreen) {
+                mainContent.requestFullscreen();
+            } else if (mainContent.webkitRequestFullscreen) { /* Safari */
+                mainContent.webkitRequestFullscreen();
+            } else if (mainContent.msRequestFullscreen) { /* IE11 */
+                mainContent.msRequestFullscreen();
+            }
+        }
+        
+        // Función para salir de pantalla completa
+        function exitFullscreen() {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) { /* Safari */
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) { /* IE11 */
+                document.msExitFullscreen();
             }
         }
         
@@ -589,6 +629,7 @@
         // Event listener para el botón de volver
         dynamicBackBtn.addEventListener('click', () => {
             if (pdfViewerContainer.style.display === 'flex') {
+                exitFullscreen();
                 pdfViewerContainer.style.display = 'none';
                 gridViewContainer.style.display = 'block';
                 resetViewer();
@@ -604,7 +645,6 @@
             if (resizeObserver) resizeObserver.disconnect();
             pagesHeight = [];
             pagesContainer.removeEventListener('scroll', updatePageNumberIndicator);
-            // Asegurarse de que el cuaderno se cierra al volver a la vista de cuadrícula
             sidebar.classList.remove('open');
         }
         
@@ -1027,4 +1067,3 @@
     </script>
 </body>
 </html>
-
