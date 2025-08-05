@@ -265,7 +265,7 @@
         const db = getFirestore(app);
         const storage = getStorage(app);
         
-        // Declaración de variables globales - CONSOLIDADAS PARA EVITAR REDECLARACIONES
+        // Declaración de variables globales
         let currentProjectRef = null;
         let currentUser = null;
         let pdfDocument = null; 
@@ -284,7 +284,7 @@
         let highlightColor = '#facc15';
         let highlightRgba = 'rgba(250, 204, 21, 0.4)';
 
-        // Variables del DOM - CONSOLIDADAS
+        // Variables del DOM
         const pageTitleEl = document.getElementById('page-title');
         const projectTitleEl = document.getElementById('project-title');
         const pdfLoaderContainer = document.getElementById('pdf-loader-container');
@@ -873,8 +873,14 @@
             if (newColor && newRgba) {
                 highlightColor = newColor;
                 highlightRgba = newRgba;
+                // Eliminar el borde de todos los botones y añadirlo al seleccionado
+                colorPalette.querySelectorAll('button').forEach(btn => {
+                    btn.classList.remove('border-white');
+                    btn.classList.add('border-transparent');
+                });
+                e.target.classList.remove('border-transparent');
+                e.target.classList.add('border-white');
                 console.log('Color de resaltado cambiado a:', highlightColor);
-                // Opcional: añadir feedback visual al botón seleccionado
             }
         });
 
@@ -894,6 +900,7 @@
                         const pageRect = pageDiv.getBoundingClientRect();
                         const serializedRects = [];
                         
+                        // Recorrer todos los rectángulos de la selección
                         for (let i = 0; i < rects.length; i++) {
                             const rect = rects[i];
                             serializedRects.push({
@@ -904,7 +911,6 @@
                             });
                         }
                         
-                        // Guardar el resaltado en Firebase
                         await saveHighlight(selectedText, serializedRects, pageNumber);
                         selection.removeAllRanges();
                     }
