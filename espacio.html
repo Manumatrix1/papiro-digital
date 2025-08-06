@@ -232,6 +232,10 @@
         let annotationColor = '#FFFF00';
         let drawingColor = '#FF0000';
         let annotationsByPage = {};
+        let currentDrawingPath = [];
+        let synthesis = window.speechSynthesis;
+        let currentUtterance = null;
+        let isSpeaking = false;
         
         // --- ELEMENTOS DEL DOM ---
         const mainContentEl = document.getElementById('main-content');
@@ -244,20 +248,17 @@
         const annotationToolbar = document.getElementById('annotation-toolbar');
         const pdfFileInput = document.getElementById('pdf-file-input');
         
-        window.pdfjsLib = window['pdfjs-dist/build/pdf'];
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
         // --- PUNTO DE ENTRADA: AUTENTICACIÓN ---
         document.addEventListener('DOMContentLoaded', () => {
             onAuthStateChanged(auth, (user) => {
-                console.log('onAuthStateChanged triggered. User:', user ? user.uid : 'null');
                 if (user) {
                     currentUser = user;
                     mainContentEl.style.display = 'flex';
                     pageLoaderContainer.style.display = 'none';
                     initializeAppLogic();
                 } else {
-                    console.log("Usuario no autenticado. Redirigiendo...");
                     window.location.href = 'index.html';
                 }
             });
@@ -268,10 +269,8 @@
             const urlParams = new URLSearchParams(window.location.search);
             const projectId = urlParams.get('id');
             const docId = urlParams.get('docId');
-            console.log(`Project ID: ${projectId}, Document ID: ${docId}`);
 
             if (!projectId) {
-                console.error("No se encontró projectId. Redirigiendo a mis tableros.");
                 window.location.href = 'mi_tablero.html';
                 return;
             }
@@ -296,7 +295,6 @@
 
         // --- CARGA DE DATOS ---
         function loadProjectDetails() {
-            console.log("Cargando detalles del proyecto...");
             onSnapshot(currentProjectRef, (projectDoc) => {
                 if (projectDoc.exists()) {
                     const projectData = projectDoc.data();
@@ -307,7 +305,6 @@
         }
 
         function listenForPDFs() {
-             console.log("Escuchando cambios en los PDFs...");
              const pdfsQuery = query(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs"));
              onSnapshot(pdfsQuery, (snapshot) => {
                 const pdfList = document.getElementById('pdf-list');
@@ -320,7 +317,6 @@
         }
         
         async function loadPDFViewer(docId) {
-            console.log(`Cargando PDF: ${docId}`);
             pageLoaderText.textContent = 'Cargando PDF...';
             pageLoaderContainer.style.display = 'flex';
             
@@ -395,7 +391,7 @@
             document.getElementById('pdf-list').appendChild(card);
         }
 
-        // --- LÓGICA DE ANOTACIONES ---
+        // --- LÓGICA DE ANOTACIONES Y NOTAS ---
         function setActiveTool(tool) {
             activeTool = tool;
             document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
@@ -418,7 +414,7 @@
         }
 
         function startDrawing(e) {
-            if (activeTool === 'select') return;
+            if (activeTool === 'select' || !e.target.classList.contains('annotation-canvas')) return;
             e.preventDefault();
             isDrawing = true;
             currentDrawingPath = [getCoords(e)];
@@ -455,12 +451,131 @@
             await saveAnnotationToFirestore(pageNum, annotationData);
         }
         
-        async function saveAnnotationToFirestore(pageNum, data) { /* ... */ }
-        async function loadAnnotationsForPage(pageNum) { /* ... */ }
-        function drawAnnotationsForPage(pageNum) { /* ... */ }
-        async function handleNewNote() { /* ... */ }
-        async function loadNotes() { /* ... */ }
+        async function saveAnnotationToFirestore(pageNum, data) {
+            if (!currentUser || !currentProjectRef || !currentPdfId) return;
+            try {
+                const annotationsRef = collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "annotations");
+                await addDoc(annotationsRef, { page: parseInt(pageNum), ...data, createdAt: new Date() });
+            } catch (error) { console.error("Error guardando anotación:", error); }
+        }
+
+        async function loadAnnotationsForPage(pageNum) {
+            if (!currentUser || !currentProjectRef || !currentPdfId) return;
+            try {
+                const q = query(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "annotations"), where("page", "==", parseInt(pageNum)));
+                onSnapshot(q, (snapshot) => {
+                    annotationsByPage[pageNum] = snapshot.docs.map(doc => doc.data());
+                    drawAnnotationsForPage(pageNum);
+                });
+            } catch (error) { console.error(`Error cargando anotaciones para la página ${pageNum}:`, error); }
+        }
+
+        function drawAnnotationsForPage(pageNum) {
+            const canvas = document.getElementById(`annotation-canvas-${pageNum}`);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (annotationsByPage[pageNum]) {
+                annotationsByPage[pageNum].forEach(annotation => {
+                    if (!annotation.path || annotation.path.length === 0) return;
+                    ctx.strokeStyle = annotation.color;
+                    ctx.lineWidth = annotation.type === 'draw' ? 2 : 20;
+                    ctx.globalAlpha = annotation.type === 'draw' ? 1.0 : 0.3;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(annotation.path[0].x, annotation.path[0].y);
+                    for (let i = 1; i < annotation.path.length; i++) {
+                        ctx.lineTo(annotation.path[i].x, annotation.path[i].y);
+                    }
+                    ctx.stroke();
+                });
+            }
+        }
+
+        async function handleNewNote() {
+            if (!pdfDocument) return;
+            const pageNumber = currentPageNum;
+            const { value: formValues } = await Swal.fire({
+                title: `Anotación en la página ${pageNumber}`,
+                html: '<input id="swal-input1" class="swal2-input" placeholder="Escribe tu nota aquí...">' +
+                      '<input id="swal-input2" class="swal2-input" placeholder="Etiquetas (separadas por comas)">',
+                focusConfirm: false, background: '#181818', color: '#fff',
+                preConfirm: () => {
+                    const noteText = document.getElementById('swal-input1').value;
+                    const tags = document.getElementById('swal-input2').value.split(',').map(tag => tag.trim()).filter(tag => tag);
+                    if (!noteText) { Swal.showValidationMessage('La nota no puede estar vacía'); return false; }
+                    return { noteText, tags };
+                }
+            });
+            if (formValues) {
+                const { noteText, tags } = formValues;
+                try {
+                    const page = await pdfDocument.getPage(pageNumber);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    await addDoc(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "notes"), {
+                        context: pageText.substring(0, 200), note: noteText, tags: tags, page: pageNumber, createdAt: new Date()
+                    });
+                    Swal.fire('Guardado!', 'Tu nota ha sido guardada.', 'success');
+                } catch (error) { console.error("Error al guardar la nota:", error); Swal.fire('Error', 'No se pudo guardar la nota.', 'error'); }
+            }
+        }
+
+        function loadNotes() {
+            if (!currentPdfId) return;
+            const notesListEl = document.getElementById('notes-list');
+            const noNotesMessageEl = document.getElementById('no-notes-message');
+            const notesQuery = query(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "notes"));
+            onSnapshot(notesQuery, (snapshot) => {
+                notesListEl.innerHTML = '';
+                if (snapshot.empty) {
+                    noNotesMessageEl.style.display = 'block';
+                    noNotesMessageEl.textContent = 'No hay notas para este PDF.';
+                } else {
+                    noNotesMessageEl.style.display = 'none';
+                    snapshot.docs.forEach((noteDoc) => {
+                        const noteData = noteDoc.data();
+                        const noteEl = document.createElement('div');
+                        noteEl.className = 'bg-surface-border-color p-3 rounded-lg shadow-md';
+                        noteEl.innerHTML = `<p class="text-xs text-gray-400 mb-1 cursor-pointer hover:text-white" data-page-num="${noteData.page}">Página: ${noteData.page}</p>
+                                            <p class="text-sm text-gray-300">${noteData.note}</p>
+                                            <div class="mt-2 flex flex-wrap gap-1">${noteData.tags.map(tag => `<span class="bg-primary-color text-surface-color text-xs font-bold px-2 py-1 rounded-full">${tag}</span>`).join('')}</div>`;
+                        notesListEl.appendChild(noteEl);
+                    });
+                }
+            });
+        }
         
+        // --- FUNCIONES DE VOZ ---
+        async function speakText(text) {
+            if (synthesis.speaking) return;
+            if (!text) {
+                const page = await pdfDocument.getPage(currentPageNum);
+                const textContent = await page.getTextContent();
+                text = textContent.items.map(item => item.str).join(' ');
+            }
+            currentUtterance = new SpeechSynthesisUtterance(text);
+            currentUtterance.onend = () => { isSpeaking = false; document.getElementById('play-pause-btn').innerHTML = '<i class="fas fa-play"></i>'; };
+            currentUtterance.onerror = (e) => { console.error('SpeechSynthesisUtterance.onerror', e); isSpeaking = false; document.getElementById('play-pause-btn').innerHTML = '<i class="fas fa-play"></i>'; };
+            synthesis.speak(currentUtterance);
+            isSpeaking = true;
+            document.getElementById('play-pause-btn').innerHTML = '<i class="fas fa-pause"></i>';
+        }
+
+        function toggleSpeech() {
+            const playPauseBtn = document.getElementById('play-pause-btn');
+            if (synthesis.speaking && !synthesis.paused) { synthesis.pause(); isSpeaking = false; playPauseBtn.innerHTML = '<i class="fas fa-play"></i>'; } 
+            else if (synthesis.paused) { synthesis.resume(); isSpeaking = true; playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>'; }
+        }
+
+        function stopSpeech() {
+            synthesis.cancel();
+            isSpeaking = false;
+            document.getElementById('play-pause-btn').innerHTML = '<i class="fas fa-play"></i>';
+        }
+
         // --- EVENT LISTENERS ---
         function addEventListeners() {
             document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
@@ -469,11 +584,8 @@
                 Swal.fire('Guardado', 'Título actualizado.', 'success');
             });
             document.getElementById('dynamic-back-btn').addEventListener('click', () => {
-                if (pdfViewerContainer.style.display === 'flex') {
-                    window.location.search = `?id=${currentProjectRef.id}`;
-                } else {
-                    window.location.href = 'mi_tablero.html';
-                }
+                if (pdfViewerContainer.style.display === 'flex') { window.location.search = `?id=${currentProjectRef.id}`; } 
+                else { window.location.href = 'mi_tablero.html'; }
             });
             document.getElementById('fullscreen-btn').addEventListener('click', () => {
                 if (!document.fullscreenElement) document.documentElement.requestFullscreen();
@@ -495,12 +607,16 @@
             pagesContainer.addEventListener('touchend', stopDrawing);
             
             // Sidebar
-            document.getElementById('open-sidebar-btn').addEventListener('click', () => {
-                document.getElementById('sidebar').classList.add('open');
-                loadNotes();
-            });
+            document.getElementById('open-sidebar-btn').addEventListener('click', () => { document.getElementById('sidebar').classList.add('open'); loadNotes(); });
             document.getElementById('close-sidebar-btn').addEventListener('click', () => document.getElementById('sidebar').classList.remove('open'));
             document.getElementById('add-note-btn').addEventListener('click', handleNewNote);
+            
+            // Voice events
+            document.getElementById('play-pause-btn').addEventListener('click', () => {
+                if (!isSpeaking) { speakText(window.getSelection().toString()); } 
+                else { toggleSpeech(); }
+            });
+            document.getElementById('stop-btn').addEventListener('click', stopSpeech);
         }
     </script>
 </body>
