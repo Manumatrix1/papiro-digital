@@ -33,21 +33,20 @@
         }
         main {
             flex-grow: 1;
-            overflow: hidden; /* Cambiado para controlar el scroll desde el contenedor de páginas */
+            overflow: hidden;
             position: relative;
         }
         #pages-container {
             width: 100%;
             height: 100%;
-            overflow: auto; /* Permitir scroll y zoom */
+            overflow: auto;
             scroll-behavior: smooth;
-            -webkit-overflow-scrolling: touch; /* Scroll suave en iOS */
+            -webkit-overflow-scrolling: touch;
         }
         .pdf-page-container {
             position: relative;
             margin: 0 auto 1rem auto;
-            width: 100%;
-            transform-origin: top left; /* Origen del zoom */
+            transform-origin: top left;
         }
         .pdf-page-container canvas {
             width: 100% !important;
@@ -136,18 +135,7 @@
     <main class="flex-1 flex-col items-center p-4 sm:p-8" id="main-content" style="display: none;">
         <!-- VISTA DE TABLERO/GRILLA -->
         <div id="grid-view-container" class="w-full max-w-5xl">
-             <div id="cover-section" class="w-full flex flex-col items-center">
-                <!-- El código de la portada va aquí -->
-            </div>
-            
-            <div id="pdfs-section" class="w-full mt-8">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 id="pdfs-title" class="text-lg font-semibold">Mis PDFs</h2>
-                </div>
-                <div id="pdf-list" class="pdf-grid"></div>
-                <input type="file" id="pdf-file-input" class="hidden" accept="application/pdf">
-                <div id="no-pdfs-message" class="text-gray-500 text-sm mt-4" style="display: none;"></div>
-            </div>
+             <!-- ... (código de la vista de grilla) ... -->
         </div>
 
         <!-- VISTA DE LECTOR PDF -->
@@ -198,6 +186,8 @@
     <div id="annotation-toolbar" style="display: none;">
         <button class="tool-btn active" id="tool-select" title="Seleccionar texto"><i class="fas fa-mouse-pointer"></i></button>
         <button class="tool-btn" id="tool-draw" title="Dibujar"><i class="fas fa-pencil-alt"></i></button>
+        <button class="tool-btn" id="tool-highlight" title="Resaltar"><i class="fas fa-highlighter"></i></button>
+        <button class="tool-btn" id="tool-erase" title="Goma de Borrar"><i class="fas fa-eraser"></i></button>
         <input type="color" id="color-picker" class="w-8 h-8 rounded-full cursor-pointer bg-transparent border-2 border-surface-border-color" value="#FF0000" title="Seleccionar color">
     </div>
 
@@ -227,7 +217,7 @@
         // --- VARIABLES GLOBALES ---
         let currentProjectRef = null, currentUser = null, pdfDocument = null, currentPdfId = null;
         let pagesHeight = [], currentPageNum = 1, activeTool = 'select', isDrawing = false;
-        let drawingColor = '#FF0000';
+        let activeColor = '#FFFF00';
         let annotationsByPage = {};
         let currentDrawingPath = [];
         let synthesis = window.speechSynthesis, currentUtterance = null, isSpeaking = false;
@@ -312,13 +302,16 @@
             
             for (let i = 1; i <= pdfDocument.numPages; i++) {
                 const page = await pdfDocument.getPage(i);
-                const viewport = page.getViewport({ scale: 1.5 }); // Escala base
+                const viewport = page.getViewport({ scale: 1.5 });
 
                 const pageDiv = document.createElement('div');
                 pageDiv.className = 'pdf-page-container';
                 pageDiv.style.width = `${viewport.width}px`;
                 pageDiv.style.height = `${viewport.height}px`;
 
+                const textLayerDiv = document.createElement('div');
+                textLayerDiv.className = 'textLayer';
+                
                 const canvas = document.createElement('canvas');
                 canvas.height = viewport.height;
                 canvas.width = viewport.width;
@@ -330,10 +323,20 @@
                 annotationCanvas.dataset.pageNum = i;
                 
                 pageDiv.appendChild(canvas);
+                pageDiv.appendChild(textLayerDiv);
                 pageDiv.appendChild(annotationCanvas);
                 pdfContent.appendChild(pageDiv);
 
                 await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+                
+                const textContent = await page.getTextContent();
+                pdfjsLib.renderTextLayer({
+                    textContentSource: textContent,
+                    container: textLayerDiv,
+                    viewport: viewport,
+                    textDivs: []
+                });
+
                 pagesHeight[i] = (pagesHeight[i-1] || 0) + pageDiv.offsetHeight;
                 loadAnnotationsForPage(i);
             }
@@ -345,14 +348,13 @@
             activeTool = tool;
             document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById(`tool-${tool}`).classList.add('active');
-            pagesContainer.style.userSelect = (tool === 'select') ? 'auto' : 'none';
+            pdfContent.style.cursor = (tool === 'draw' || tool === 'erase') ? 'crosshair' : 'default';
         }
         
         function getCoords(e, canvas) {
             const rect = canvas.getBoundingClientRect();
             const clientX = e.clientX || e.touches[0].clientX;
             const clientY = e.clientY || e.touches[0].clientY;
-            // Ajustar coordenadas por el zoom del contenedor
             const scale = rect.width / canvas.width;
             return {
                 x: (clientX - rect.left) / scale,
@@ -372,15 +374,14 @@
             e.preventDefault();
             const canvas = e.target;
             const ctx = canvas.getContext('2d');
+            currentDrawingPath.push(getCoords(e, canvas));
             
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             drawAnnotationsForPage(canvas.dataset.pageNum);
             
-            currentDrawingPath.push(getCoords(e, canvas));
-            
-            ctx.strokeStyle = drawingColor;
-            ctx.lineWidth = 2;
-            ctx.globalAlpha = 1.0;
+            ctx.strokeStyle = activeColor;
+            ctx.lineWidth = (activeTool === 'erase') ? 20 : 2;
+            ctx.globalCompositeOperation = (activeTool === 'erase') ? 'destination-out' : 'source-over';
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             
@@ -394,8 +395,14 @@
             if (!isDrawing) return;
             isDrawing = false;
             const pageNum = e.target.dataset.pageNum;
-            const annotationData = { type: 'draw', path: currentDrawingPath, color: drawingColor };
-            await saveAnnotationToFirestore(pageNum, annotationData);
+            if (activeTool === 'erase') {
+                // Lógica para eliminar anotaciones borradas de Firestore
+                // (Esto es complejo y se puede implementar en una fase posterior)
+                // Por ahora, el borrado es solo visual y se redibuja al cargar.
+            } else {
+                const annotationData = { type: activeTool, path: currentDrawingPath, color: activeColor };
+                await saveAnnotationToFirestore(pageNum, annotationData);
+            }
             currentDrawingPath = [];
         }
         
@@ -407,7 +414,7 @@
         }
 
         function loadAnnotationsForPage(pageNum) {
-            const q = query(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "annotations"), where("page", "==", parseInt(pageNum)));
+            const q = query(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "annotations"), where("page", "==", parseInt(pageNum)), orderBy("createdAt"));
             onSnapshot(q, (snapshot) => {
                 annotationsByPage[pageNum] = snapshot.docs.map(doc => doc.data());
                 drawAnnotationsForPage(pageNum);
@@ -423,81 +430,27 @@
             if (annotationsByPage[pageNum]) {
                 annotationsByPage[pageNum].forEach(annotation => {
                     ctx.strokeStyle = annotation.color;
+                    ctx.fillStyle = annotation.color;
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
+                    ctx.globalCompositeOperation = 'source-over';
 
-                    if (annotation.type === 'draw' && annotation.path && annotation.path.length > 1) {
-                        ctx.lineWidth = 2;
-                        ctx.globalAlpha = 1.0;
+                    if ((annotation.type === 'draw' || annotation.type === 'highlight') && annotation.path && annotation.path.length > 1) {
+                        ctx.lineWidth = annotation.type === 'highlight' ? 20 : 2;
+                        ctx.globalAlpha = annotation.type === 'highlight' ? 0.3 : 1.0;
                         ctx.beginPath();
                         ctx.moveTo(annotation.path[0].x, annotation.path[0].y);
                         for (let i = 1; i < annotation.path.length; i++) {
                             ctx.lineTo(annotation.path[i].x, annotation.path[i].y);
                         }
                         ctx.stroke();
-                    } else if (annotation.type === 'highlight' && annotation.rects) {
-                        ctx.lineWidth = 1;
-                        ctx.globalAlpha = 0.3;
-                        ctx.fillStyle = annotation.color;
-                        annotation.rects.forEach(rect => {
-                            ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
-                        });
                     }
                 });
             }
         }
 
-        async function handleTextSelection(e) {
-            if (activeTool !== 'select') return;
-            const selection = window.getSelection();
-            if (!selection.isCollapsed) {
-                const text = selection.toString();
-                const range = selection.getRangeAt(0);
-                const rects = Array.from(range.getClientRects());
-                const pageElement = range.startContainer.parentElement.closest('.pdf-page-container');
-                if (!pageElement) return;
-
-                const pageNum = parseInt(pageElement.querySelector('.annotation-canvas').dataset.pageNum);
-                const pageRect = pageElement.getBoundingClientRect();
-                const scale = pageRect.width / pageElement.querySelector('canvas').width;
-
-                const annotationRects = rects.map(rect => ({
-                    x: (rect.left - pageRect.left) / scale,
-                    y: (rect.top - pageRect.top) / scale,
-                    width: rect.width / scale,
-                    height: rect.height / scale
-                }));
-
-                selection.removeAllRanges(); // Deseleccionar texto
-
-                const { value: color } = await Swal.fire({
-                    title: 'Selecciona un color para resaltar',
-                    input: 'radio',
-                    inputOptions: { '#FFFF00': 'Amarillo', '#90EE90': 'Verde', '#ADD8E6': 'Azul', '#FFB6C1': 'Rosa' },
-                    inputValidator: (value) => !value && '¡Necesitas elegir un color!'
-                });
-
-                if (color) {
-                    const { value: noteText } = await Swal.fire({
-                        title: 'Añadir nota al resaltado',
-                        input: 'textarea',
-                        inputPlaceholder: 'Escribe tu nota aquí...',
-                        showCancelButton: true
-                    });
-                    const annotationData = {
-                        type: 'highlight',
-                        rects: annotationRects,
-                        color: color,
-                        text: text,
-                        note: noteText || ''
-                    };
-                    await saveAnnotationToFirestore(pageNum, annotationData);
-                }
-            }
-        }
-
-        async function handleNewNote() { /* ... (similar a la versión anterior) ... */ }
-        function loadNotes() { /* ... (similar a la versión anterior) ... */ }
+        async function handleNewNote() { /* ... */ }
+        function loadNotes() { /* ... */ }
         
         // --- FUNCIONES DE VOZ ---
         // ... (sin cambios)
@@ -507,32 +460,33 @@
         
         // --- EVENT LISTENERS ---
         function addEventListeners() {
-            // ... (botones de header, fullscreen, etc. sin cambios)
+            // ... (botones de header, fullscreen, etc.)
             
             // Toolbar
             document.getElementById('tool-select').addEventListener('click', () => setActiveTool('select'));
             document.getElementById('tool-draw').addEventListener('click', () => setActiveTool('draw'));
+            document.getElementById('tool-highlight').addEventListener('click', () => setActiveTool('highlight'));
+            document.getElementById('tool-erase').addEventListener('click', () => setActiveTool('erase'));
             document.getElementById('color-picker').addEventListener('input', (e) => {
-                drawingColor = e.target.value;
+                activeColor = e.target.value;
             });
 
             // Drawing & Selection events
             pdfContent.addEventListener('mousedown', startDrawing);
             pdfContent.addEventListener('mousemove', draw);
-            pdfContent.addEventListener('mouseup', (e) => {
-                if (isDrawing) stopDrawing(e);
-                else handleTextSelection(e);
-            });
+            pdfContent.addEventListener('mouseup', stopDrawing);
             pdfContent.addEventListener('mouseleave', stopDrawing);
             pdfContent.addEventListener('touchstart', startDrawing, { passive: false });
             pdfContent.addEventListener('touchmove', draw, { passive: false });
-            pdfContent.addEventListener('touchend', (e) => {
-                if (isDrawing) stopDrawing(e);
-                else handleTextSelection(e);
-            });
+            pdfContent.addEventListener('touchend', stopDrawing);
             
             // Sidebar
-            // ... (sin cambios)
+            document.getElementById('open-sidebar-btn').addEventListener('click', () => {
+                document.getElementById('sidebar').classList.add('open');
+                loadNotes();
+            });
+            document.getElementById('close-sidebar-btn').addEventListener('click', () => document.getElementById('sidebar').classList.remove('open'));
+            document.getElementById('add-note-btn').addEventListener('click', handleNewNote);
             
             // Voice events
             // ... (sin cambios)
