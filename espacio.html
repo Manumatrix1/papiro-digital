@@ -887,7 +887,7 @@
             for (let i = 0; i < pagesHeight.length; i++) {
                 cumulativeHeight += pagesHeight[i];
                 if (scrollTop < cumulativeHeight) {
-                    currentPageNum = i + 1;
+                    page = i + 1;
                     break;
                 }
             }
