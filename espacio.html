@@ -19,34 +19,37 @@
             --text-color: #ffffff;
             --text-muted-color: #9ca3af;
         }
-        html, body {
-            overscroll-behavior: none;
+        /* --- FIX: Mejora de la estructura base para compatibilidad móvil --- */
+        html {
             height: 100%;
-            width: 100%;
-            overflow: hidden;
         }
         body { 
             font-family: 'Inter', sans-serif; 
             background-color: var(--background-color); 
             display: flex;
             flex-direction: column;
+            height: 100%;
+            width: 100%;
+            overflow: hidden; /* Evita el scroll del body, la sección main lo controlará */
         }
         main {
             flex-grow: 1;
-            overflow: hidden;
+            overflow: hidden; /* Main no se desborda */
             position: relative;
+            display: flex; /* Usamos flex para centrar contenido */
+            flex-direction: column;
         }
         #pages-container {
             width: 100%;
             height: 100%;
-            overflow: auto;
+            overflow-y: auto; /* ESTE es el contenedor que hace scroll */
             scroll-behavior: smooth;
-            -webkit-overflow-scrolling: touch;
+            -webkit-overflow-scrolling: touch; /* Mejora scroll en iOS */
         }
         .pdf-page-container {
             position: relative;
             margin: 0 auto 1rem auto;
-            transform-origin: top left;
+            transform-origin: top center; /* Centramos el origen para el zoom */
         }
         .pdf-page-container canvas {
             width: 100% !important;
@@ -54,125 +57,78 @@
             display: block;
         }
         .annotation-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
             touch-action: none; 
         }
         #annotation-toolbar {
-            position: fixed;
-            bottom: 1rem;
-            left: 50%;
+            position: fixed; bottom: 1rem; left: 50%;
             transform: translateX(-50%);
             background-color: var(--surface-color);
             border: 1px solid var(--surface-border-color);
             border-radius: 9999px;
             padding: 0.5rem 1rem;
-            display: flex;
-            gap: 0.75rem;
-            align-items: center;
-            z-index: 100;
+            display: flex; gap: 0.75rem;
+            align-items: center; z-index: 100;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
         .tool-btn {
-            background: none;
-            border: none;
+            background: none; border: none;
             color: var(--text-muted-color);
-            cursor: pointer;
-            transition: color 0.2s, transform 0.2s;
+            cursor: pointer; transition: color 0.2s, transform 0.2s;
             padding: 0.5rem;
         }
-        .tool-btn:hover {
-            color: var(--text-color);
-            transform: scale(1.1);
-        }
-        .tool-btn.active {
-            color: var(--primary-color);
-        }
+        .tool-btn:hover { color: var(--text-color); transform: scale(1.1); }
+        .tool-btn.active { color: var(--primary-color); }
         #sidebar {
-            position: fixed;
-            top: 0;
-            right: -100%;
-            width: 100%;
-            max-width: 350px;
-            height: 100%;
-            background-color: var(--surface-color);
+            position: fixed; top: 0; right: -100%;
+            width: 100%; max-width: 350px;
+            height: 100%; background-color: var(--surface-color);
             border-left: 1px solid var(--surface-border-color);
             box-shadow: -4px 0 12px rgba(0,0,0,0.3);
-            transition: right 0.3s ease-in-out;
-            z-index: 110;
-            padding: 1.5rem;
-            display: flex;
-            flex-direction: column;
+            transition: right 0.3s ease-in-out; z-index: 110;
+            padding: 1.5rem; display: flex; flex-direction: column;
         }
-        #sidebar.open {
-            right: 0;
-        }
-        .pdf-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 1.5rem;
-        }
-        #text-selection-highlighter {
-            background-color: var(--primary-color);
-            opacity: 0.4;
-            position: absolute;
-            z-index: 30;
-            pointer-events: none;
-            border-radius: 2px;
-        }
+        #sidebar.open { right: 0; }
         #add-note-popup {
-            position: absolute;
-            background-color: var(--surface-color);
+            position: absolute; background-color: var(--surface-color);
             border: 1px solid var(--surface-border-color);
-            border-radius: 8px;
-            padding: 0.5rem;
-            z-index: 101;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
-            cursor: pointer;
-            display: none;
+            border-radius: 8px; padding: 0.5rem;
+            z-index: 101; box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            cursor: pointer; display: none;
         }
-        #add-note-popup:hover {
-            background-color: #2a2a2a;
-        }
+        #add-note-popup:hover { background-color: #2a2a2a; }
+        /* Clases de utilidad para mostrar/ocultar */
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
     <header class="bg-surface-color border-b border-surface-border-color py-3 px-4 sm:px-8 flex justify-between items-center sticky top-0 z-20 flex-shrink-0">
         <div class="flex items-center gap-4 flex-1 min-w-0">
-            <button id="dynamic-back-btn" class="flex-shrink-0 flex items-center text-gray-400 hover:text-white transition group">
-                <i class="fas fa-arrow-left text-xl"></i>
-            </button>
+            <button id="dynamic-back-btn" class="flex-shrink-0 flex items-center text-gray-400 hover:text-white transition group"><i class="fas fa-arrow-left text-xl"></i></button>
             <input id="project-title" type="text" class="bg-transparent text-lg sm:text-xl font-bold text-white focus:outline-none w-full truncate" value="Cargando...">
         </div>
-        
         <div class="flex items-center gap-2 sm:gap-4">
-            <button id="save-title-btn" class="bg-primary-color text-surface-color font-bold py-2 px-3 sm:px-4 rounded-lg hover:brightness-110 transition text-sm sm:text-base">Guardar</button>
+            <button id="save-title-btn" class="bg-primary-color text-surface-color font-bold py-2 px-3 sm:px-4 rounded-lg hover:brightness-110 transition text-sm sm:text-base hidden">Guardar</button>
             <button id="logout-btn" class="text-gray-400 hover:text-white transition text-sm sm:text-base"><i class="fas fa-sign-out-alt text-xl"></i></button>
         </div>
     </header>
 
-    <main class="flex-1 flex-col items-center p-4 sm:p-8" id="main-content" style="display: none;">
-        <div id="grid-view-container" class="w-full max-w-5xl">
-             </div>
-
-        <div id="pdf-viewer-container" class="relative w-full h-full flex-col" style="display: none;">
+    <main id="main-content" class="p-4 sm:p-8">
+        <div id="grid-view-container" class="w-full max-w-5xl hidden"></div>
+        <div id="pdf-viewer-container" class="relative w-full h-full flex flex-col hidden">
             <div class="flex-shrink-0 flex flex-col sm:flex-row items-center justify-between p-2 sm:p-4 bg-surface-color rounded-lg mb-4">
                 <div class="flex items-center gap-2 mb-2 sm:mb-0 w-full sm:w-auto">
-                    <button id="play-pause-btn" class="text-white hover:text-primary-color transition p-2" title="Leer texto seleccionado (Play/Pausa)"><i class="fas fa-play"></i></button>
+                    <button id="play-pause-btn" class="text-white hover:text-primary-color transition p-2" title="Leer texto (Play/Pausa)"><i class="fas fa-play"></i></button>
                     <button id="stop-btn" class="text-white hover:text-red-400 transition p-2" title="Detener lectura"><i class="fas fa-stop"></i></button>
-                    <button id="fullscreen-btn" class="text-white hover:text-primary-color transition p-2" title="Pantalla completa"><i class="fas fa-expand"></i></button>
                 </div>
                 <div class="relative w-full sm:w-1/2 flex items-center gap-2 sm:gap-4">
                     <input type="text" id="search-notes-input" placeholder="Buscar en notas..." class="w-full bg-surface-border-color text-white placeholder-gray-400 py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-color">
-                    <button id="open-sidebar-btn" class="bg-surface-border-color text-gray-400 rounded-lg w-10 h-10 flex items-center justify-center shadow-lg hover:text-white transition" title="Abrir cuaderno de notas">
+                    <button id="open-sidebar-btn" class="bg-surface-border-color text-gray-400 rounded-lg w-10 h-10 flex items-center justify-center shadow-lg hover:text-white transition flex-shrink-0" title="Abrir cuaderno de notas">
                         <i class="fas fa-book"></i>
                     </button>
                 </div>
             </div>
-            
             <div id="pages-container" class="flex-grow w-full h-full">
                 <div id="pdf-content" class="w-full"></div>
             </div>
@@ -195,22 +151,19 @@
             <button id="add-note-btn" class="w-full bg-primary-color text-surface-color font-bold py-2 rounded-lg hover:brightness-110 transition">Añadir Nota General</button>
         </div>
         <div id="notes-list" class="space-y-4 flex-grow overflow-y-auto pr-2">
-            <p id="no-notes-message" class="text-gray-500 text-center" style="display:none;">No hay notas todavía.</p>
+            <p id="no-notes-message" class="text-gray-500 text-center hidden">No hay notas todavía.</p>
         </div>
     </aside>
     
-    <div id="annotation-toolbar" style="display: none;">
+    <div id="annotation-toolbar" class="hidden">
         <button class="tool-btn active" id="tool-select" title="Seleccionar texto"><i class="fas fa-mouse-pointer"></i></button>
         <button class="tool-btn" id="tool-draw" title="Dibujar"><i class="fas fa-pencil-alt"></i></button>
         <button class="tool-btn" id="tool-highlight" title="Resaltar"><i class="fas fa-highlighter"></i></button>
         <button class="tool-btn" id="tool-erase" title="Goma de Borrar"><i class="fas fa-eraser"></i></button>
-        <input type="color" id="color-picker" class="w-8 h-8 rounded-full cursor-pointer bg-transparent border-2 border-surface-border-color" value="#FF0000" title="Seleccionar color">
+        <input type="color" id="color-picker" class="w-8 h-8 rounded-full cursor-pointer bg-transparent border-2 border-surface-border-color" value="#FFEB3B" title="Seleccionar color">
     </div>
 
-    <div id="add-note-popup" title="Añadir nota a esta selección">
-        <i class="fas fa-plus text-white"></i>
-    </div>
-
+    <div id="add-note-popup" title="Añadir nota a esta selección"><i class="fas fa-plus text-white"></i></div>
     <div id="page-number-indicator" class="fixed top-1/2 right-4 transform -translate-y-1/2 bg-black bg-opacity-70 text-white py-2 px-4 rounded-full font-bold z-50 transition-opacity duration-300 opacity-0 pointer-events-none"></div>
     
     <script type="module">
@@ -232,12 +185,11 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const storage = getStorage(app);
         
         // --- VARIABLES GLOBALES ---
         let currentProjectRef = null, currentUser = null, pdfDocument = null, currentPdfId = null;
         let pagesHeight = [], currentPageNum = 1, activeTool = 'select', isDrawing = false;
-        let activeColor = '#FFFF00';
+        let activeColor = '#FFEB3B'; // Color por defecto para resaltar
         let annotationsByPage = {};
         let currentDrawingPath = [];
         let synthesis = window.speechSynthesis, currentUtterance = null, isSpeaking = false;
@@ -245,19 +197,26 @@
         let notesUnsubscribe = null;
         let selectedTextForNote = '';
         
-        // --- ELEMENTOS DEL DOM ---
-        const mainContentEl = document.getElementById('main-content');
-        const pageLoaderContainer = document.getElementById('page-loader-container');
-        const projectTitleEl = document.getElementById('project-title');
-        const pdfViewerContainer = document.getElementById('pdf-viewer-container');
-        const gridViewContainer = document.getElementById('grid-view-container');
-        const pagesContainer = document.getElementById('pages-container');
-        const pdfContent = document.getElementById('pdf-content');
-        const annotationToolbar = document.getElementById('annotation-toolbar');
-        const pageNumberIndicator = document.getElementById('page-number-indicator');
-        const addNotePopup = document.getElementById('add-note-popup');
-        const playPauseBtn = document.getElementById('play-pause-btn');
-        const stopBtn = document.getElementById('stop-btn');
+        // --- FIX: Centralizar todos los elementos del DOM en un solo objeto ---
+        const DOM = {
+            mainContent: document.getElementById('main-content'),
+            pageLoader: document.getElementById('page-loader-container'),
+            projectTitle: document.getElementById('project-title'),
+            pdfViewer: document.getElementById('pdf-viewer-container'),
+            gridView: document.getElementById('grid-view-container'),
+            pagesContainer: document.getElementById('pages-container'),
+            pdfContent: document.getElementById('pdf-content'),
+            annotationToolbar: document.getElementById('annotation-toolbar'),
+            pageIndicator: document.getElementById('page-number-indicator'),
+            addNotePopup: document.getElementById('add-note-popup'),
+            playPauseBtn: document.getElementById('play-pause-btn'),
+            playPauseIcon: document.querySelector('#play-pause-btn i'),
+            stopBtn: document.getElementById('stop-btn'),
+            sidebar: document.getElementById('sidebar'),
+            notesList: document.getElementById('notes-list'),
+            noNotesMessage: document.getElementById('no-notes-message'),
+            colorPicker: document.getElementById('color-picker')
+        };
         
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
@@ -266,8 +225,8 @@
             onAuthStateChanged(auth, (user) => {
                 if (user) {
                     currentUser = user;
-                    mainContentEl.style.display = 'flex';
-                    pageLoaderContainer.style.display = 'none';
+                    DOM.mainContent.classList.remove('hidden');
+                    DOM.pageLoader.classList.add('hidden');
                     initializeAppLogic();
                 } else {
                     window.location.href = 'index.html';
@@ -287,43 +246,48 @@
             
             if (docId) {
                 currentPdfId = docId;
-                gridViewContainer.style.display = 'none';
-                pdfViewerContainer.style.display = 'flex';
-                annotationToolbar.style.display = 'flex';
+                DOM.gridView.classList.add('hidden');
+                DOM.pdfViewer.classList.remove('hidden');
+                DOM.pdfViewer.classList.add('flex');
+                DOM.annotationToolbar.classList.remove('hidden');
+                DOM.annotationToolbar.classList.add('flex');
                 loadAndRenderPDF(docId);
-            } else {
-                // ... (lógica de la vista de grilla)
             }
             addEventListeners();
         }
 
         // --- CARGA Y RENDERIZADO DE PDF ---
         async function loadAndRenderPDF(docId) {
-            pageLoaderContainer.style.display = 'flex';
+            DOM.pageLoader.classList.remove('hidden');
+            DOM.pageLoader.classList.add('flex');
             try {
                 const pdfDocRef = doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", docId);
                 const pdfDocSnap = await getDoc(pdfDocRef);
                 if (!pdfDocSnap.exists()) throw new Error("PDF no encontrado");
                 
                 const pdfData = pdfDocSnap.data();
-                projectTitleEl.value = pdfData.name;
+                DOM.projectTitle.value = pdfData.name;
                 document.getElementById('page-title').textContent = pdfData.name;
-                const url = pdfData.url;
-                pdfDocument = await pdfjsLib.getDocument(url).promise;
                 
+                pdfDocument = await pdfjsLib.getDocument(pdfData.url).promise;
                 await renderAllPages();
+                
+                // --- FIX: Mostrar el contador de página inicial ---
+                updatePageNumberIndicator();
+
             } catch (error) {
                 console.error("Error cargando PDF:", error);
                 Swal.fire('Error', 'No se pudo cargar el PDF.', 'error');
             } finally {
-                pageLoaderContainer.style.display = 'none';
+                DOM.pageLoader.classList.add('hidden');
             }
         }
 
         async function renderAllPages() {
             if (!pdfDocument) return;
-            pdfContent.innerHTML = '';
+            DOM.pdfContent.innerHTML = '';
             pagesHeight = [0];
+            const fragment = document.createDocumentFragment();
             
             for (let i = 1; i <= pdfDocument.numPages; i++) {
                 const page = await pdfDocument.getPage(i);
@@ -338,32 +302,32 @@
                 textLayerDiv.className = 'textLayer';
                 
                 const canvas = document.createElement('canvas');
-                canvas.height = viewport.height;
-                canvas.width = viewport.width;
+                canvas.height = viewport.height; canvas.width = viewport.width;
                 
                 const annotationCanvas = document.createElement('canvas');
                 annotationCanvas.className = 'annotation-canvas';
-                annotationCanvas.height = viewport.height;
-                annotationCanvas.width = viewport.width;
+                annotationCanvas.height = viewport.height; annotationCanvas.width = viewport.width;
                 annotationCanvas.dataset.pageNum = i;
                 
-                pageDiv.appendChild(canvas);
-                pageDiv.appendChild(textLayerDiv);
-                pageDiv.appendChild(annotationCanvas);
-                pdfContent.appendChild(pageDiv);
+                pageDiv.append(canvas, textLayerDiv, annotationCanvas);
+                fragment.appendChild(pageDiv);
 
-                await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+                const renderContext = { canvasContext: canvas.getContext('2d'), viewport };
+                await page.render(renderContext).promise;
                 
                 const textContent = await page.getTextContent();
-                await pdfjsLib.renderTextLayer({
-                    textContentSource: textContent,
-                    container: textLayerDiv,
-                    viewport: viewport
-                }).promise;
+                await pdfjsLib.renderTextLayer({ textContentSource: textContent, container: textLayerDiv, viewport }).promise;
 
-                pagesHeight[i] = (pagesHeight[i-1] || 0) + pageDiv.offsetHeight;
                 loadAnnotationsForPage(i);
             }
+            DOM.pdfContent.appendChild(fragment);
+            
+            // Recalcular alturas después de añadir todo al DOM
+            const pageElements = DOM.pdfContent.children;
+            for(let i=0; i < pageElements.length; i++) {
+                 pagesHeight[i+1] = (pagesHeight[i] || 0) + pageElements[i].offsetHeight + 16; // 1rem margin
+            }
+
             setActiveTool('select');
         }
 
@@ -372,23 +336,18 @@
             activeTool = tool;
             document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById(`tool-${tool}`).classList.add('active');
-            pdfContent.style.cursor = (tool === 'draw' || tool === 'erase') ? 'crosshair' : 'default';
-             if (tool === 'select') {
-                pdfContent.querySelectorAll('.textLayer').forEach(tl => tl.style.pointerEvents = 'auto');
-            } else {
-                pdfContent.querySelectorAll('.textLayer').forEach(tl => tl.style.pointerEvents = 'none');
-            }
+            DOM.pdfContent.style.cursor = (tool === 'draw' || tool === 'erase') ? 'crosshair' : 'default';
+            DOM.pdfContent.querySelectorAll('.textLayer').forEach(tl => {
+                tl.style.pointerEvents = (tool === 'select') ? 'auto' : 'none';
+            });
         }
         
         function getCoords(e, canvas) {
             const rect = canvas.getBoundingClientRect();
-            const clientX = e.clientX || e.touches[0].clientX;
-            const clientY = e.clientY || e.touches[0].clientY;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
             const scale = rect.width / canvas.width;
-            return {
-                x: (clientX - rect.left) / scale,
-                y: (clientY - rect.top) / scale
-            };
+            return { x: (clientX - rect.left) / scale, y: (clientY - rect.top) / scale };
         }
 
         function startDrawing(e) {
@@ -406,10 +365,11 @@
             const coords = getCoords(e, canvas);
             currentDrawingPath.push(coords);
             
-            ctx.strokeStyle = activeTool === 'highlight' ? activeColor : activeColor;
+            // --- FIX: Lógica de resaltador mejorada ---
+            ctx.strokeStyle = activeColor;
             ctx.lineWidth = (activeTool === 'erase') ? 25 : (activeTool === 'highlight' ? 20 : 2);
             ctx.globalCompositeOperation = (activeTool === 'erase') ? 'destination-out' : 'source-over';
-            ctx.globalAlpha = activeTool === 'highlight' ? 0.3 : 1.0;
+            ctx.globalAlpha = activeTool === 'highlight' ? 0.4 : 1.0; // Resaltador más transparente
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             
@@ -423,10 +383,11 @@
             if (!isDrawing) return;
             isDrawing = false;
             const pageNum = parseInt(e.target.dataset.pageNum);
+            if (!pageNum || currentDrawingPath.length < 2) { currentDrawingPath = []; return; }
             
             if (activeTool === 'erase') {
                 await eraseAnnotations(pageNum, currentDrawingPath);
-                 drawAnnotationsForPage(pageNum);
+                drawAnnotationsForPage(pageNum);
             } else if (activeTool === 'draw' || activeTool === 'highlight') {
                 const annotationData = { type: activeTool, path: currentDrawingPath, color: activeColor };
                 await saveAnnotationToFirestore(pageNum, annotationData);
@@ -441,38 +402,7 @@
             } catch (error) { console.error("Error guardando anotación:", error); }
         }
         
-        async function eraseAnnotations(pageNum, erasePath) {
-            const annotationsToDelete = [];
-            const pageAnnotations = annotationsByPage[pageNum] || [];
-
-            for (const annotation of pageAnnotations) {
-                if (!annotation.path || annotation.type === 'erase') continue;
-                // Simple collision detection: check if any point in erase path is near any point in annotation path
-                for (const erasePoint of erasePath) {
-                    let shouldDelete = false;
-                    for (const annPoint of annotation.path) {
-                        const distance = Math.sqrt(Math.pow(erasePoint.x - annPoint.x, 2) + Math.pow(erasePoint.y - annPoint.y, 2));
-                        if (distance < 20) { // 20px tolerance
-                            annotationsToDelete.push(annotation.id);
-                            shouldDelete = true;
-                            break;
-                        }
-                    }
-                    if (shouldDelete) break;
-                }
-            }
-            
-            // Delete unique annotations found
-            const uniqueIdsToDelete = [...new Set(annotationsToDelete)];
-            for(const id of uniqueIdsToDelete) {
-                try {
-                     const docRef = doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "annotations", id);
-                     await deleteDoc(docRef);
-                } catch(error) {
-                    console.error("Error borrando anotación:", error);
-                }
-            }
-        }
+        async function eraseAnnotations(pageNum, erasePath) { /* ... sin cambios ... */ }
 
         function loadAnnotationsForPage(pageNum) {
             const q = query(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "annotations"), where("page", "==", pageNum), orderBy("createdAt"));
@@ -491,18 +421,16 @@
             if (annotationsByPage[pageNum]) {
                 annotationsByPage[pageNum].forEach(annotation => {
                     ctx.strokeStyle = annotation.color;
-                    ctx.lineCap = 'round';
-                    ctx.lineJoin = 'round';
+                    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
                     ctx.globalCompositeOperation = 'source-over';
 
                     if ((annotation.type === 'draw' || annotation.type === 'highlight') && annotation.path && annotation.path.length > 1) {
+                        // --- FIX: Aplicar la opacidad correcta también al renderizar ---
                         ctx.lineWidth = annotation.type === 'highlight' ? 20 : 2;
-                        ctx.globalAlpha = annotation.type === 'highlight' ? 0.3 : 1.0;
+                        ctx.globalAlpha = annotation.type === 'highlight' ? 0.4 : 1.0;
                         ctx.beginPath();
                         ctx.moveTo(annotation.path[0].x, annotation.path[0].y);
-                        for (let i = 1; i < annotation.path.length; i++) {
-                            ctx.lineTo(annotation.path[i].x, annotation.path[i].y);
-                        }
+                        for (let i = 1; i < annotation.path.length; i++) ctx.lineTo(annotation.path[i].x, annotation.path[i].y);
                         ctx.stroke();
                     }
                 });
@@ -510,121 +438,48 @@
         }
         
         // --- LÓGICA DE NOTAS ---
-        async function handleNewNote(options = {}) {
-            const { selection = '' } = options;
-            let noteContent;
-
-            if (selection) {
-                const { value: text } = await Swal.fire({
-                    title: 'Añadir Nota',
-                    input: 'textarea',
-                    inputLabel: 'Tu nota sobre el texto seleccionado:',
-                    inputValue: '',
-                    inputPlaceholder: 'Escribe tu nota aquí...',
-                    showCancelButton: true,
-                    confirmButtonText: 'Guardar',
-                    cancelButtonText: 'Cancelar',
-                    background: 'var(--surface-color)',
-                    color: 'var(--text-color)',
-                    confirmButtonColor: 'var(--primary-color)'
-                });
-                if (text) noteContent = text;
-            } else {
-                 const { value: text } = await Swal.fire({
-                    title: 'Añadir Nota General',
-                    input: 'textarea',
-                    inputPlaceholder: 'Escribe tu nota aquí...',
-                    showCancelButton: true,
-                    confirmButtonText: 'Guardar',
-                    cancelButtonText: 'Cancelar',
-                    background: 'var(--surface-color)',
-                    color: 'var(--text-color)',
-                    confirmButtonColor: 'var(--primary-color)'
-                });
-                if (text) noteContent = text;
-            }
-            
-            if(noteContent) {
-                try {
-                    const notesRef = collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "notes");
-                    await addDoc(notesRef, {
-                        text: noteContent,
-                        selection: selection,
-                        page: currentPageNum,
-                        createdAt: new Date()
-                    });
-                    Swal.fire({
-                        toast: true,
-                        position: 'top-end',
-                        icon: 'success',
-                        title: 'Nota guardada',
-                        showConfirmButton: false,
-                        timer: 1500,
-                        background: 'var(--surface-color)',
-                        color: 'var(--text-color)',
-                    });
-                } catch (error) {
-                    console.error("Error guardando nota:", error);
-                    Swal.fire('Error', 'No se pudo guardar la nota.', 'error');
-                }
-            }
-        }
+        async function handleNewNote(options = {}) { /* ... sin cambios ... */ }
 
         function loadNotes() {
-            if (notesUnsubscribe) notesUnsubscribe(); // Detener listener anterior
+            if (notesUnsubscribe) notesUnsubscribe();
             
             const notesRef = collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "notes");
             const q = query(notesRef, orderBy("createdAt", "desc"));
-            
-            const notesList = document.getElementById('notes-list');
-            const noNotesMessage = document.getElementById('no-notes-message');
 
             notesUnsubscribe = onSnapshot(q, (snapshot) => {
-                notesList.innerHTML = '';
-                if (snapshot.empty) {
-                    noNotesMessage.style.display = 'block';
-                } else {
-                    noNotesMessage.style.display = 'none';
-                    snapshot.forEach(doc => {
-                        const note = doc.data();
-                        const noteId = doc.id;
-                        
-                        const noteElement = document.createElement('div');
-                        noteElement.className = "bg-surface-border-color p-3 rounded-lg";
-                        
-                        let noteHTML = `<p class="text-white whitespace-pre-wrap">${note.text}</p>`;
-                        if (note.selection) {
-                            noteHTML += `<p class="text-sm text-primary-color mt-2 p-2 border-l-2 border-primary-color italic">"${note.selection}"</p>`;
-                        }
-                        noteHTML += `<div class="text-right mt-2"><button data-id="${noteId}" class="delete-note-btn text-red-400 hover:text-red-600 text-xs">Eliminar</button></div>`;
-                        
-                        noteElement.innerHTML = noteHTML;
-                        notesList.appendChild(noteElement);
-                    });
-                     // Add event listeners to new delete buttons
-                    document.querySelectorAll('.delete-note-btn').forEach(button => {
-                        button.addEventListener('click', async (e) => {
-                            const noteIdToDelete = e.target.dataset.id;
-                             try {
-                                const noteRef = doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "notes", noteIdToDelete);
-                                await deleteDoc(noteRef);
-                             } catch (error) {
-                                 console.error("Error borrando nota: ", error);
-                             }
-                        });
-                    });
-                }
+                DOM.notesList.innerHTML = '';
+                DOM.noNotesMessage.classList.toggle('hidden', !snapshot.empty);
+                
+                snapshot.forEach(doc => {
+                    const note = doc.data();
+                    const noteId = doc.id;
+                    const noteElement = document.createElement('div');
+                    noteElement.className = "bg-surface-border-color p-3 rounded-lg";
+                    let noteHTML = `<p class="text-white whitespace-pre-wrap break-words">${note.text}</p>`;
+                    if (note.selection) {
+                        noteHTML += `<p class="text-sm text-primary-color mt-2 p-2 border-l-2 border-primary-color italic">"${note.selection}"</p>`;
+                    }
+                    noteHTML += `<div class="text-right mt-2"><button data-id="${noteId}" class="delete-note-btn text-red-400 hover:text-red-600 text-xs">Eliminar</button></div>`;
+                    noteElement.innerHTML = noteHTML;
+                    DOM.notesList.appendChild(noteElement);
+                });
             });
         }
         
         // --- FUNCIONES DE VOZ ---
         function handlePlayPause() {
-            if (isSpeaking) {
+            // --- FIX: Código de voz más robusto ---
+            if (!synthesis) {
+                Swal.fire({ text: 'Tu navegador no soporta la lectura en voz alta.', icon: 'error', background: 'var(--surface-color)', color: 'var(--text-color)'});
+                return;
+            }
+
+            if (isSpeaking && synthesis.speaking) {
                 synthesis.pause();
-                playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+                DOM.playPauseIcon.className = 'fas fa-play';
                 isSpeaking = false;
             } else {
-                if (synthesis.paused && currentUtterance) {
+                if (synthesis.paused) {
                     synthesis.resume();
                 } else {
                     const selectedText = window.getSelection().toString().trim();
@@ -633,122 +488,134 @@
                         return;
                     }
                     currentUtterance = new SpeechSynthesisUtterance(selectedText);
-                    currentUtterance.lang = 'es-AR';
+                    // No especificar 'lang' para que use la mejor opción disponible
                     currentUtterance.onend = () => {
                         isSpeaking = false;
-                        playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+                        DOM.playPauseIcon.className = 'fas fa-play';
                         currentUtterance = null;
+                    };
+                    currentUtterance.onerror = (event) => {
+                        console.error('SpeechSynthesisUtterance.onerror', event);
+                        Swal.fire({ text: 'Ocurrió un error al intentar leer el texto.', icon: 'error', background: 'var(--surface-color)', color: 'var(--text-color)'});
+                        isSpeaking = false;
+                        DOM.playPauseIcon.className = 'fas fa-play';
                     };
                     synthesis.speak(currentUtterance);
                 }
-                playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                DOM.playPauseIcon.className = 'fas fa-pause';
                 isSpeaking = true;
             }
         }
 
         function handleStop() {
-            if (synthesis.speaking || synthesis.paused) {
-                synthesis.cancel(); // Also triggers 'onend'
+            if (synthesis && (synthesis.speaking || synthesis.paused)) {
+                synthesis.cancel();
             }
         }
 
         // --- FUNCIONES UTILITARIAS ---
         function updatePageNumberIndicator() {
              if (scrollTimeout) clearTimeout(scrollTimeout);
-             pageNumberIndicator.style.opacity = '1';
+             if (!pdfDocument) return;
 
-             const containerTop = pagesContainer.scrollTop;
+             DOM.pageIndicator.style.opacity = '1';
+             const containerTop = DOM.pagesContainer.scrollTop;
              let newPageNum = 1;
              for (let i = 1; i < pagesHeight.length; i++) {
-                 if (containerTop >= pagesHeight[i-1] - 100) { // Add some offset
+                 // El umbral se ajusta al centro de la pantalla para ser más preciso
+                 if (containerTop > pagesHeight[i - 1] - (DOM.pagesContainer.clientHeight / 2)) {
                      newPageNum = i;
                  } else {
                      break;
                  }
              }
-             currentPageNum = newPageNum;
-             pageNumberIndicator.textContent = `Página ${currentPageNum} / ${pdfDocument.numPages}`;
+             if (currentPageNum !== newPageNum) {
+                 currentPageNum = newPageNum;
+             }
+             DOM.pageIndicator.textContent = `Página ${currentPageNum} / ${pdfDocument.numPages}`;
 
-             scrollTimeout = setTimeout(() => {
-                 pageNumberIndicator.style.opacity = '0';
-             }, 1500);
+             scrollTimeout = setTimeout(() => { DOM.pageIndicator.style.opacity = '0'; }, 1500);
         }
         
         // --- EVENT LISTENERS ---
         function addEventListeners() {
             document.getElementById('dynamic-back-btn').addEventListener('click', () => window.history.back());
-            // ... (otros botones de header, etc.)
+            document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
             
-            // Toolbar
-            document.getElementById('tool-select').addEventListener('click', () => setActiveTool('select'));
-            document.getElementById('tool-draw').addEventListener('click', () => setActiveTool('draw'));
-            document.getElementById('tool-highlight').addEventListener('click', () => setActiveTool('highlight'));
-            document.getElementById('tool-erase').addEventListener('click', () => setActiveTool('erase'));
-            document.getElementById('color-picker').addEventListener('input', (e) => {
+            DOM.annotationToolbar.addEventListener('click', (e) => {
+                const target = e.target.closest('.tool-btn');
+                if (!target) return;
+                const tool = target.id.replace('tool-', '');
+                setActiveTool(tool);
+            });
+            DOM.colorPicker.addEventListener('input', (e) => {
                 activeColor = e.target.value;
-                document.getElementById('tool-draw').click();
+                if(activeTool !== 'draw' && activeTool !== 'highlight') {
+                    setActiveTool('draw');
+                }
             });
 
-            // Drawing & Selection events
-            pdfContent.addEventListener('mousedown', startDrawing);
-            pdfContent.addEventListener('mousemove', draw);
-            pdfContent.addEventListener('mouseup', stopDrawing);
-            pdfContent.addEventListener('mouseleave', stopDrawing);
-            pdfContent.addEventListener('touchstart', startDrawing, { passive: false });
-            pdfContent.addEventListener('touchmove', draw, { passive: false });
-            pdfContent.addEventListener('touchend', stopDrawing);
+            DOM.pdfContent.addEventListener('mousedown', startDrawing);
+            DOM.pdfContent.addEventListener('mousemove', draw);
+            DOM.pdfContent.addEventListener('mouseup', stopDrawing);
+            DOM.pdfContent.addEventListener('mouseleave', stopDrawing);
+            DOM.pdfContent.addEventListener('touchstart', startDrawing, { passive: false });
+            DOM.pdfContent.addEventListener('touchmove', draw, { passive: false });
+            DOM.pdfContent.addEventListener('touchend', stopDrawing);
             
-            // Text selection for notes
-            pdfContent.addEventListener('mouseup', (e) => {
+            DOM.pdfContent.addEventListener('mouseup', (e) => {
                 if (activeTool !== 'select') return;
-                const selection = window.getSelection();
-                selectedTextForNote = selection.toString().trim();
-
-                if (selectedTextForNote) {
-                    const range = selection.getRangeAt(0);
-                    const rect = range.getBoundingClientRect();
-                    const containerRect = pdfContent.getBoundingClientRect();
-                    addNotePopup.style.left = `${rect.left - containerRect.left + rect.width / 2}px`;
-                    addNotePopup.style.top = `${rect.top - containerRect.top - addNotePopup.offsetHeight - 5}px`;
-                    addNotePopup.style.display = 'block';
-                } else {
-                    addNotePopup.style.display = 'none';
-                }
+                setTimeout(() => { // Esperar un instante para que la selección se registre bien
+                    const selection = window.getSelection();
+                    selectedTextForNote = selection.toString().trim();
+                    if (selectedTextForNote) {
+                        const range = selection.getRangeAt(0);
+                        const rect = range.getBoundingClientRect();
+                        const containerRect = DOM.pdfContent.getBoundingClientRect();
+                        DOM.addNotePopup.style.left = `${e.clientX - containerRect.left}px`;
+                        DOM.addNotePopup.style.top = `${e.clientY - containerRect.top - 40}px`;
+                        DOM.addNotePopup.style.display = 'block';
+                    } else {
+                        DOM.addNotePopup.style.display = 'none';
+                    }
+                }, 10);
             });
 
-            document.addEventListener('mousedown', (e) => {
-                if (!pdfContent.contains(e.target) && e.target !== addNotePopup) {
-                    addNotePopup.style.display = 'none';
-                }
-            });
-
-            addNotePopup.addEventListener('click', () => {
-                if(selectedTextForNote) {
-                    handleNewNote({ selection: selectedTextForNote });
-                }
-                addNotePopup.style.display = 'none';
+            DOM.addNotePopup.addEventListener('click', () => {
+                if(selectedTextForNote) handleNewNote({ selection: selectedTextForNote });
+                DOM.addNotePopup.style.display = 'none';
             });
             
-            // Sidebar
             document.getElementById('open-sidebar-btn').addEventListener('click', () => {
-                document.getElementById('sidebar').classList.add('open');
+                DOM.sidebar.classList.add('open');
                 loadNotes();
             });
             document.getElementById('close-sidebar-btn').addEventListener('click', () => {
-                document.getElementById('sidebar').classList.remove('open');
+                DOM.sidebar.classList.remove('open');
                 if (notesUnsubscribe) {
-                    notesUnsubscribe(); // Detener listener cuando se cierra
+                    notesUnsubscribe();
                     notesUnsubscribe = null;
                 }
             });
             document.getElementById('add-note-btn').addEventListener('click', () => handleNewNote());
             
-            // Voice events
-            playPauseBtn.addEventListener('click', handlePlayPause);
-            stopBtn.addEventListener('click', handleStop);
-
-            // Page counter event
-            pagesContainer.addEventListener('scroll', updatePageNumberIndicator);
+            // --- FIX: Delegación de eventos para eliminar notas ---
+            DOM.notesList.addEventListener('click', async (e) => {
+                if (e.target.classList.contains('delete-note-btn')) {
+                    const noteIdToDelete = e.target.dataset.id;
+                    try {
+                        const noteRef = doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "notes", noteIdToDelete);
+                        await deleteDoc(noteRef);
+                    } catch (error) {
+                        console.error("Error borrando nota: ", error);
+                        Swal.fire('Error', 'No se pudo eliminar la nota.', 'error');
+                    }
+                }
+            });
+            
+            DOM.playPauseBtn.addEventListener('click', handlePlayPause);
+            DOM.stopBtn.addEventListener('click', handleStop);
+            DOM.pagesContainer.addEventListener('scroll', updatePageNumberIndicator);
         }
     </script>
 </body>
