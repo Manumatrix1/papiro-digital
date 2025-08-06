@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Papiro Digital</title>
+    <title id="page-title">Papiro Digital</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -19,12 +19,74 @@
             --text-color: #ffffff;
             --text-muted-color: #9ca3af;
         }
-        .hidden { display: none; }
+        .hidden { display: none !important; }
+        html { height: 100%; }
         body {
             font-family: 'Inter', sans-serif;
             background-color: var(--background-color);
             color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
         }
+        main {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        #pdf-viewer-container {
+            flex-grow: 1;
+            overflow: hidden;
+        }
+        #pages-container {
+            width: 100%; height: 100%;
+            overflow-y: auto; scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        .pdf-page-container {
+            position: relative; margin: 0 auto 1rem auto;
+        }
+        .textLayer ::selection { background: rgba(136, 201, 153, 0.5); }
+        .speaking-highlight {
+            background-color: rgba(136, 201, 153, 0.4);
+            border-radius: 2px;
+        }
+        .swal-input-dark {
+             color: var(--text-color) !important;
+             background-color: var(--surface-border-color) !important;
+        }
+        .pdf-card {
+            transition: transform 0.2s ease-in-out;
+            background-color: var(--surface-color);
+            border: 1px solid var(--surface-border-color);
+        }
+        .pdf-card:hover { transform: translateY(-5px); }
+        #annotation-toolbar {
+            position: fixed; bottom: 1rem; left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--surface-color);
+            border: 1px solid var(--surface-border-color);
+            border-radius: 9999px;
+            padding: 0.5rem 1rem;
+            display: flex; gap: 0.75rem;
+            align-items: center; z-index: 100;
+        }
+        .tool-btn {
+            background: none; border: none; color: var(--text-muted-color);
+            cursor: pointer; transition: color 0.2s, transform 0.2s; padding: 0.5rem;
+        }
+        .tool-btn:hover { color: var(--text-color); transform: scale(1.1); }
+        .tool-btn.active { color: var(--primary-color); }
+        #sidebar {
+            position: fixed; top: 0; right: -100%;
+            width: 100%; max-width: 350px;
+            height: 100%; background-color: var(--surface-color);
+            border-left: 1px solid var(--surface-border-color);
+            transition: right 0.3s ease-in-out; z-index: 110;
+            padding: 1.5rem; display: flex; flex-direction: column;
+        }
+        #sidebar.open { right: 0; }
     </style>
 </head>
 <body>
@@ -33,7 +95,7 @@
         <p id="page-loader-text" class="mt-4 text-xl">Iniciando...</p>
     </div>
 
-    <div id="main-content" class="hidden flex-col min-h-screen">
+    <div id="main-content" class="hidden flex flex-col h-full">
         <header class="bg-surface-color border-b border-surface-border-color py-3 px-4 sm:px-8 flex justify-between items-center sticky top-0 z-20 flex-shrink-0">
             <div class="flex items-center gap-4 flex-1 min-w-0">
                 <button id="dynamic-back-btn" class="flex-shrink-0 flex items-center text-gray-400 hover:text-white transition group"><i class="fas fa-arrow-left text-xl"></i></button>
@@ -44,7 +106,7 @@
             </div>
         </header>
 
-        <main class="flex-grow p-4 sm:p-8 flex flex-col">
+        <main class="flex-grow p-4 sm:p-8 flex flex-col overflow-y-auto">
             <div id="grid-view-container" class="w-full max-w-5xl mx-auto hidden">
                  <div class="flex justify-between items-center mb-6">
                     <h2 class="text-lg font-semibold">Documentos</h2>
@@ -57,23 +119,40 @@
                  <div id="no-pdfs-message" class="text-gray-400 text-center mt-8 hidden">No hay PDFs en este tablero.</div>
             </div>
 
-            <div id="pdf-viewer-container" class="relative w-full h-full flex-grow flex-col hidden">
-                <div id="pages-container" class="flex-grow w-full h-full overflow-y-auto">
+            <div id="pdf-viewer-container" class="relative w-full flex-grow flex flex-col hidden">
+                <div class="flex-shrink-0 flex flex-col sm:flex-row items-center justify-between p-2 sm:p-4 bg-surface-color rounded-lg mb-4">
+                    <div class="flex items-center gap-2 mb-2 sm:mb-0 w-full sm:w-auto">
+                        <button id="play-pause-btn" class="text-white hover:text-primary-color transition p-2" title="Leer página actual"><i class="fas fa-play"></i></button>
+                        <button id="stop-btn" class="text-white hover:text-red-400 transition p-2" title="Detener lectura"><i class="fas fa-stop"></i></button>
+                    </div>
+                    <div class="relative w-full sm:w-1/2 flex items-center gap-2 sm:gap-4">
+                        <input type="text" id="search-notes-input" placeholder="Buscar en notas..." class="w-full bg-surface-border-color text-white py-2 px-4 rounded-lg focus:outline-none">
+                        <button id="open-sidebar-btn" class="bg-surface-border-color text-gray-400 rounded-lg w-10 h-10 flex items-center justify-center hover:text-white transition flex-shrink-0" title="Abrir notas">
+                            <i class="fas fa-book"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="pages-container" class="flex-grow w-full h-full">
                     <div id="pdf-content" class="w-full"></div>
                 </div>
             </div>
         </main>
     </div>
 
+    <aside id="sidebar"></aside>
+    <div id="annotation-toolbar" class="hidden"></div>
+    <div id="add-note-popup" class="hidden" title="Añadir nota"><i class="fas fa-plus text-white"></i></div>
+    <div id="page-number-indicator" class="fixed top-1/2 right-4 transform -translate-y-1/2 bg-black bg-opacity-70 text-white py-2 px-4 rounded-full font-bold z-50 opacity-0 pointer-events-none"></div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { getFirestore, collection, query, doc, onSnapshot, getDoc, orderBy, addDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { getFirestore, collection, query, doc, onSnapshot, getDoc, orderBy, addDoc, deleteDoc, updateDoc, writeBatch } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
 
         // CONFIG
         const firebaseConfig = {
-             apiKey: "AIzaSyBYVYRdA_DB1Kob9b_wGd5Wd4JsYFMyBRc",
+            apiKey: "AIzaSyBYVYRdA_DB1Kob9b_wGd5Wd4JsYFMyBRc",
             authDomain: "papiro2025-d09e0.firebaseapp.com",
             projectId: "papiro2025-d09e0",
             storageBucket: "papiro2025-d09e0.firebasestorage.app",
@@ -87,7 +166,8 @@
         const storage = getStorage(app);
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-        // DOM y ESTADO
+        // ESTADO Y DOM
+        let currentUser, currentProjectId, currentPdfId, pdfDocument;
         const pageLoader = document.getElementById('page-loader');
         const mainContent = document.getElementById('main-content');
         const projectTitle = document.getElementById('project-title');
@@ -96,10 +176,9 @@
         const pdfsGrid = document.getElementById('pdfs-grid');
         const noPdfsMessage = document.getElementById('no-pdfs-message');
         const addPdfInput = document.getElementById('add-pdf-input');
+        const pdfContent = document.getElementById('pdf-content');
         
-        let currentUser, currentProjectId, currentPdfId;
-
-        // INICIO
+        // --- INICIO ---
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
@@ -111,7 +190,6 @@
                     window.location.href = 'mi_tablero.html';
                     return;
                 }
-
                 initializePage();
             } else {
                 window.location.href = 'index.html';
@@ -120,25 +198,32 @@
 
         async function initializePage() {
             await loadProjectDetails();
-            addEventListeners();
+            // addEventListeners(); // Se llamará dentro de cada vista
 
             if (currentPdfId) {
-                showView('viewer');
-                // loadAndRenderPDF(currentPdfId); // Tu función para cargar el PDF
+                await showView('viewer');
             } else {
-                showView('grid');
-                loadPdfsForProject();
+                await showView('grid');
             }
-            // Ocultar loader y mostrar contenido
+            
             mainContent.classList.remove('hidden');
-            mainContent.style.display = 'flex';
             pageLoader.classList.add('hidden');
         }
 
-        function showView(viewName) {
+        async function showView(viewName) {
             gridView.classList.toggle('hidden', viewName !== 'grid');
             pdfViewer.classList.toggle('hidden', viewName !== 'viewer');
-            if (viewName === 'viewer') pdfViewer.classList.add('flex');
+            
+            if (viewName === 'viewer') {
+                pdfViewer.classList.add('flex');
+                // Inicializar todo lo del visor
+                // addViewerEventListeners();
+                await loadAndRenderPDF(currentPdfId); // <<--- FIX: ESTA LÍNEA ES LA CLAVE
+            } else {
+                // Inicializar todo lo de la grilla
+                // addGridEventListeners();
+                loadPdfsForProject();
+            }
         }
 
         async function loadProjectDetails() {
@@ -148,12 +233,13 @@
                 projectTitle.value = projectSnap.data().name;
             }
         }
-        
+
+        // --- VISTA DE GRILLA ---
         function loadPdfsForProject() {
             const q = query(collection(db, "users", currentUser.uid, "projects", currentProjectId, "pdfs"), orderBy("createdAt", "desc"));
             onSnapshot(q, (snapshot) => {
                 pdfsGrid.innerHTML = '';
-                noPdfsMessage.classList.toggle('hidden', !snapshot.empty);
+                noPdfsMessage.classList.toggle('hidden', snapshot.empty);
                 snapshot.forEach(pdfDoc => {
                     const pdfData = pdfDoc.data();
                     const card = document.createElement('a');
@@ -165,17 +251,50 @@
                         </div>
                         <div class="p-2 h-1/4 flex items-center justify-center">
                             <p class="w-full text-center text-sm font-semibold text-white truncate">${pdfData.name || 'Documento'}</p>
-                        </div>
-                    `;
+                        </div>`;
                     pdfsGrid.appendChild(card);
                 });
             });
         }
         
-        async function uploadPdf(file) {
-            // Tu función de subida de PDF...
-        }
+        async function uploadPdf(file) { /* ... Tu función de subida ... */ }
 
+        // --- VISTA DE VISOR ---
+        async function loadAndRenderPDF(docId) {
+            pageLoader.classList.remove('hidden');
+            pageLoader.querySelector('p').textContent = 'Cargando documento...';
+            try {
+                const pdfDocRef = doc(db, "users", currentUser.uid, "projects", currentProjectId, "pdfs", docId);
+                const pdfDocSnap = await getDoc(pdfDocRef);
+                if (!pdfDocSnap.exists()) throw new Error("PDF no encontrado");
+
+                pdfDocument = await pdfjsLib.getDocument(pdfDocSnap.data().url).promise;
+                
+                const fragment = document.createDocumentFragment();
+                for (let i = 1; i <= pdfDocument.numPages; i++) {
+                    const page = await pdfDocument.getPage(i);
+                    const viewport = page.getViewport({ scale: 1.5 });
+                    const pageDiv = document.createElement('div');
+                    pageDiv.className = 'pdf-page-container';
+                    pageDiv.style.width = `${viewport.width}px`;
+                    pageDiv.style.height = `${viewport.height}px`;
+                    const canvas = document.createElement('canvas');
+                    canvas.height = viewport.height; canvas.width = viewport.width;
+                    pageDiv.appendChild(canvas);
+                    fragment.appendChild(pageDiv);
+                    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+                }
+                pdfContent.innerHTML = '';
+                pdfContent.appendChild(fragment);
+                
+            } catch (error) {
+                console.error("Error cargando PDF:", error);
+                Swal.fire('Error', 'No se pudo cargar el PDF.', 'error');
+            } finally {
+                pageLoader.classList.add('hidden');
+            }
+        }
+        
         function addEventListeners() {
             document.getElementById('dynamic-back-btn').addEventListener('click', () => {
                 if (currentPdfId) {
@@ -186,9 +305,9 @@
             });
             document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
             addPdfInput.addEventListener('change', (e) => uploadPdf(e.target.files[0]));
+            
+            // Aquí puedes añadir el resto de tus event listeners para el visor
         }
-
-        // Aquí pegarías el resto de funciones del visor (anotaciones, lector de voz, etc.)
 
     </script>
 </body>
