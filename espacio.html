@@ -35,14 +35,15 @@
         #grid-view-container, #pdf-viewer-container {
             padding: 1.5rem;
             overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
         #pdf-viewer-container {
-             padding: 0.5rem; /* Menos padding para el visor */
+             padding: 0.5rem;
         }
         .pdf-page-container {
             position: relative;
             margin: 0 auto 1rem auto;
-            max-width: 100%; /* CLAVE: Para que no se salga de la pantalla en móviles */
+            max-width: 100%; 
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         }
         .pdf-page-container canvas {
@@ -64,7 +65,7 @@
         <p id="page-loader-text" class="mt-4 text-xl">Iniciando...</p>
     </div>
 
-    <div id="main-content" class="hidden flex flex-col h-full">
+    <div id="main-content" class="hidden flex-col h-full">
         <header class="bg-surface-color border-b border-surface-border-color py-3 px-4 sm:px-8 flex justify-between items-center sticky top-0 z-20 flex-shrink-0">
             <div class="flex items-center gap-4 flex-1 min-w-0">
                 <button id="dynamic-back-btn" class="flex-shrink-0 flex items-center text-gray-400 hover:text-white transition group"><i class="fas fa-arrow-left text-xl"></i></button>
@@ -87,15 +88,11 @@
         </main>
     </div>
 
-    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js"></script>
-
     <script type="module">
-        const { initializeApp } = firebase.app;
-        const { getAuth, onAuthStateChanged, signOut } = firebase.auth;
-        const { getFirestore, collection, query, doc, onSnapshot, getDoc, orderBy } = firebase.firestore;
+        // FIX: Usando el método de importación de módulos, el único correcto y moderno.
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        import { getFirestore, collection, query, doc, onSnapshot, getDoc, orderBy } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
         
         const firebaseConfig = { apiKey: "AIzaSyBYVYRdA_DB1Kob9b_wGd5Wd4JsYFMyBRc", authDomain: "papiro2025-d09e0.firebaseapp.com", projectId: "papiro2025-d09e0", storageBucket: "papiro2025-d09e0.firebasestorage.app", messagingSenderId: "1096335704864", appId: "1:1096335704864:web:75f1f27cd920df64554d45"};
         const app = initializeApp(firebaseConfig);
@@ -105,17 +102,7 @@
 
         let currentUser, currentProjectId, currentPdfId, pdfDocument;
         const DOM = {
-            pageLoader: document.getElementById('page-loader'),
-            mainContent: document.getElementById('main-content'),
-            projectTitle: document.getElementById('project-title'),
-            gridView: document.getElementById('grid-view-container'),
-            pdfViewer: document.getElementById('pdf-viewer-container'),
-            pdfsGrid: document.getElementById('pdfs-grid'),
-            noPdfsMessage: document.getElementById('no-pdfs-message'),
-            pagesContainer: document.getElementById('pages-container'),
-            pdfContent: document.getElementById('pdf-content'),
-            dynamicBackBtn: document.getElementById('dynamic-back-btn'),
-            logoutBtn: document.getElementById('logout-btn'),
+            pageLoader: document.getElementById('page-loader'), mainContent: document.getElementById('main-content'), projectTitle: document.getElementById('project-title'), gridView: document.getElementById('grid-view-container'), pdfViewer: document.getElementById('pdf-viewer-container'), pdfsGrid: document.getElementById('pdfs-grid'), noPdfsMessage: document.getElementById('no-pdfs-message'), pagesContainer: document.getElementById('pages-container'), pdfContent: document.getElementById('pdf-content'), dynamicBackBtn: document.getElementById('dynamic-back-btn'), logoutBtn: document.getElementById('logout-btn'),
         };
 
         onAuthStateChanged(auth, (user) => {
@@ -142,7 +129,7 @@
             DOM.gridView.classList.toggle('hidden', viewName !== 'grid');
             DOM.pdfViewer.classList.toggle('hidden', viewName !== 'viewer');
             if (viewName === 'viewer') {
-                DOM.pdfViewer.classList.add('flex');
+                DOM.pdfViewer.classList.add('flex', 'flex-col');
                 await loadAndRenderPDF(currentPdfId);
             } else {
                 DOM.gridView.classList.add('flex', 'flex-col');
@@ -171,7 +158,7 @@
                 });
             }, (error) => {
                 console.error("Error cargando PDFs:", error);
-                DOM.noPdfsMessage.textContent = 'Error al cargar documentos. Asegúrate de tener los índices de Firestore creados.';
+                DOM.noPdfsMessage.textContent = 'Error al cargar. Asegúrate de tener los índices de Firestore creados (ver consola F12).';
                 DOM.noPdfsMessage.classList.remove('hidden');
             });
         }
@@ -201,7 +188,7 @@
                     pagePlaceholder.id = `page-container-${i}`;
                     pagePlaceholder.className = 'pdf-page-container';
                     pagePlaceholder.dataset.pageNum = i;
-                    pagePlaceholder.style.minHeight = '1000px'; // Altura estimada
+                    pagePlaceholder.style.minHeight = '1000px';
                     DOM.pdfContent.appendChild(pagePlaceholder);
                     observer.observe(pagePlaceholder);
                 }
@@ -211,7 +198,7 @@
 
         async function renderPage(pageNum) {
             const pageContainer = document.getElementById(`page-container-${pageNum}`);
-            if (pageContainer.querySelector('canvas')) return; // Ya renderizada
+            if (pageContainer.querySelector('canvas')) return;
 
             const page = await pdfDocument.getPage(pageNum);
             const viewport = page.getViewport({ scale: 1.5 });
