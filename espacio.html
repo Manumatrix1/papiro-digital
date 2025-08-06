@@ -36,46 +36,20 @@
             flex-direction: column;
             overflow: hidden;
         }
-        #grid-view-container {
-            overflow-y: auto;
-        }
-        #pdf-viewer-container {
-            flex-grow: 1;
-            overflow: hidden;
-        }
+        #grid-view-container { overflow-y: auto; }
+        #pdf-viewer-container { flex-grow: 1; overflow: hidden; }
         #pages-container {
             width: 100%; height: 100%;
             overflow-y: auto; scroll-behavior: smooth;
             -webkit-overflow-scrolling: touch;
         }
-        .pdf-page-container {
-            position: relative;
-            margin: 0 auto 1rem auto;
-        }
-        .pdf-page-container canvas, .textLayer {
-            width: 100% !important;
-            height: auto !important;
-            display: block;
-        }
-        .annotation-canvas {
-            position: absolute; top: 0; left: 0;
-            width: 100%; height: 100%;
-            touch-action: none;
-        }
+        .pdf-page-container { position: relative; margin: 0 auto 1rem auto; }
+        .pdf-page-container canvas, .textLayer { width: 100% !important; height: auto !important; display: block; }
+        .annotation-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; }
         .textLayer ::selection { background: rgba(136, 201, 153, 0.5); }
-        .speaking-highlight {
-            background-color: rgba(136, 201, 153, 0.4) !important;
-            border-radius: 2px;
-        }
-        .swal-input-dark {
-             color: var(--text-color) !important;
-             background-color: var(--surface-border-color) !important;
-        }
-        .pdf-card {
-            transition: transform 0.2s ease-in-out;
-            background-color: var(--surface-color);
-            border: 1px solid var(--surface-border-color);
-        }
+        .speaking-highlight { background-color: rgba(136, 201, 153, 0.4) !important; border-radius: 2px; }
+        .swal-input-dark { color: var(--text-color) !important; background-color: var(--surface-border-color) !important; }
+        .pdf-card { transition: transform 0.2s ease-in-out; background-color: var(--surface-color); border: 1px solid var(--surface-border-color); }
         .pdf-card:hover { transform: translateY(-5px); }
         #annotation-toolbar {
             position: fixed; bottom: 1rem; left: 50%;
@@ -87,10 +61,7 @@
             display: flex; gap: 0.75rem;
             align-items: center; z-index: 100;
         }
-        .tool-btn {
-            background: none; border: none; color: var(--text-muted-color);
-            cursor: pointer; transition: color 0.2s, transform 0.2s; padding: 0.5rem;
-        }
+        .tool-btn { background: none; border: none; color: var(--text-muted-color); cursor: pointer; transition: color 0.2s, transform 0.2s; padding: 0.5rem; }
         .tool-btn:hover { color: var(--text-color); transform: scale(1.1); }
         .tool-btn.active { color: var(--primary-color); }
         #sidebar {
@@ -129,7 +100,7 @@
             </div>
         </header>
 
-        <main class="flex-grow p-4 sm:p-8 flex flex-col overflow-y-auto">
+        <main class="flex-grow p-4 sm:p-8 flex flex-col overflow-hidden">
             <div id="grid-view-container" class="w-full max-w-5xl mx-auto hidden">
                  <div class="flex justify-between items-center mb-6">
                     <h2 class="text-lg font-semibold">Documentos</h2>
@@ -185,7 +156,6 @@
         import { getFirestore, collection, query, doc, onSnapshot, getDoc, orderBy, addDoc, deleteDoc, updateDoc, writeBatch, where } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
 
-        // CONFIG
         const firebaseConfig = { apiKey: "AIzaSyBYVYRdA_DB1Kob9b_wGd5Wd4JsYFMyBRc", authDomain: "papiro2025-d09e0.firebaseapp.com", projectId: "papiro2025-d09e0", storageBucket: "papiro2025-d09e0.firebasestorage.app", messagingSenderId: "1096335704864", appId: "1:1096335704864:web:75f1f27cd920df64554d45" };
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -193,7 +163,6 @@
         const storage = getStorage(app);
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-        // ESTADO Y DOM
         let currentUser, currentProjectId, currentPdfId, pdfDocument;
         let pagesHeight = [], currentPageNum = 1, activeTool = 'select', isDrawing = false;
         let activeColor = '#FFEB3B', annotationsByPage = {}, currentDrawingPath = [], selectedTextForNote = '';
@@ -203,7 +172,6 @@
             pageLoader: document.getElementById('page-loader'), mainContent: document.getElementById('main-content'), projectTitle: document.getElementById('project-title'), gridView: document.getElementById('grid-view-container'), pdfViewer: document.getElementById('pdf-viewer-container'), pdfsGrid: document.getElementById('pdfs-grid'), noPdfsMessage: document.getElementById('no-pdfs-message'), addPdfInput: document.getElementById('add-pdf-input'), pagesContainer: document.getElementById('pages-container'), pdfContent: document.getElementById('pdf-content'), pageIndicator: document.getElementById('page-number-indicator'), sidebar: document.getElementById('sidebar'), notesList: document.getElementById('notes-list'), noNotesMessage: document.getElementById('no-notes-message'), searchNotesInput: document.getElementById('search-notes-input'), annotationToolbar: document.getElementById('annotation-toolbar'), addNotePopup: document.getElementById('add-note-popup'), colorPicker: document.getElementById('color-picker'), playPauseBtn: document.getElementById('play-pause-btn'), playPauseIcon: document.querySelector('#play-pause-btn i'), stopBtn: document.getElementById('stop-btn'), dynamicBackBtn: document.getElementById('dynamic-back-btn'), logoutBtn: document.getElementById('logout-btn'), addNoteBtn: document.getElementById('add-note-btn'), closeSidebarBtn: document.getElementById('close-sidebar-btn'), openSidebarBtn: document.getElementById('open-sidebar-btn'),
         };
 
-        // --- INICIO DE LA APP ---
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
@@ -242,10 +210,29 @@
             if (projectSnap.exists()) DOM.projectTitle.value = projectSnap.data().name;
         }
 
-        function loadPdfsForProject() { /* ... Tu función de grilla ... */ }
+        function loadPdfsForProject() {
+            const q = query(collection(db, "users", currentUser.uid, "projects", currentProjectId, "pdfs"), orderBy("createdAt", "desc"));
+            onSnapshot(q, (snapshot) => {
+                DOM.pdfsGrid.innerHTML = '';
+                DOM.noPdfsMessage.classList.toggle('hidden', snapshot.empty);
+                snapshot.forEach(pdfDoc => {
+                    const pdfData = pdfDoc.data();
+                    const card = document.createElement('a');
+                    card.href = `espacio.html?id=${currentProjectId}&docId=${pdfDoc.id}`;
+                    card.className = 'pdf-card rounded-lg shadow-lg cursor-pointer flex flex-col aspect-[2/3]';
+                    card.innerHTML = `<div class="flex-grow w-full bg-gray-800 rounded-t-lg flex items-center justify-center p-2"><i class="fas fa-file-pdf text-4xl text-gray-500"></i></div><div class="p-2 h-1/4 flex items-center justify-center"><p class="w-full text-center text-sm font-semibold text-white truncate">${pdfData.name || 'Documento'}</p></div>`;
+                    DOM.pdfsGrid.appendChild(card);
+                });
+            }, (error) => {
+                console.error("Error cargando PDFs:", error);
+                if (error.code === 'failed-precondition') {
+                    DOM.noPdfsMessage.innerHTML = 'Error: Se requiere un índice en la base de datos. Por favor, cree el índice desde el enlace en la consola de su navegador (F12).';
+                    DOM.noPdfsMessage.classList.remove('hidden');
+                }
+            });
+        }
+        
         async function uploadPdf(file) { /* ... Tu función de subida ... */ }
-
-        // --- FUNCIONES COMPLETAS DEL VISOR ---
 
         async function loadAndRenderPDF(docId) {
             document.getElementById('page-loader-text').textContent = 'Cargando documento...';
@@ -302,10 +289,7 @@
             return { x: (clientX - rect.left) / scale, y: (clientY - rect.top) / scale };
         }
 
-        function startDrawing(e) {
-            if (activeTool === 'select' || !e.target.classList.contains('annotation-canvas')) return;
-            e.preventDefault(); isDrawing = true; currentDrawingPath = [getCoords(e, e.target)];
-        }
+        function startDrawing(e) { if (activeTool === 'select' || !e.target.classList.contains('annotation-canvas')) return; e.preventDefault(); isDrawing = true; currentDrawingPath = [getCoords(e, e.target)]; }
 
         function draw(e) {
             if (!isDrawing) return; e.preventDefault();
@@ -330,9 +314,7 @@
             currentDrawingPath = [];
         }
 
-        async function saveAnnotationToFirestore(pageNum, data) {
-            await addDoc(collection(db, "users", currentUser.uid, "projects", currentProjectId, "pdfs", currentPdfId, "annotations"), { page: pageNum, ...data, createdAt: new Date() });
-        }
+        async function saveAnnotationToFirestore(pageNum, data) { await addDoc(collection(db, "users", currentUser.uid, "projects", currentProjectId, "pdfs", currentPdfId, "annotations"), { page: pageNum, ...data, createdAt: new Date() }); }
         
         async function eraseAnnotations(pageNum, erasePath) { /* ... Lógica de borrado preciso ... */ }
 
@@ -343,53 +325,91 @@
                 drawAnnotationsForPage(pageNum);
             });
         }
-
-        function drawAnnotationsForPage(pageNum) { /* ... Lógica para dibujar anotaciones ... */ }
+        
+        function drawAnnotationsForPage(pageNum) {
+            const canvas = document.querySelector(`.annotation-canvas[data-page-num="${pageNum}"]`);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            (annotationsByPage[pageNum] || []).forEach(ann => {
+                if ((ann.type === 'draw' || ann.type === 'highlight') && ann.path && ann.path.length > 1) {
+                    ctx.strokeStyle = ann.color; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.lineWidth = ann.type === 'highlight' ? 20 : 2;
+                    ctx.globalAlpha = ann.type === 'highlight' ? 0.4 : 1.0;
+                    ctx.beginPath(); ctx.moveTo(ann.path[0].x, ann.path[0].y);
+                    for (let i = 1; i < ann.path.length; i++) ctx.lineTo(ann.path[i].x, ann.path[i].y);
+                    ctx.stroke();
+                }
+            });
+        }
         
         async function handleNewNote(options = {}) {
-            const { selection = '' } = options;
+            const { selection = '', color = '#ffffff' } = options;
             const { value: text } = await Swal.fire({ title: selection ? 'Añadir Nota' : 'Añadir Nota General', input: 'textarea', inputLabel: selection ? 'Tu nota sobre el texto:' : 'Escribe tu nota:', showCancelButton: true, confirmButtonText: 'Guardar', background: 'var(--surface-color)', color: 'var(--text-color)', confirmButtonColor: 'var(--primary-color)', customClass: { input: 'swal-input-dark' } });
-            if (text) await addDoc(collection(db, "users", currentUser.uid, "projects", currentProjectId, "pdfs", currentPdfId, "notes"), { text, selection, page: currentPageNum, createdAt: new Date() });
+            if (text) await addDoc(collection(db, "users", currentUser.uid, "projects", currentProjectId, "pdfs", currentPdfId, "notes"), { text, selection, color, page: currentPageNum, createdAt: new Date() });
         }
 
         function loadNotes() {
             if (notesUnsubscribe) notesUnsubscribe();
             const q = query(collection(db, "users", currentUser.uid, "projects", currentProjectId, "pdfs", currentPdfId, "notes"), orderBy("createdAt", "desc"));
-            notesUnsubscribe = onSnapshot(q, (snapshot) => { /* ... Lógica para renderizar notas ... */ });
+            notesUnsubscribe = onSnapshot(q, (snapshot) => {
+                DOM.notesList.innerHTML = '';
+                DOM.noNotesMessage.classList.toggle('hidden', !snapshot.empty);
+                snapshot.forEach(doc => {
+                    const note = doc.data(); const noteElement = document.createElement('div');
+                    noteElement.className = "note-item bg-surface-border-color p-3 rounded-lg";
+                    noteElement.dataset.text = `${note.text} ${note.selection || ''}`.toLowerCase();
+                    let noteHTML = `<p class="text-white whitespace-pre-wrap break-words">${note.text}</p>`;
+                    if (note.selection) noteHTML += `<div class="flex items-center gap-2 mt-2 p-2 border-l-2" style="border-color: ${note.color};"><div class="w-3 h-3 rounded-full" style="background-color: ${note.color};"></div><p class="text-sm text-gray-400 italic">"${note.selection}"</p></div>`;
+                    noteHTML += `<div class="text-right mt-2"><button data-id="${doc.id}" class="delete-note-btn text-red-400 hover:text-red-600 text-xs">Eliminar</button></div>`;
+                    noteElement.innerHTML = noteHTML; DOM.notesList.appendChild(noteElement);
+                });
+            });
         }
         
         async function handlePlayPause() {
-            if (!synthesis) return;
-            if (isSpeaking && synthesis.speaking) synthesis.pause();
-            else if (synthesis.paused) synthesis.resume();
+             if (!synthesis || !pdfDocument) return;
+            DOM.playPauseIcon.className = 'fas fa-pause';
+            if (isSpeaking && synthesis.speaking) { synthesis.pause(); DOM.playPauseIcon.className = 'fas fa-play'; }
+            else if (synthesis.paused) { synthesis.resume(); } 
             else {
                 try {
-                    DOM.playPauseIcon.className = 'fas fa-spinner fa-spin';
                     const page = await pdfDocument.getPage(currentPageNum);
                     const textContent = await page.getTextContent();
                     const pageText = textContent.items.map(item => item.str).join(' ');
-                    if (!pageText.trim()) return Swal.fire('Info', 'No hay texto en esta página.', 'info');
+                    if (!pageText.trim()) { Swal.fire('Info', 'No hay texto en esta página.', 'info'); DOM.playPauseIcon.className = 'fas fa-play'; return; }
                     spokenTextSpans = Array.from(document.querySelectorAll(`.textLayer[data-page-num="${currentPageNum}"] > span`));
                     currentUtterance = new SpeechSynthesisUtterance(pageText);
                     currentUtterance.lang = 'es';
                     currentUtterance.onboundary = (e) => {
                         if (lastHighlightedSpan) lastHighlightedSpan.classList.remove('speaking-highlight');
-                        const targetSpan = spokenTextSpans.find(span => span.textContent.includes(e.target.text.substring(e.charIndex).split(' ')[0]));
+                        const currentWord = e.target.text.substring(e.charIndex).split(' ')[0];
+                        const targetSpan = spokenTextSpans.find(span => span.textContent.includes(currentWord));
                         if (targetSpan) { targetSpan.classList.add('speaking-highlight'); targetSpan.scrollIntoView({ behavior: 'smooth', block: 'center' }); lastHighlightedSpan = targetSpan; }
                     };
                     currentUtterance.onend = () => { isSpeaking = false; DOM.playPauseIcon.className = 'fas fa-play'; if (lastHighlightedSpan) lastHighlightedSpan.classList.remove('speaking-highlight'); };
-                    synthesis.speak(currentUtterance);
-                    isSpeaking = true;
-                } catch (e) { console.error("Error en TTS", e); Swal.fire('Error', 'No se pudo iniciar la lectura.', 'error');
-                } finally { DOM.playPauseIcon.className = isSpeaking ? 'fas fa-pause' : 'fas fa-play'; }
+                    synthesis.speak(currentUtterance); isSpeaking = true;
+                } catch (e) { console.error("Error en TTS", e); Swal.fire('Error', 'No se pudo iniciar la lectura.', 'error'); DOM.playPauseIcon.className = 'fas fa-play'; }
             }
         }
         
         function handleStop() { if (synthesis) synthesis.cancel(); }
 
-        function updatePageNumberIndicator() { /* ... Tu función de indicador de página ... */ }
+        function updatePageNumberIndicator() {
+            if (scrollTimeout) clearTimeout(scrollTimeout);
+            if (!pdfDocument) return;
+            DOM.pageIndicator.style.opacity = '1';
+            const containerTop = DOM.pagesContainer.scrollTop;
+            let newPageNum = 1;
+            for (let i = 1; i < pagesHeight.length; i++) {
+                if (containerTop > pagesHeight[i - 1] - (DOM.pagesContainer.clientHeight / 2)) newPageNum = i; else break;
+            }
+            if (currentPageNum !== newPageNum) currentPageNum = newPageNum;
+            DOM.pageIndicator.textContent = `Página ${currentPageNum} / ${pdfDocument.numPages}`;
+            scrollTimeout = setTimeout(() => { DOM.pageIndicator.style.opacity = '0'; }, 1500);
+        }
         
-        // --- MANEJADORES DE EVENTOS ---
         function addEventListeners() {
             DOM.dynamicBackBtn.addEventListener('click', () => {
                 if (currentPdfId) window.location.href = `espacio.html?id=${currentProjectId}`;
@@ -398,7 +418,7 @@
             DOM.logoutBtn.addEventListener('click', () => signOut(auth));
             DOM.addPdfInput.addEventListener('change', (e) => uploadPdf(e.target.files[0]));
             DOM.openSidebarBtn.addEventListener('click', () => { DOM.sidebar.classList.add('open'); loadNotes(); });
-            DOM.closeSidebarBtn.addEventListener('click', () => { DOM.sidebar.classList.remove('open'); if (notesUnsubscribe) notesUnsubscribe(); });
+            DOM.closeSidebarBtn.addEventListener('click', () => { DOM.sidebar.classList.remove('open'); if (notesUnsubscribe) notesUnsubscribe = null; });
             DOM.addNoteBtn.addEventListener('click', () => handleNewNote());
             DOM.playPauseBtn.addEventListener('click', handlePlayPause);
             DOM.stopBtn.addEventListener('click', handleStop);
@@ -416,9 +436,18 @@
             DOM.pdfContent.addEventListener('touchend', stopDrawing);
             DOM.pagesContainer.addEventListener('scroll', updatePageNumberIndicator);
             DOM.notesList.addEventListener('click', async e => {
-                if (e.target.classList.contains('delete-note-btn')) { /* ... Lógica de borrado de nota ... */ }
+                if (e.target.classList.contains('delete-note-btn')) {
+                    const noteIdToDelete = e.target.dataset.id;
+                    const noteRef = doc(db, "users", currentUser.uid, "projects", currentProjectId, "pdfs", currentPdfId, "notes", noteIdToDelete);
+                    await deleteDoc(noteRef);
+                }
             });
-            DOM.searchNotesInput.addEventListener('input', (e) => { /* ... Lógica de búsqueda de nota ... */ });
+            DOM.searchNotesInput.addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                document.querySelectorAll('#notes-list .note-item').forEach(noteEl => {
+                    noteEl.classList.toggle('hidden', !noteEl.dataset.text.includes(searchTerm));
+                });
+            });
         }
     </script>
 </body>
