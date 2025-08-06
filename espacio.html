@@ -12,9 +12,11 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #0f0f0f; }
+        #main-content { scroll-behavior: smooth; }
         #pages-container .pdf-page-container {
-            position: relative; /* Clave para posicionar overlays */
+            position: relative; /* CRÍTICO para posicionar overlays */
             margin-bottom: 1rem;
+            line-height: 0; /* Evita espacios extra debajo del canvas */
         }
         .annotation-overlay {
             position: absolute;
@@ -32,7 +34,6 @@
             width: 90%;
         }
         #sidebar.open { right: 0; }
-        .pdf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1.5rem; }
         #page-number-indicator {
             position: fixed;
             bottom: 2rem;
@@ -43,7 +44,6 @@
             padding: 0.5rem 1.5rem;
             border-radius: 9999px;
             font-weight: 600;
-            display: none;
             z-index: 50;
             transition: opacity 0.3s ease-in-out, visibility 0.3s;
             opacity: 0;
@@ -55,7 +55,7 @@
         }
     </style>
 </head>
-<body class="text-white flex flex-col min-h-screen">
+<body class="text-white flex flex-col h-screen">
     <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-4 sm:px-6 flex justify-between items-center sticky top-0 z-40">
         <div class="flex items-center gap-4">
             <button id="dynamic-back-btn" class="flex items-center text-gray-400 hover:text-white transition group">
@@ -65,37 +65,33 @@
             <h1 id="project-title-display" class="text-lg sm:text-xl font-bold text-white truncate">Cargando...</h1>
         </div>
         <div class="flex items-center gap-2 sm:gap-4">
-             <button id="open-sidebar-btn" title="Abrir Cuaderno" class="bg-gray-700 text-white rounded-lg w-10 h-10 flex items-center justify-center shadow-lg hover:bg-gray-600 transition">
-                <i class="fas fa-book"></i>
-            </button>
+             <button id="open-sidebar-btn" title="Abrir Cuaderno" class="bg-gray-700 text-white rounded-lg w-10 h-10 items-center justify-center shadow-lg hover:bg-gray-600 transition" style="display: none;"><i class="fas fa-book"></i></button>
             <button id="logout-btn" class="text-gray-400 hover:text-white transition text-sm sm:text-base">Salir</button>
         </div>
     </header>
 
-    <main class="flex-1 flex flex-col items-center overflow-auto p-4 sm:p-6" id="main-content">
-        <div id="grid-view-container" class="w-full max-w-6xl">
-             <div id="pdfs-section" class="w-full">
-                <div id="pdf-list" class="pdf-grid">
-                    <div class="pdf-list-item flex flex-col items-center justify-center bg-[#181818] rounded-lg p-6 shadow-lg border border-dashed border-gray-600 transition hover:bg-[#2a2a2a] cursor-pointer" id="visual-upload-btn" style="aspect-ratio: 1 / 1.41;">
+    <main id="main-content" class="flex-1 flex flex-col items-center overflow-auto">
+        <div id="grid-view-container" class="w-full max-w-6xl p-4 sm:p-6">
+             <div id="pdf-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    <div class="flex flex-col items-center justify-center bg-[#181818] rounded-lg p-6 shadow-lg border border-dashed border-gray-600 transition hover:bg-[#2a2a2a] cursor-pointer" id="visual-upload-btn" style="aspect-ratio: 1 / 1.41;">
                         <svg class="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-                        <span class="mt-4 font-semibold text-gray-400 text-sm">Nuevo PDF</span>
+                        <span class="mt-4 font-semibold text-gray-400 text-sm text-center">Nuevo PDF</span>
                     </div>
                 </div>
                 <input type="file" id="pdf-file-input" class="hidden" accept="application/pdf">
-            </div>
         </div>
 
-        <div id="pdf-viewer-container" class="w-full max-w-4xl" style="display: none;">
-             <div id="pdf-controls" class="sticky top-[65px] bg-[#141414] z-30 p-3 rounded-b-lg mb-4 flex items-center justify-center gap-6">
-                <button id="play-pause-btn" title="Leer texto seleccionado" class="text-white hover:text-[#88c999] transition text-lg"><i class="fas fa-play"></i></button>
-                <button id="stop-btn" title="Detener lectura" class="text-white hover:text-red-400 transition text-lg"><i class="fas fa-stop"></i></button>
+        <div id="pdf-viewer-container" class="w-full max-w-4xl pt-4" style="display: none;">
+             <div id="pdf-controls" class="sticky top-0 bg-[#0f0f0f] bg-opacity-80 backdrop-blur-sm z-30 p-3 mb-4 flex items-center justify-center gap-6 rounded-b-lg">
+                <button id="play-pause-btn" title="Leer texto seleccionado o página actual" class="text-white hover:text-[#88c999] transition text-xl"><i class="fas fa-play"></i></button>
+                <button id="stop-btn" title="Detener lectura" class="text-white hover:text-red-400 transition text-xl"><i class="fas fa-stop"></i></button>
              </div>
             <div id="pages-container" class="w-full h-full">
                 </div>
         </div>
     </main>
 
-    <aside id="sidebar" class="bg-[#181818] text-white fixed top-0 w-full h-full transform translate-x-full transition-transform duration-300 z-50 p-4 flex flex-col border-l border-gray-700">
+    <aside id="sidebar" class="bg-[#181818] text-white fixed top-0 h-full transform translate-x-full z-50 p-4 flex flex-col border-l border-gray-700">
         <div class="flex justify-between items-center mb-4 pb-3 border-b border-gray-700">
             <h3 class="text-xl font-bold">Cuaderno de Notas</h3>
             <button id="close-sidebar-btn" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
@@ -126,7 +122,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { getFirestore, collection, query, onSnapshot, doc, getDoc, addDoc, setDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { getFirestore, collection, query, onSnapshot, doc, getDoc, addDoc, setDoc, orderBy } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
 
         const firebaseConfig = {
@@ -143,17 +139,12 @@
         const storage = getStorage(app);
         
         // --- ESTADO GLOBAL ---
-        let currentUser = null;
-        let currentProjectId = null;
-        let currentPdfId = null;
-        let pdfDocument = null; 
-        let unsubscribeHighlights = null;
-        let highlightColor = '#facc15'; 
-        let highlightRgba = 'rgba(250, 204, 21, 0.4)';
-        let pageRenderQueue = [];
-        let isRendering = false;
-
+        let currentUser = null, currentProjectId = null, currentPdfId = null;
+        let pdfDocument = null, unsubscribeHighlights = null;
+        let highlightColor = '#facc15', highlightRgba = 'rgba(250, 204, 21, 0.4)';
+        
         // --- ELEMENTOS DEL DOM ---
+        const mainContent = document.getElementById('main-content');
         const projectTitleDisplay = document.getElementById('project-title-display');
         const pdfLoaderContainer = document.getElementById('pdf-loader-container');
         const pdfLoaderText = document.getElementById('pdf-loader-text');
@@ -164,8 +155,6 @@
         const pdfList = document.getElementById('pdf-list');
         const pdfFileInput = document.getElementById('pdf-file-input');
         const pageNumberIndicator = document.getElementById('page-number-indicator');
-        
-        // --- ELEMENTOS DEL CUADERNO Y VOZ ---
         const sidebar = document.getElementById('sidebar');
         const openSidebarBtn = document.getElementById('open-sidebar-btn');
         const closeSidebarBtn = document.getElementById('close-sidebar-btn');
@@ -176,30 +165,21 @@
         const playPauseBtn = document.getElementById('play-pause-btn');
         const stopBtn = document.getElementById('stop-btn');
 
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js`;
 
-        // --- INICIALIZACIÓN Y AUTENTICACIÓN ---
+        // --- INICIALIZACIÓN Y ROUTING ---
         onAuthStateChanged(auth, async (user) => {
-            if (!user) {
-                window.location.href = 'index.html';
-                return;
-            }
+            if (!user) { window.location.href = 'index.html'; return; }
             currentUser = user;
             const urlParams = new URLSearchParams(window.location.search);
             currentProjectId = urlParams.get('id');
             const docId = urlParams.get('docId');
-
-            if (!currentProjectId) {
-                window.location.href = 'mi_tablero.html';
-                return;
-            }
+            if (!currentProjectId) { window.location.href = 'mi_tablero.html'; return; }
 
             const projectRef = doc(db, "users", currentUser.uid, "projects", currentProjectId);
             const projectDoc = await getDoc(projectRef);
-            if (projectDoc.exists()) {
-                projectTitleDisplay.textContent = projectDoc.data().name;
-            }
-
+            if(projectDoc.exists()) projectTitleDisplay.textContent = projectDoc.data().name;
+            
             if (docId) {
                 currentPdfId = docId;
                 await loadPDFViewer(currentPdfId);
@@ -214,7 +194,7 @@
         function loadPdfGrid() {
             gridViewContainer.style.display = 'block';
             pdfViewerContainer.style.display = 'none';
-            const pdfsQuery = query(collection(db, "users", currentUser.uid, "projects", currentProjectId, "pdfs"));
+            const pdfsQuery = query(collection(db, "users", currentUser.uid, "projects", currentProjectId, "pdfs"), orderBy("createdAt", "desc"));
             onSnapshot(pdfsQuery, (snapshot) => {
                 pdfList.querySelectorAll('.pdf-card').forEach(card => card.remove());
                 snapshot.forEach(createPdfCard);
@@ -235,16 +215,14 @@
         pdfFileInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file || file.type !== 'application/pdf') return;
-
             showLoader("Subiendo PDF...");
             const newPdfDocRef = doc(collection(db, "users", currentUser.uid, "projects", currentProjectId, "pdfs"));
             const storageRef = ref(storage, `proyectos/${currentUser.uid}/${currentProjectId}/pdfs/${newPdfDocRef.id}-${file.name}`);
-            const uploadTask = uploadBytesResumable(storageRef, file);
-            uploadTask.on('state_changed', 
+            uploadBytesResumable(storageRef, file).on('state_changed', 
                 (s) => pdfLoaderText.textContent = `Subiendo: ${Math.round((s.bytesTransferred / s.totalBytes) * 100)}%`,
                 (err) => { hideLoader(); console.error(err); Swal.fire('Error', 'No se pudo subir el PDF.', 'error'); },
                 async () => {
-                    const url = await getDownloadURL(uploadTask.snapshot.ref);
+                    const url = await getDownloadURL(storageRef);
                     await setDoc(newPdfDocRef, { name: file.name.replace('.pdf', ''), fileName: file.name, url, createdAt: new Date() });
                     hideLoader();
                 }
@@ -256,71 +234,54 @@
             showLoader("Cargando documento...");
             gridViewContainer.style.display = 'none';
             pdfViewerContainer.style.display = 'block';
-
             const pdfDocRef = doc(db, "users", currentUser.uid, "projects", currentProjectId, "pdfs", pdfId);
             const pdfDocSnap = await getDoc(pdfDocRef);
-            if (!pdfDocSnap.exists()) {
-                hideLoader();
-                Swal.fire('Error', 'Documento no encontrado.', 'error');
-                return;
-            }
+            if (!pdfDocSnap.exists()) { hideLoader(); Swal.fire('Error', 'Documento no encontrado.', 'error'); return; }
+            
             projectTitleDisplay.textContent = pdfDocSnap.data().name;
-
-            const loadingTask = pdfjsLib.getDocument(pdfDocSnap.data().url);
-            pdfDocument = await loadingTask.promise;
+            pdfDocument = await pdfjsLib.getDocument(pdfDocSnap.data().url).promise;
             pagesContainer.innerHTML = '';
             
+            const renderPromises = [];
             for (let i = 1; i <= pdfDocument.numPages; i++) {
                 const pageDiv = document.createElement('div');
                 pageDiv.className = 'pdf-page-container';
                 pageDiv.dataset.pageNumber = i;
                 const canvas = document.createElement('canvas');
-                canvas.className = 'w-full h-auto shadow-lg bg-white';
                 pageDiv.appendChild(canvas);
                 pagesContainer.appendChild(pageDiv);
-                pageRenderQueue.push(i);
+                renderPromises.push(renderPage(i, canvas));
             }
             
-            processRenderQueue();
+            await Promise.all(renderPromises);
             loadAndDrawAnnotations();
-            main-content.addEventListener('scroll', handleScroll, { passive: true });
+            mainContent.addEventListener('scroll', handleScroll, { passive: true });
             pagesContainer.addEventListener('mouseup', handleTextSelection);
             hideLoader();
         }
 
-        function processRenderQueue() {
-            if (isRendering || pageRenderQueue.length === 0) return;
-            isRendering = true;
-            const pageNum = pageRenderQueue.shift();
-            renderPage(pageNum).then(() => {
-                isRendering = false;
-                processRenderQueue();
-            });
-        }
-
-        async function renderPage(pageNum) {
+        async function renderPage(pageNum, canvas) {
             const page = await pdfDocument.getPage(pageNum);
             const viewport = page.getViewport({ scale: 1.8 });
-            const canvas = pagesContainer.querySelector(`[data-page-number="${pageNum}"] canvas`);
             const context = canvas.getContext('2d');
             canvas.height = viewport.height;
             canvas.width = viewport.width;
             await page.render({ canvasContext: context, viewport }).promise;
         }
 
-        // --- FUNCIONALIDAD DE ANOTACIONES ---
+        // --- LÓGICA DEL CUADERNO (LA BUENA) ---
         function loadAndDrawAnnotations() {
             if (unsubscribeHighlights) unsubscribeHighlights();
-            const highlightsQuery = query(collection(db, "users", currentUser.uid, "projects", currentProjectId, "pdfs", currentPdfId, "highlights"));
-            unsubscribeHighlights = onSnapshot(highlightsQuery, (snapshot) => {
+            const q = query(collection(db, "users", currentUser.uid, "projects", currentProjectId, "pdfs", currentPdfId, "highlights"), orderBy("createdAt", "asc"));
+            unsubscribeHighlights = onSnapshot(q, (snapshot) => {
                 document.querySelectorAll('.annotation-overlay').forEach(el => el.remove());
                 notesList.innerHTML = '';
                 noNotesMessage.style.display = snapshot.empty ? 'block' : 'none';
                 
-                snapshot.docs.sort((a, b) => a.data().createdAt.seconds - b.data().createdAt.seconds).forEach(doc => {
+                snapshot.forEach(doc => {
                     const data = doc.data();
                     drawAnnotation(data);
-                    createNoteCard(data, doc.id);
+                    createNoteCard(data);
                 });
             });
         }
@@ -331,46 +292,49 @@
             data.rectangles.forEach(rect => {
                 const overlay = document.createElement('div');
                 overlay.className = 'annotation-overlay';
-                overlay.style.backgroundColor = data.rgba;
-                overlay.style.left = `${rect.left}px`;
-                overlay.style.top = `${rect.top}px`;
-                overlay.style.width = `${rect.width}px`;
-                overlay.style.height = `${rect.height}px`;
+                Object.assign(overlay.style, {
+                    backgroundColor: data.rgba,
+                    left: `${rect.left}px`,
+                    top: `${rect.top}px`,
+                    width: `${rect.width}px`,
+                    height: `${rect.height}px`,
+                });
                 pageDiv.appendChild(overlay);
             });
         }
         
         async function handleTextSelection() {
             const selection = window.getSelection();
-            const selectedText = selection.toString().trim();
-            if (!selectedText) return;
+            if (selection.isCollapsed || !selection.rangeCount) return;
 
             const range = selection.getRangeAt(0);
             const pageElement = range.startContainer.parentElement.closest('.pdf-page-container');
             if (!pageElement) return;
 
+            const selectedText = selection.toString().trim();
+            if (!selectedText) return;
+
             const pageNum = parseInt(pageElement.dataset.pageNumber);
             const pageRect = pageElement.getBoundingClientRect();
+            const mainRect = mainContent.getBoundingClientRect();
+            
+            // La fórmula de coordenadas correcta y robusta
             const selectionRects = Array.from(range.getClientRects()).map(rect => ({
-                top: rect.top - pageRect.top + main-content.scrollTop,
+                top: rect.top - pageRect.top,
                 left: rect.left - pageRect.left,
                 width: rect.width,
                 height: rect.height
             }));
-
-            selection.removeAllRanges(); // Limpiar la selección visualmente
+            
+            selection.removeAllRanges();
 
             const { value: result } = await Swal.fire({
                 title: 'Añadir Anotación',
                 html: `<p class="text-sm text-gray-400 text-left mb-2 line-clamp-2">Resaltado: "${selectedText}"</p>
                        <textarea id="swal-note" class="swal2-textarea" placeholder="Escribe tu nota aquí..." style="min-height: 100px;"></textarea>
                        <input id="swal-tags" class="swal2-input" placeholder="Etiquetas (ej: importante, examen)">`,
-                focusConfirm: false,
-                confirmButtonText: 'Guardar',
-                showCancelButton: true,
-                cancelButtonText: 'Cancelar',
-                background: '#181818',
-                color: '#fff',
+                focusConfirm: false, confirmButtonText: 'Guardar', showCancelButton: true, cancelButtonText: 'Cancelar',
+                background: '#181818', color: '#fff',
                 preConfirm: () => ({
                     note: document.getElementById('swal-note').value,
                     tags: document.getElementById('swal-tags').value.split(',').map(t => t.trim()).filter(Boolean)
@@ -385,31 +349,25 @@
                 });
             }
         }
-
-        // --- UI DEL CUADERNO ---
-        function createNoteCard(data, docId) {
+        
+        function createNoteCard(data) {
             const card = document.createElement('div');
             card.className = 'note-card bg-[#2a2a2a] p-3 rounded-lg cursor-pointer hover:bg-gray-700';
             card.dataset.fulltext = `${data.text} ${data.note} ${data.tags.join(' ')}`.toLowerCase();
             card.style.borderLeft = `4px solid ${data.color}`;
-
-            card.innerHTML = `
-                <p class="text-xs text-gray-400 mb-1">Página ${data.page}</p>
-                <p class="font-semibold text-sm text-white line-clamp-2">"${data.text}"</p>
-                <p class="text-sm text-gray-300 mt-1 line-clamp-3">${data.note || '<i>Sin nota adicional</i>'}</p>
-                <div class="mt-2 flex flex-wrap gap-1">
-                    ${data.tags.map(tag => `<span class="bg-gray-500 text-white text-xs font-bold px-2 py-1 rounded-full">${tag}</span>`).join('')}
-                </div>`;
-            card.addEventListener('click', () => { // Scroll a la anotación
+            card.innerHTML = `<p class="text-xs text-gray-400 mb-1">Página ${data.page}</p>
+                              <p class="font-semibold text-sm text-white line-clamp-2">"${data.text}"</p>
+                              <p class="text-sm text-gray-300 mt-1 line-clamp-3">${data.note || '<i>Sin nota adicional</i>'}</p>
+                              <div class="mt-2 flex flex-wrap gap-1">${data.tags.map(tag => `<span class="bg-gray-500 text-white text-xs font-bold px-2 py-1 rounded-full">${tag}</span>`).join('')}</div>`;
+            card.addEventListener('click', () => {
                  const pageDiv = pagesContainer.querySelector(`[data-page-number="${data.page}"]`);
-                 if(pageDiv) {
-                    main-content.scrollTo({ top: pageDiv.offsetTop - 80, behavior: 'smooth' });
-                    sidebar.classList.remove('open');
-                 }
+                 if(pageDiv) mainContent.scrollTo({ top: pageDiv.offsetTop, behavior: 'smooth' });
+                 sidebar.classList.remove('open');
             });
             notesList.appendChild(card);
         }
 
+        // --- CONTROLES Y EVENTOS ---
         highlightTools.addEventListener('click', (e) => {
             const button = e.target.closest('button');
             if (button && button.dataset.color) {
@@ -422,58 +380,40 @@
         
         searchNotesInput.addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase();
-            notesList.querySelectorAll('.note-card').forEach(card => {
-                card.style.display = card.dataset.fulltext.includes(term) ? 'block' : 'none';
-            });
+            notesList.querySelectorAll('.note-card').forEach(card => card.style.display = card.dataset.fulltext.includes(term) ? 'block' : 'none');
         });
 
         openSidebarBtn.addEventListener('click', () => sidebar.classList.add('open'));
         closeSidebarBtn.addEventListener('click', () => sidebar.classList.remove('open'));
+        dynamicBackBtn.addEventListener('click', () => window.location.search = `?id=${currentProjectId}`);
+        document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
 
-        // --- FUNCIONES RESTAURADAS: VOZ Y CONTEO DE PÁGINA ---
+        // --- VOZ Y CONTADOR DE PÁGINA ---
         const synthesis = window.speechSynthesis;
-        let utterance = null;
         let isSpeaking = false;
+        playPauseBtn.addEventListener('click', () => {
+            if(isSpeaking) { synthesis.pause(); isSpeaking = false; playPauseBtn.innerHTML = '<i class="fas fa-play"></i>'; } 
+            else if (synthesis.paused) { synthesis.resume(); isSpeaking = true; playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>'; } 
+            else { speakText(window.getSelection().toString()); }
+        });
+        stopBtn.addEventListener('click', () => { if (synthesis.speaking) synthesis.cancel(); });
 
         async function speakText(text) {
             if (synthesis.speaking) synthesis.cancel();
-            
-            let textToRead = text;
-            if(!textToRead) { // Si no hay texto seleccionado, intenta leer el contenido de la página actual
-                 const currentPage = findCurrentPage();
-                 const page = await pdfDocument.getPage(currentPage);
-                 const content = await page.getTextContent();
-                 textToRead = content.items.map(item => item.str).join(' ');
-            }
-            if(!textToRead) {
-                Swal.fire({title: 'Nada para leer', text:'Selecciona texto o desplázate a una página con texto.', icon:'info', background:'#181818', color: '#fff' });
-                return;
-            }
-
-            utterance = new SpeechSynthesisUtterance(textToRead);
+            let textToRead = text || await getTextFromCurrentPage();
+            if(!textToRead) { Swal.fire({title: 'Nada para leer', icon:'info', background:'#181818', color: '#fff' }); return; }
+            const utterance = new SpeechSynthesisUtterance(textToRead);
             utterance.onstart = () => { isSpeaking = true; playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>'; };
             utterance.onend = () => { isSpeaking = false; playPauseBtn.innerHTML = '<i class="fas fa-play"></i>'; };
-            utterance.onerror = () => { isSpeaking = false; playPauseBtn.innerHTML = '<i class="fas fa-play"></i>'; };
             synthesis.speak(utterance);
         }
         
-        playPauseBtn.addEventListener('click', () => {
-            if(isSpeaking) {
-                synthesis.pause();
-                isSpeaking = false;
-                playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-            } else if (synthesis.paused) {
-                 synthesis.resume();
-                 isSpeaking = true;
-                 playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
-            } else {
-                speakText(window.getSelection().toString());
-            }
-        });
-
-        stopBtn.addEventListener('click', () => {
-            if (synthesis.speaking) synthesis.cancel();
-        });
+        async function getTextFromCurrentPage() {
+            const pageNum = findCurrentPage();
+            const page = await pdfDocument.getPage(pageNum);
+            const content = await page.getTextContent();
+            return content.items.map(item => item.str).join(' ');
+        }
         
         let scrollTimeout;
         function handleScroll() {
@@ -482,23 +422,23 @@
             pageNumberIndicator.textContent = `${currentPage} / ${pdfDocument.numPages}`;
             pageNumberIndicator.classList.add('visible');
             clearTimeout(scrollTimeout);
-            scrollTimeout = setTimeout(() => {
-                pageNumberIndicator.classList.remove('visible');
-            }, 1500);
+            scrollTimeout = setTimeout(() => pageNumberIndicator.classList.remove('visible'), 1500);
         }
         
         function findCurrentPage() {
-             const scrollPosition = main-content.scrollTop + (window.innerHeight / 2);
-             const pages = Array.from(pagesContainer.children);
-             const currentPage = pages.find(p => scrollPosition >= p.offsetTop && scrollPosition <= p.offsetTop + p.offsetHeight);
-             return currentPage ? parseInt(currentPage.dataset.pageNumber) : 1;
+             const scrollCenter = mainContent.scrollTop + (mainContent.clientHeight / 2);
+             for(const page of pagesContainer.children) {
+                 if (scrollCenter >= page.offsetTop && scrollCenter <= page.offsetTop + page.offsetHeight) {
+                     return parseInt(page.dataset.pageNumber);
+                 }
+             }
+             return 1;
         }
-
-        // --- NAVEGACIÓN Y OTROS ---
-        dynamicBackBtn.addEventListener('click', () => window.location.search = `?id=${currentProjectId}`);
-        document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+        
+        // --- HELPERS ---
         function showLoader(message) { pdfLoaderText.textContent = message; pdfLoaderContainer.style.display = 'flex'; }
         function hideLoader() { pdfLoaderContainer.style.display = 'none'; }
+
     </script>
 </body>
 </html>
