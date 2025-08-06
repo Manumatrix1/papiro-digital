@@ -151,13 +151,13 @@
         <div id="pdf-viewer-container" class="relative w-full h-full flex-col" style="display: none;">
             <div class="flex-shrink-0 flex flex-col sm:flex-row items-center justify-between p-2 sm:p-4 bg-surface-color rounded-lg mb-4">
                 <div class="flex items-center gap-2 mb-2 sm:mb-0 w-full sm:w-auto">
-                    <button id="play-pause-btn" class="text-white hover:text-primary-color transition p-2"><i class="fas fa-play"></i></button>
-                    <button id="stop-btn" class="text-white hover:text-red-400 transition p-2"><i class="fas fa-stop"></i></button>
-                    <button id="fullscreen-btn" class="text-white hover:text-primary-color transition p-2"><i class="fas fa-expand"></i></button>
+                    <button id="play-pause-btn" class="text-white hover:text-primary-color transition p-2" title="Leer texto seleccionado (Play/Pausa)"><i class="fas fa-play"></i></button>
+                    <button id="stop-btn" class="text-white hover:text-red-400 transition p-2" title="Detener lectura"><i class="fas fa-stop"></i></button>
+                    <button id="fullscreen-btn" class="text-white hover:text-primary-color transition p-2" title="Pantalla completa"><i class="fas fa-expand"></i></button>
                 </div>
                 <div class="relative w-full sm:w-1/2 flex items-center gap-2 sm:gap-4">
-                    <input type="text" id="search-notes-input" placeholder="Buscar notas..." class="w-full bg-surface-border-color text-white placeholder-gray-400 py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-color">
-                    <button id="open-sidebar-btn" class="bg-surface-border-color text-gray-400 rounded-lg w-10 h-10 flex items-center justify-center shadow-lg hover:text-white transition">
+                    <input type="text" id="search-notes-input" placeholder="Buscar en notas..." class="w-full bg-surface-border-color text-white placeholder-gray-400 py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-color">
+                    <button id="open-sidebar-btn" class="bg-surface-border-color text-gray-400 rounded-lg w-10 h-10 flex items-center justify-center shadow-lg hover:text-white transition" title="Abrir cuaderno de notas">
                         <i class="fas fa-book"></i>
                     </button>
                 </div>
@@ -191,7 +191,7 @@
     
     <!-- TOOLBAR -->
     <div id="annotation-toolbar" style="display: none;">
-        <button class="tool-btn active" id="tool-select" title="Seleccionar"><i class="fas fa-mouse-pointer"></i></button>
+        <button class="tool-btn active" id="tool-select" title="Seleccionar texto"><i class="fas fa-mouse-pointer"></i></button>
         <button class="tool-btn" id="tool-draw" title="Dibujar"><i class="fas fa-pencil-alt"></i></button>
         <button class="tool-btn" id="tool-highlight" title="Resaltar"><i class="fas fa-highlighter"></i></button>
         <input type="color" id="color-picker" class="color-picker" value="#FFFF00" title="Seleccionar color">
@@ -236,17 +236,18 @@
         let synthesis = window.speechSynthesis;
         let currentUtterance = null;
         let isSpeaking = false;
+        let scrollTimeout = null;
         
         // --- ELEMENTOS DEL DOM ---
         const mainContentEl = document.getElementById('main-content');
         const pageLoaderContainer = document.getElementById('page-loader-container');
-        const pageLoaderText = document.getElementById('page-loader-text');
         const projectTitleEl = document.getElementById('project-title');
         const pdfViewerContainer = document.getElementById('pdf-viewer-container');
         const gridViewContainer = document.getElementById('grid-view-container');
         const pagesContainer = document.getElementById('pages-container');
         const annotationToolbar = document.getElementById('annotation-toolbar');
         const pdfFileInput = document.getElementById('pdf-file-input');
+        const pageNumberIndicator = document.getElementById('page-number-indicator');
         
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
@@ -317,7 +318,6 @@
         }
         
         async function loadPDFViewer(docId) {
-            pageLoaderText.textContent = 'Cargando PDF...';
             pageLoaderContainer.style.display = 'flex';
             
             try {
@@ -332,7 +332,7 @@
                 const url = pdfData.url;
                 pdfDocument = await pdfjsLib.getDocument(url).promise;
                 pagesContainer.innerHTML = '';
-                pagesHeight = [];
+                pagesHeight = [0]; // Start with 0 for cumulative calculation
                 
                 for (let i = 1; i <= pdfDocument.numPages; i++) {
                     const page = await pdfDocument.getPage(i);
@@ -361,9 +361,12 @@
                     pagesContainer.appendChild(pageDiv);
 
                     await page.render({ canvasContext: canvas.getContext('2d'), viewport: scaledViewport }).promise;
-                    pagesHeight.push(pageDiv.offsetHeight);
+                    // Store cumulative height for page calculation
+                    pagesHeight[i] = (pagesHeight[i-1] || 0) + pageDiv.offsetHeight;
                     loadAnnotationsForPage(i);
                 }
+                setActiveTool('select');
+                updatePageNumberIndicator(); // Initial call
             } catch (error) {
                 console.error("Error cargando PDF:", error);
                 Swal.fire('Error', 'No se pudo cargar el PDF.', 'error');
@@ -504,7 +507,7 @@
                 focusConfirm: false, background: '#181818', color: '#fff',
                 preConfirm: () => {
                     const noteText = document.getElementById('swal-input1').value;
-                    const tags = document.getElementById('swal-input2').value.split(',').map(tag => tag.trim()).filter(tag => tag);
+                    const tags = document.getElementById('swal-input2').value.split(',').map(tag => tag.trim().toLowerCase()).filter(tag => tag);
                     if (!noteText) { Swal.showValidationMessage('La nota no puede estar vacía'); return false; }
                     return { noteText, tags };
                 }
@@ -538,10 +541,17 @@
                     snapshot.docs.forEach((noteDoc) => {
                         const noteData = noteDoc.data();
                         const noteEl = document.createElement('div');
-                        noteEl.className = 'bg-surface-border-color p-3 rounded-lg shadow-md';
+                        noteEl.className = 'bg-surface-border-color p-3 rounded-lg shadow-md note-item';
+                        
+                        const tagsHTML = (noteData.tags || []).map(tag => {
+                            const bgColor = stringToColor(tag);
+                            const textColor = getContrastColor(bgColor);
+                            return `<span class="text-xs font-bold px-2 py-1 rounded-full" style="background-color: ${bgColor}; color: ${textColor};">${tag}</span>`;
+                        }).join('');
+
                         noteEl.innerHTML = `<p class="text-xs text-gray-400 mb-1 cursor-pointer hover:text-white" data-page-num="${noteData.page}">Página: ${noteData.page}</p>
-                                            <p class="text-sm text-gray-300">${noteData.note}</p>
-                                            <div class="mt-2 flex flex-wrap gap-1">${noteData.tags.map(tag => `<span class="bg-primary-color text-surface-color text-xs font-bold px-2 py-1 rounded-full">${tag}</span>`).join('')}</div>`;
+                                            <p class="text-sm text-gray-300 note-text">${noteData.note}</p>
+                                            <div class="mt-2 flex flex-wrap gap-1 tags-container">${tagsHTML}</div>`;
                         notesListEl.appendChild(noteEl);
                     });
                 }
@@ -551,11 +561,12 @@
         // --- FUNCIONES DE VOZ ---
         async function speakText(text) {
             if (synthesis.speaking) return;
-            if (!text) {
+            if (!text && pdfDocument) {
                 const page = await pdfDocument.getPage(currentPageNum);
                 const textContent = await page.getTextContent();
                 text = textContent.items.map(item => item.str).join(' ');
             }
+            if (!text) return;
             currentUtterance = new SpeechSynthesisUtterance(text);
             currentUtterance.onend = () => { isSpeaking = false; document.getElementById('play-pause-btn').innerHTML = '<i class="fas fa-play"></i>'; };
             currentUtterance.onerror = (e) => { console.error('SpeechSynthesisUtterance.onerror', e); isSpeaking = false; document.getElementById('play-pause-btn').innerHTML = '<i class="fas fa-play"></i>'; };
@@ -574,6 +585,50 @@
             synthesis.cancel();
             isSpeaking = false;
             document.getElementById('play-pause-btn').innerHTML = '<i class="fas fa-play"></i>';
+        }
+
+        // --- FUNCIONES UTILITARIAS ---
+        function stringToColor(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            let color = '#';
+            for (let i = 0; i < 3; i++) {
+                let value = (hash >> (i * 8)) & 0xFF;
+                color += ('00' + value.toString(16)).substr(-2);
+            }
+            return color;
+        }
+
+        function getContrastColor(hexColor) {
+            if (hexColor.startsWith('#')) { hexColor = hexColor.slice(1); }
+            const r = parseInt(hexColor.substr(0, 2), 16);
+            const g = parseInt(hexColor.substr(2, 2), 16);
+            const b = parseInt(hexColor.substr(4, 2), 16);
+            const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+            return (yiq >= 128) ? '#000000' : '#FFFFFF';
+        }
+        
+        function updatePageNumberIndicator() {
+            if (!pdfDocument) return;
+            
+            const scrollTop = pagesContainer.scrollTop;
+            let foundPage = 1;
+            for (let i = 1; i < pagesHeight.length; i++) {
+                if (scrollTop < pagesHeight[i]) {
+                    foundPage = i;
+                    break;
+                }
+            }
+            currentPageNum = foundPage;
+            pageNumberIndicator.textContent = `${currentPageNum} / ${pdfDocument.numPages}`;
+            pageNumberIndicator.style.opacity = '1';
+            
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                pageNumberIndicator.style.opacity = '0';
+            }, 1500);
         }
 
         // --- EVENT LISTENERS ---
@@ -617,6 +672,19 @@
                 else { toggleSpeech(); }
             });
             document.getElementById('stop-btn').addEventListener('click', stopSpeech);
+
+            // Search notes event
+            document.getElementById('search-notes-input').addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                const notes = document.querySelectorAll('#notes-list .note-item');
+                notes.forEach(note => {
+                    const noteText = note.textContent.toLowerCase();
+                    note.style.display = noteText.includes(searchTerm) ? 'block' : 'none';
+                });
+            });
+
+            // Page counter event
+            pagesContainer.addEventListener('scroll', updatePageNumberIndicator);
         }
     </script>
 </body>
