@@ -4,12 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title id="page-title">Cargando...</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PDF.js CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <!-- Fuentes de Google -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome para iconos -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <!-- SweetAlert2 para alertas personalizadas -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- Importaciones de Firebase UMD (Universal Module Definition) -->
+    <!-- Estas importaciones cargan Firebase globalmente, evitando problemas de módulos -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+
     <style>
         /* Estilos generales para el cuerpo y la fuente */
         body { 
@@ -324,33 +337,28 @@
     <!-- Indicador de número de página flotante -->
     <div id="page-number-indicator" class="z-50"></div>
     
-    <script type="module">
+    <script>
         console.log("Script starting to parse..."); // Mensaje de diagnóstico para verificar el inicio del script
-
-        // Importaciones de Firebase
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signOut, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, collection, query, where, getDocs, doc, updateDoc, onSnapshot, deleteDoc, setDoc, addDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
         // Configuración de Firebase: ¡AHORA USA LA CONFIGURACIÓN DEL ENTORNO DE CANVAS!
         // Esto es CRÍTICO para que Firebase funcione correctamente en este entorno.
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
         
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const storage = getStorage(app);
+        // Inicializa Firebase con la configuración proporcionada
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const storage = firebase.storage();
 
         // *** IMPORTANTE: Autenticación inicial con el token proporcionado por Canvas ***
         // Esto es crucial para que Firebase funcione correctamente en este entorno.
         async function authenticateFirebase() {
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
+                    await auth.signInWithCustomToken(__initial_auth_token);
                     console.log("Firebase: Autenticado con token personalizado.");
                 } else {
-                    await signInAnonymously(auth);
+                    await auth.signInAnonymously();
                     console.log("Firebase: Autenticado anónimamente.");
                 }
             } catch (error) {
@@ -432,7 +440,8 @@
             authenticateFirebase();
 
             // Observa cambios en el estado de autenticación de Firebase
-            onAuthStateChanged(auth, async (user) => {
+            // Usamos firebase.auth().onAuthStateChanged ya que las importaciones son UMD
+            firebase.auth().onAuthStateChanged(async (user) => {
                 currentUser = user;
                 if (!currentUser) {
                     // Si no hay usuario autenticado, redirige a la página de inicio
@@ -451,11 +460,12 @@
                     return;
                 }
                 // Establece la referencia al documento del proyecto en Firestore
-                currentProjectRef = doc(db, "users", currentUser.uid, "projects", projectId);
+                // Usamos db.collection().doc() ya que las importaciones son UMD
+                currentProjectRef = db.collection("users").doc(currentUser.uid).collection("projects").doc(projectId);
                 
                 // Escucha cambios en el documento del proyecto en tiempo real
-                onSnapshot(currentProjectRef, (projectDoc) => {
-                    if (projectDoc.exists()) {
+                currentProjectRef.onSnapshot((projectDoc) => {
+                    if (projectDoc.exists) { // Usar .exists para verificar si el documento existe
                         const projectData = projectDoc.data();
                         projectTitleEl.value = projectData.name;
                         pageTitleEl.textContent = projectData.name;
@@ -491,8 +501,9 @@
                 }
 
                 // Escucha cambios en la colección de PDFs del proyecto en tiempo real
-                const pdfsQuery = query(collection(db, "users", currentUser.uid, "projects", projectId, "pdfs"));
-                onSnapshot(pdfsQuery, (snapshot) => {
+                // Usamos db.collection().where() y .onSnapshot() ya que las importaciones son UMD
+                const pdfsQuery = db.collection("users").doc(currentUser.uid).collection("projects").doc(projectId).collection("pdfs");
+                pdfsQuery.onSnapshot((snapshot) => {
                     // Limpia la lista de PDFs y añade el botón de subir
                     pdfList.innerHTML = `<div class="pdf-list-item flex flex-col items-center justify-center bg-[#181818] rounded-lg p-4 sm:p-6 shadow-lg border border-dashed border-gray-600 transition hover:bg-[#2a2a2a] cursor-pointer" id="visual-upload-btn" style="aspect-ratio: 1 / 1;">
                                                 <svg class="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -530,10 +541,11 @@
                 showLoader(); // Muestra el loader
 
                 // Obtiene la referencia y los datos del documento PDF de Firestore
-                const pdfDocumentRef = doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", docId);
-                const pdfDocSnapshot = await getDoc(pdfDocumentRef);
+                // Usamos db.collection().doc().get() ya que las importaciones son UMD
+                const pdfDocumentRef = db.collection("users").doc(currentUser.uid).collection("projects").doc(currentProjectRef.id).collection("pdfs").doc(docId);
+                const pdfDocSnapshot = await pdfDocumentRef.get();
                 
-                if (!pdfDocSnapshot.exists()) {
+                if (!pdfDocSnapshot.exists) { // Usar .exists para verificar si el documento existe
                     throw new Error("Documento PDF no encontrado en Firestore");
                 }
                 const pdfData = pdfDocSnapshot.data();
@@ -541,7 +553,7 @@
                 projectTitleEl.value = pdfData.name; // Actualiza el título del proyecto/PDF
 
                 // Verifica si el usuario está autenticado para acceder al almacenamiento
-                const user = auth.currentUser;
+                const user = firebase.auth().currentUser; // Usamos firebase.auth().currentUser
                 if (!user) {
                     console.error("No hay usuario autenticado. No se puede cargar el PDF.");
                     Swal.fire('Error', 'Ocurrió un error. Intente de nuevo.', 'error');
@@ -549,8 +561,9 @@
                 }
                 
                 // Obtiene la URL de descarga del PDF desde Firebase Storage
-                const pdfRef = ref(storage, `proyectos/${currentUser.uid}/${currentProjectRef.id}/pdfs/${pdfFileName}`);
-                const url = await getDownloadURL(pdfRef);
+                // Usamos storage.ref().child().getDownloadURL() ya que las importaciones son UMD
+                const pdfRef = storage.ref().child(`proyectos/${currentUser.uid}/${currentProjectRef.id}/pdfs/${pdfFileName}`);
+                const url = await pdfRef.getDownloadURL();
 
                 // Carga el documento PDF usando PDF.js
                 const loadingTask = pdfjsLib.getDocument({ url: url });
@@ -692,8 +705,9 @@
                 clearTimeout(timer);
                 timer = setTimeout(async () => {
                     try {
-                        const pdfRef = doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", pdfDoc.id);
-                        await updateDoc(pdfRef, { name: newName });
+                        // Usamos currentProjectRef.collection().doc().update() ya que las importaciones son UMD
+                        const pdfRef = currentProjectRef.collection("pdfs").doc(pdfDoc.id);
+                        await pdfRef.update({ name: newName });
                         console.log('Nombre de PDF actualizado:', newName);
                     } catch (error) {
                         console.error("Error al actualizar el nombre del PDF:", error);
@@ -719,7 +733,8 @@
                 // Evita que el clic en el botón de eliminar o el input active el visor
                 if (!e.target.closest('.delete-pdf-btn') && e.target.tagName.toLowerCase() !== 'input') {
                     currentPdfId = pdfDoc.id;
-                    currentPdfRef = doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId);
+                    // Usamos currentProjectRef.collection().doc() ya que las importaciones son UMD
+                    currentPdfRef = currentProjectRef.collection("pdfs").doc(currentPdfId);
                     loadPDFViewer(pdfDoc.id);
                 }
             });
@@ -740,8 +755,9 @@
                 }).then(async (result) => {
                     if (result.isConfirmed) {
                         try {
-                            const pdfRefToDelete = doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", pdfId);
-                            await deleteDoc(pdfRefToDelete);
+                            // Usamos currentProjectRef.collection().doc().delete() ya que las importaciones son UMD
+                            const pdfRefToDelete = currentProjectRef.collection("pdfs").doc(pdfId);
+                            await pdfRefToDelete.delete();
                             Swal.fire('¡Eliminado!', 'El PDF ha sido eliminado.', 'success');
                         } catch (error) {
                             console.error("Error al eliminar el PDF:", error);
@@ -793,14 +809,12 @@
             pdfLoaderText.textContent = "Subiendo PDF...";
             showLoader();
 
-            // Crea una nueva referencia de documento en Firestore para el PDF
-            const newPdfRef = doc(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs"));
-            // Crea una referencia en Firebase Storage para el archivo
-            const storageRef = ref(storage, `proyectos/${currentUser.uid}/${currentProjectRef.id}/pdfs/${file.name}`);
-            // Inicia la tarea de subida
-            const uploadTask = uploadBytesResumable(storageRef, file);
+            // Usamos currentProjectRef.collection().doc() y storage.ref().child().put() ya que las importaciones son UMD
+            const newPdfDocRef = currentProjectRef.collection("pdfs").doc(); // Genera un nuevo ID para el documento
+            const storageRef = storage.ref().child(`proyectos/${currentUser.uid}/${currentProjectRef.id}/pdfs/${file.name}`);
+            const uploadTask = storageRef.put(file);
 
-            uploadTask.on('state_changed',
+            uploadTask.on(firebase.storage.TaskEvent.STATE_CHANGED, // Usamos firebase.storage.TaskEvent.STATE_CHANGED
                 (snapshot) => {
                     const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
                     pdfLoaderText.textContent = `Subiendo PDF: ${Math.round(progress)}%`;
@@ -813,12 +827,12 @@
                 async () => {
                     try {
                         // Cuando la subida se completa, obtiene la URL de descarga y guarda los metadatos en Firestore
-                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                        await setDoc(newPdfRef, {
+                        const downloadURL = await storageRef.getDownloadURL();
+                        await newPdfDocRef.set({ // Usamos .set() en la referencia del nuevo documento
                             name: file.name.split('.').slice(0, -1).join('.'), // Nombre sin extensión
                             fileName: file.name,
                             url: downloadURL,
-                            createdAt: new Date()
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp() // Usamos serverTimestamp()
                         });
                         hideLoader();
                         Swal.fire('Éxito', 'PDF subido con éxito.', 'success');
@@ -834,7 +848,7 @@
         // Listener para el botón de cerrar sesión
         logoutBtn.addEventListener('click', async () => {
             try {
-                await signOut(auth);
+                await firebase.auth().signOut(); // Usamos firebase.auth().signOut()
                 window.location.href = 'index.html';
             } catch (error) {
                 console.error("Error al cerrar sesión:", error);
@@ -985,7 +999,8 @@
          */
         async function saveCoverPosition() {
             try {
-                await updateDoc(currentProjectRef, {
+                // Usamos currentProjectRef.update() ya que las importaciones son UMD
+                await currentProjectRef.update({
                     coverPosition: bgY,
                 });
                 Swal.fire('Éxito', 'Posición de portada guardada.', 'success');
@@ -1038,10 +1053,11 @@
             pdfLoaderText.textContent = "Subiendo portada...";
             showLoader();
 
-            const storageRef = ref(storage, `proyectos/${currentUser.uid}/${currentProjectRef.id}/cover/${file.name}`);
-            const uploadTask = uploadBytesResumable(storageRef, file);
+            // Usamos storage.ref().child().put() ya que las importaciones son UMD
+            const storageRef = storage.ref().child(`proyectos/${currentUser.uid}/${currentProjectRef.id}/cover/${file.name}`);
+            const uploadTask = storageRef.put(file);
 
-            uploadTask.on('state_changed',
+            uploadTask.on(firebase.storage.TaskEvent.STATE_CHANGED, // Usamos firebase.storage.TaskEvent.STATE_CHANGED
                 (snapshot) => {
                     const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
                     pdfLoaderText.textContent = `Subiendo portada: ${Math.round(progress)}%`;
@@ -1052,8 +1068,9 @@
                     Swal.fire('Error', 'Error al subir la portada.', 'error');
                 },
                 () => {
-                    getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
-                        await updateDoc(currentProjectRef, {
+                    storageRef.getDownloadURL().then(async (downloadURL) => {
+                        // Usamos currentProjectRef.update() ya que las importaciones son UMD
+                        await currentProjectRef.update({
                             coverURL: downloadURL,
                             coverPosition: 50 // Posición inicial de la portada
                         });
@@ -1157,16 +1174,16 @@
             }).then(async (result) => {
                 if (result.isConfirmed) {
                     try {
-                        const { note, tags } = result.value;
-                        await addDoc(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "highlights"), {
+                        // Usamos currentPdfRef.collection().add() ya que las importaciones son UMD
+                        await currentPdfRef.collection("highlights").add({
                             text: text,
-                            note: note,
-                            tags: tags,
+                            note: result.value.note,
+                            tags: result.value.tags,
                             page: page,
                             rectangles: rects, // Guarda los rectángulos serializados
                             color: highlightColor,
                             rgba: highlightRgba,
-                            createdAt: new Date()
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp() // Usamos serverTimestamp()
                         });
                         Swal.fire('Guardado!', 'Tu resaltado y nota han sido guardados.', 'success');
                     } catch (error) {
@@ -1185,9 +1202,9 @@
             if (!currentPdfId) return;
 
             try {
-                const highlightsQuery = query(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "highlights"));
-                // onSnapshot para actualizaciones en tiempo real
-                onSnapshot(highlightsQuery, (snapshot) => {
+                // Usamos currentPdfRef.collection().onSnapshot() ya que las importaciones son UMD
+                const highlightsQuery = currentPdfRef.collection("highlights");
+                highlightsQuery.onSnapshot((snapshot) => {
                     // Elimina todos los overlays y notas de la sidebar existentes antes de redibujar
                     pagesContainer.querySelectorAll('.annotation-overlay').forEach(overlay => overlay.remove());
                     notesList.innerHTML = '';
@@ -1267,7 +1284,8 @@
                 if (editResult.isConfirmed) {
                     try {
                         const { note, tags } = editResult.value;
-                        await updateDoc(doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "highlights", highlightId), {
+                        // Usamos currentPdfRef.collection().doc().update() ya que las importaciones son UMD
+                        await currentPdfRef.collection("highlights").doc(highlightId).update({
                             note: note,
                             tags: tags
                         });
@@ -1290,7 +1308,8 @@
                     }).then(async (deleteResult) => {
                         if (deleteResult.isConfirmed) {
                             try {
-                                await deleteDoc(doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "highlights", highlightId));
+                                // Usamos currentPdfRef.collection().doc().delete() ya que las importaciones son UMD
+                                await currentPdfRef.collection("highlights").doc(highlightId).delete();
                                 Swal.fire('Eliminado!', 'El resaltado ha sido eliminado.', 'success');
                             } catch (error) {
                                 console.error("Error al eliminar el resaltado:", error);
@@ -1352,9 +1371,9 @@
             if (!pdfDocument || !currentPdfId) return;
 
             // Obtiene todas las anotaciones actuales de Firestore (una vez)
-            const highlightsQuery = query(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "highlights"));
-            const querySnapshot = await getDocs(highlightsQuery);
-            const highlights = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            // Usamos currentPdfRef.collection().get() ya que las importaciones son UMD
+            const highlightsQuerySnapshot = await currentPdfRef.collection("highlights").get();
+            const highlights = highlightsQuerySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
             // Elimina todos los overlays existentes antes de redibujar
             pagesContainer.querySelectorAll('.annotation-overlay').forEach(overlay => overlay.remove());
