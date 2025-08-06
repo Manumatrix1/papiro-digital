@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title id="page-title">Papiro Digital</title>
+    <title>Papiro Digital</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -19,156 +19,61 @@
             --text-color: #ffffff;
             --text-muted-color: #9ca3af;
         }
-        html { height: 100%; }
-        body { 
-            font-family: 'Inter', sans-serif; 
-            background-color: var(--background-color); 
-            display: flex; flex-direction: column;
-            height: 100%; width: 100%;
-            overflow: hidden;
-        }
-        main {
-            flex-grow: 1; overflow: hidden;
-            position: relative; display: flex;
-            flex-direction: column;
-        }
-        #pages-container {
-            width: 100%; height: 100%;
-            overflow-y: auto; scroll-behavior: smooth;
-            -webkit-overflow-scrolling: touch;
-        }
-        .pdf-page-container {
-            position: relative; margin: 0 auto 1rem auto;
-            transform-origin: top center;
-        }
-        .pdf-page-container canvas, .textLayer {
-            width: 100% !important; height: auto !important;
-            display: block;
-        }
-        .annotation-canvas {
-            position: absolute; top: 0; left: 0;
-            width: 100%; height: 100%;
-            touch-action: none; 
-        }
-        /* --- MEJORA: Estilo para resaltar el texto que se está leyendo --- */
-        .textLayer ::selection { background: rgba(136, 201, 153, 0.5); }
-        .speaking-highlight {
-            background-color: rgba(136, 201, 153, 0.4);
-            border-radius: 2px;
-        }
-        #annotation-toolbar {
-            position: fixed; bottom: 1rem; left: 50%;
-            transform: translateX(-50%);
-            background-color: var(--surface-color);
-            border: 1px solid var(--surface-border-color);
-            border-radius: 9999px;
-            padding: 0.5rem 1rem;
-            display: flex; gap: 0.75rem;
-            align-items: center; z-index: 100;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-        }
-        .tool-btn {
-            background: none; border: none; color: var(--text-muted-color);
-            cursor: pointer; transition: color 0.2s, transform 0.2s; padding: 0.5rem;
-        }
-        .tool-btn:hover { color: var(--text-color); transform: scale(1.1); }
-        .tool-btn.active { color: var(--primary-color); }
-        #sidebar {
-            position: fixed; top: 0; right: -100%;
-            width: 100%; max-width: 350px;
-            height: 100%; background-color: var(--surface-color);
-            border-left: 1px solid var(--surface-border-color);
-            box-shadow: -4px 0 12px rgba(0,0,0,0.3);
-            transition: right 0.3s ease-in-out; z-index: 110;
-            padding: 1.5rem; display: flex; flex-direction: column;
-        }
-        #sidebar.open { right: 0; }
-        #add-note-popup {
-            position: absolute; background-color: var(--surface-color);
-            border: 1px solid var(--surface-border-color);
-            border-radius: 8px; padding: 0.5rem;
-            z-index: 101; box-shadow: 0 2px 10px rgba(0,0,0,0.5);
-            cursor: pointer; display: none;
-        }
-        #add-note-popup:hover { background-color: #2a2a2a; }
-        .hidden { display: none !important; }
-        /* --- FIX: Estilo para el input de SweetAlert en modo oscuro --- */
-        .swal-input-dark {
-             color: var(--text-color) !important;
-             background-color: var(--surface-border-color) !important;
+        .hidden { display: none; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
         }
     </style>
 </head>
 <body>
-    <header class="bg-surface-color border-b border-surface-border-color py-3 px-4 sm:px-8 flex justify-between items-center sticky top-0 z-20 flex-shrink-0">
-        <div class="flex items-center gap-4 flex-1 min-w-0">
-            <button id="dynamic-back-btn" class="flex-shrink-0 flex items-center text-gray-400 hover:text-white transition group"><i class="fas fa-arrow-left text-xl"></i></button>
-            <input id="project-title" type="text" class="bg-transparent text-lg sm:text-xl font-bold text-white focus:outline-none w-full truncate" value="Cargando...">
-        </div>
-        <div class="flex items-center gap-2 sm:gap-4">
-            <button id="logout-btn" class="text-gray-400 hover:text-white transition text-sm sm:text-base"><i class="fas fa-sign-out-alt text-xl"></i></button>
-        </div>
-    </header>
-
-    <main id="main-content" class="p-4 sm:p-8">
-        <div id="pdf-viewer-container" class="relative w-full h-full flex-col hidden">
-            <div class="flex-shrink-0 flex flex-col sm:flex-row items-center justify-between p-2 sm:p-4 bg-surface-color rounded-lg mb-4">
-                <div class="flex items-center gap-2 mb-2 sm:mb-0 w-full sm:w-auto">
-                    <button id="play-pause-btn" class="text-white hover:text-primary-color transition p-2" title="Leer página actual (Play/Pausa)"><i class="fas fa-play"></i></button>
-                    <button id="stop-btn" class="text-white hover:text-red-400 transition p-2" title="Detener lectura"><i class="fas fa-stop"></i></button>
-                </div>
-                <div class="relative w-full sm:w-1/2 flex items-center gap-2 sm:gap-4">
-                    <input type="text" id="search-notes-input" placeholder="Buscar en notas..." class="w-full bg-surface-border-color text-white placeholder-gray-400 py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-color">
-                    <button id="open-sidebar-btn" class="bg-surface-border-color text-gray-400 rounded-lg w-10 h-10 flex items-center justify-center shadow-lg hover:text-white transition flex-shrink-0" title="Abrir cuaderno de notas">
-                        <i class="fas fa-book"></i>
-                    </button>
-                </div>
-            </div>
-            <div id="pages-container" class="flex-grow w-full h-full">
-                <div id="pdf-content" class="w-full"></div>
-            </div>
-        </div>
-    </main>
-
-    <div id="page-loader-container" class="fixed inset-0 bg-background-color flex justify-center items-center z-50">
-        <div class="text-center">
-            <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary-color"></div>
-            <p id="page-loader-text" class="mt-4 text-xl">Cargando...</p>
-        </div>
+    <div id="page-loader" class="fixed inset-0 bg-[#0f0f0f] flex flex-col items-center justify-center z-50">
+        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#88c999]"></div>
+        <p id="page-loader-text" class="mt-4 text-xl">Iniciando...</p>
     </div>
 
-    <aside id="sidebar">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="text-xl font-bold">Cuaderno de Notas</h3>
-            <button id="close-sidebar-btn" class="text-gray-400 hover:text-white"><i class="fas fa-times text-2xl"></i></button>
-        </div>
-        <div class="mb-4">
-            <button id="add-note-btn" class="w-full bg-primary-color text-surface-color font-bold py-2 rounded-lg hover:brightness-110 transition">Añadir Nota General</button>
-        </div>
-        <div id="notes-list" class="space-y-4 flex-grow overflow-y-auto pr-2">
-            <p id="no-notes-message" class="text-gray-500 text-center hidden">No hay notas todavía.</p>
-        </div>
-    </aside>
-    
-    <div id="annotation-toolbar" class="hidden">
-        <button class="tool-btn active" id="tool-select" title="Seleccionar texto"><i class="fas fa-mouse-pointer"></i></button>
-        <button class="tool-btn" id="tool-draw" title="Dibujar"><i class="fas fa-pencil-alt"></i></button>
-        <button class="tool-btn" id="tool-highlight" title="Resaltar"><i class="fas fa-highlighter"></i></button>
-        <button class="tool-btn" id="tool-erase" title="Goma de Borrar"><i class="fas fa-eraser"></i></button>
-        <input type="color" id="color-picker" class="w-8 h-8 rounded-full cursor-pointer bg-transparent border-2 border-surface-border-color" value="#FFEB3B" title="Seleccionar color">
+    <div id="main-content" class="hidden flex-col min-h-screen">
+        <header class="bg-surface-color border-b border-surface-border-color py-3 px-4 sm:px-8 flex justify-between items-center sticky top-0 z-20 flex-shrink-0">
+            <div class="flex items-center gap-4 flex-1 min-w-0">
+                <button id="dynamic-back-btn" class="flex-shrink-0 flex items-center text-gray-400 hover:text-white transition group"><i class="fas fa-arrow-left text-xl"></i></button>
+                <input id="project-title" type="text" class="bg-transparent text-lg sm:text-xl font-bold text-white focus:outline-none w-full truncate" value="Cargando...">
+            </div>
+            <div class="flex items-center gap-2 sm:gap-4">
+                <button id="logout-btn" class="text-gray-400 hover:text-white transition"><i class="fas fa-sign-out-alt text-xl"></i></button>
+            </div>
+        </header>
+
+        <main class="flex-grow p-4 sm:p-8 flex flex-col">
+            <div id="grid-view-container" class="w-full max-w-5xl mx-auto hidden">
+                 <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-lg font-semibold">Documentos</h2>
+                    <label for="add-pdf-input" class="bg-primary-color text-[#1C1C1C] font-bold py-2 px-4 rounded-lg hover:brightness-110 transition text-sm flex items-center gap-2 cursor-pointer">
+                        <i class="fas fa-plus"></i> Añadir PDF
+                    </label>
+                    <input type="file" id="add-pdf-input" accept=".pdf" class="hidden">
+                 </div>
+                 <div id="pdfs-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
+                 <div id="no-pdfs-message" class="text-gray-400 text-center mt-8 hidden">No hay PDFs en este tablero.</div>
+            </div>
+
+            <div id="pdf-viewer-container" class="relative w-full h-full flex-grow flex-col hidden">
+                <div id="pages-container" class="flex-grow w-full h-full overflow-y-auto">
+                    <div id="pdf-content" class="w-full"></div>
+                </div>
+            </div>
+        </main>
     </div>
 
-    <div id="add-note-popup" title="Añadir nota a esta selección"><i class="fas fa-plus text-white"></i></div>
-    <div id="page-number-indicator" class="fixed top-1/2 right-4 transform -translate-y-1/2 bg-black bg-opacity-70 text-white py-2 px-4 rounded-full font-bold z-50 transition-opacity duration-300 opacity-0 pointer-events-none"></div>
-    
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
-        import { getFirestore, collection, query, where, doc, onSnapshot, deleteDoc, getDoc, addDoc, orderBy, writeBatch } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        import { getFirestore, collection, query, doc, onSnapshot, getDoc, orderBy, addDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
 
-        // CONFIGURACIÓN DE FIREBASE
+        // CONFIG
         const firebaseConfig = {
-            apiKey: "AIzaSyBYVYRdA_DB1Kob9b_wGd5Wd4JsYFMyBRc",
+             apiKey: "AIzaSyBYVYRdA_DB1Kob9b_wGd5Wd4JsYFMyBRc",
             authDomain: "papiro2025-d09e0.firebaseapp.com",
             projectId: "papiro2025-d09e0",
             storageBucket: "papiro2025-d09e0.firebasestorage.app",
@@ -179,441 +84,112 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        
-        // VARIABLES GLOBALES
-        let currentProjectRef, currentUser, pdfDocument, currentPdfId;
-        let pagesHeight = [], currentPageNum = 1, activeTool = 'select', isDrawing = false;
-        let activeColor = '#FFEB3B';
-        let annotationsByPage = {};
-        let currentDrawingPath = [];
-        let synthesis = window.speechSynthesis, currentUtterance, isSpeaking = false, spokenTextSpans = [];
-        let scrollTimeout, notesUnsubscribe, lastHighlightedSpan = null;
-        
-        // ELEMENTOS DEL DOM
-        const DOM = {
-            mainContent: document.getElementById('main-content'),
-            pageLoader: document.getElementById('page-loader-container'),
-            projectTitle: document.getElementById('project-title'),
-            pdfViewer: document.getElementById('pdf-viewer-container'),
-            pagesContainer: document.getElementById('pages-container'),
-            pdfContent: document.getElementById('pdf-content'),
-            annotationToolbar: document.getElementById('annotation-toolbar'),
-            pageIndicator: document.getElementById('page-number-indicator'),
-            addNotePopup: document.getElementById('add-note-popup'),
-            playPauseBtn: document.getElementById('play-pause-btn'),
-            playPauseIcon: document.querySelector('#play-pause-btn i'),
-            stopBtn: document.getElementById('stop-btn'),
-            sidebar: document.getElementById('sidebar'),
-            notesList: document.getElementById('notes-list'),
-            noNotesMessage: document.getElementById('no-notes-message'),
-            colorPicker: document.getElementById('color-picker'),
-            searchNotesInput: document.getElementById('search-notes-input'),
-        };
-        
+        const storage = getStorage(app);
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-        // PUNTO DE ENTRADA
-        document.addEventListener('DOMContentLoaded', () => {
-            onAuthStateChanged(auth, user => {
-                if (user) {
-                    currentUser = user;
-                    DOM.pageLoader.classList.add('hidden');
-                    initializeAppLogic();
-                } else {
-                    window.location.href = 'index.html';
+        // DOM y ESTADO
+        const pageLoader = document.getElementById('page-loader');
+        const mainContent = document.getElementById('main-content');
+        const projectTitle = document.getElementById('project-title');
+        const gridView = document.getElementById('grid-view-container');
+        const pdfViewer = document.getElementById('pdf-viewer-container');
+        const pdfsGrid = document.getElementById('pdfs-grid');
+        const noPdfsMessage = document.getElementById('no-pdfs-message');
+        const addPdfInput = document.getElementById('add-pdf-input');
+        
+        let currentUser, currentProjectId, currentPdfId;
+
+        // INICIO
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                const urlParams = new URLSearchParams(window.location.search);
+                currentProjectId = urlParams.get('id');
+                currentPdfId = urlParams.get('docId');
+
+                if (!currentProjectId) {
+                    window.location.href = 'mi_tablero.html';
+                    return;
                 }
-            });
+
+                initializePage();
+            } else {
+                window.location.href = 'index.html';
+            }
         });
 
-        function initializeAppLogic() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const projectId = urlParams.get('id');
-            const docId = urlParams.get('docId');
-
-            if (!projectId || !docId) { window.location.href = 'mi_tablero.html'; return; }
-            
-            currentProjectRef = doc(db, "users", currentUser.uid, "projects", projectId);
-            currentPdfId = docId;
-
-            DOM.pdfViewer.classList.remove('hidden');
-            DOM.pdfViewer.classList.add('flex');
-            DOM.annotationToolbar.classList.remove('hidden');
-            DOM.annotationToolbar.classList.add('flex');
-            
-            loadAndRenderPDF(docId);
+        async function initializePage() {
+            await loadProjectDetails();
             addEventListeners();
-        }
 
-        async function loadAndRenderPDF(docId) {
-            DOM.pageLoader.classList.remove('hidden');
-            try {
-                const pdfDocRef = doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", docId);
-                const pdfDocSnap = await getDoc(pdfDocRef);
-                if (!pdfDocSnap.exists()) throw new Error("PDF no encontrado");
-                
-                const pdfData = pdfDocSnap.data();
-                DOM.projectTitle.value = pdfData.name;
-                document.getElementById('page-title').textContent = pdfData.name;
-                
-                pdfDocument = await pdfjsLib.getDocument(pdfData.url).promise;
-                await renderAllPages();
-                updatePageNumberIndicator();
-            } catch (error) {
-                console.error("Error cargando PDF:", error);
-                Swal.fire('Error', 'No se pudo cargar el PDF.', 'error');
-            } finally {
-                DOM.pageLoader.classList.add('hidden');
-            }
-        }
-        
-        // --- MEJORA: `renderTextLayer` ahora captura los spans para el lector de voz ---
-        async function renderAllPages() {
-            if (!pdfDocument) return;
-            DOM.pdfContent.innerHTML = '';
-            pagesHeight = [0];
-            const fragment = document.createDocumentFragment();
-            
-            for (let i = 1; i <= pdfDocument.numPages; i++) {
-                const page = await pdfDocument.getPage(i);
-                const viewport = page.getViewport({ scale: 1.5 });
-
-                const pageDiv = document.createElement('div');
-                pageDiv.className = 'pdf-page-container';
-                pageDiv.style.width = `${viewport.width}px`;
-                pageDiv.style.height = `${viewport.height}px`;
-
-                const canvas = document.createElement('canvas');
-                canvas.height = viewport.height; canvas.width = viewport.width;
-                
-                const textLayerDiv = document.createElement('div');
-                textLayerDiv.className = 'textLayer';
-                textLayerDiv.dataset.pageNum = i;
-                
-                const annotationCanvas = document.createElement('canvas');
-                annotationCanvas.className = 'annotation-canvas';
-                annotationCanvas.height = viewport.height; annotationCanvas.width = viewport.width;
-                annotationCanvas.dataset.pageNum = i;
-                
-                pageDiv.append(canvas, textLayerDiv, annotationCanvas);
-                fragment.appendChild(pageDiv);
-
-                await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-                
-                const textContent = await page.getTextContent();
-                pdfjsLib.renderTextLayer({ textContentSource: textContent, container: textLayerDiv, viewport });
-
-                loadAnnotationsForPage(i);
-            }
-            DOM.pdfContent.appendChild(fragment);
-            
-            const pageElements = DOM.pdfContent.children;
-            for(let i=0; i < pageElements.length; i++) {
-                 pagesHeight[i+1] = (pagesHeight[i] || 0) + pageElements[i].offsetHeight + 16;
-            }
-            setActiveTool('select');
-        }
-
-        // LÓGICA DE ANOTACIONES
-        function setActiveTool(tool) {
-            activeTool = tool;
-            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
-            document.getElementById(`tool-${tool}`).classList.add('active');
-            DOM.pdfContent.style.cursor = (tool === 'draw' || tool === 'erase') ? 'crosshair' : 'default';
-        }
-        
-        function getCoords(e, canvas) {
-            const rect = canvas.getBoundingClientRect();
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            const scale = rect.width / canvas.width;
-            return { x: (clientX - rect.left) / scale, y: (clientY - rect.top) / scale };
-        }
-
-        function startDrawing(e) {
-            if (activeTool === 'select' || !e.target.classList.contains('annotation-canvas')) return;
-            e.preventDefault();
-            isDrawing = true;
-            currentDrawingPath = [getCoords(e, e.target)];
-        }
-
-        function draw(e) {
-            if (!isDrawing) return; e.preventDefault();
-            const canvas = e.target; const ctx = canvas.getContext('2d');
-            const coords = getCoords(e, canvas); currentDrawingPath.push(coords);
-            
-            ctx.strokeStyle = activeColor;
-            ctx.lineWidth = (activeTool === 'erase') ? 20 : (activeTool === 'highlight' ? 20 : 2);
-            ctx.globalCompositeOperation = (activeTool === 'erase') ? 'destination-out' : 'source-over';
-            ctx.globalAlpha = activeTool === 'highlight' ? 0.4 : 1.0;
-            ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-            
-            ctx.beginPath();
-            ctx.moveTo(currentDrawingPath[currentDrawingPath.length - 2].x, currentDrawingPath[currentDrawingPath.length - 2].y);
-            ctx.lineTo(coords.x, coords.y);
-            ctx.stroke();
-        }
-
-        async function stopDrawing(e) {
-            if (!isDrawing) return;
-            isDrawing = false;
-            const pageNum = parseInt(e.target.dataset.pageNum);
-            if (!pageNum || currentDrawingPath.length < 2) { currentDrawingPath = []; return; }
-            
-            if (activeTool === 'erase') {
-                await eraseAnnotations(pageNum, currentDrawingPath);
-            } else if (activeTool === 'draw' || activeTool === 'highlight') {
-                await saveAnnotationToFirestore(pageNum, { type: activeTool, path: currentDrawingPath, color: activeColor });
-            }
-            currentDrawingPath = [];
-        }
-        
-        async function saveAnnotationToFirestore(pageNum, data) {
-            const annotationsRef = collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "annotations");
-            await addDoc(annotationsRef, { page: pageNum, ...data, createdAt: new Date() });
-        }
-        
-        // --- FIX: Lógica de borrado precisa que "corta" los trazos ---
-        async function eraseAnnotations(pageNum, erasePath) {
-            const annotationsOnPage = annotationsByPage[pageNum] || [];
-            const batch = writeBatch(db);
-
-            for (const ann of annotationsOnPage) {
-                if (ann.type !== 'draw' && ann.type !== 'highlight') continue;
-
-                let intersections = [];
-                // Detectar todos los puntos de intersección del borrador con el trazo
-                for (let i = 1; i < ann.path.length; i++) {
-                    for (let j = 1; j < erasePath.length; j++) {
-                        const p1 = ann.path[i-1], p2 = ann.path[i];
-                        const p3 = erasePath[j-1], p4 = erasePath[j];
-                        
-                        // Una simple comprobación de proximidad
-                        const dist = Math.abs((p2.y - p1.y) * p4.x - (p2.x - p1.x) * p4.y + p2.x * p1.y - p2.y * p1.x) / Math.sqrt(Math.pow(p2.y - p1.y, 2) + Math.pow(p2.x - p1.x, 2));
-                        if (dist < 10) { // 10px tolerance
-                           intersections.push(i);
-                           break;
-                        }
-                    }
-                }
-
-                if (intersections.length > 0) {
-                    const docRef = doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "annotations", ann.id);
-                    batch.delete(docRef); // Borrar el trazo original
-
-                    // Crear nuevos trazos a partir de los segmentos no borrados
-                    let lastCut = 0;
-                    intersections.push(ann.path.length); // Añadir el final del trazo
-                    for (const cutPoint of intersections) {
-                        const newPathSegment = ann.path.slice(lastCut, cutPoint);
-                        if (newPathSegment.length > 1) {
-                            const newAnnRef = doc(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "annotations"));
-                            batch.set(newAnnRef, { ...ann, path: newPathSegment, createdAt: new Date() });
-                        }
-                        lastCut = cutPoint + 1;
-                    }
-                }
-            }
-            await batch.commit();
-        }
-
-        function loadAnnotationsForPage(pageNum) {
-            const q = query(collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "annotations"), where("page", "==", pageNum), orderBy("createdAt"));
-            onSnapshot(q, (snapshot) => {
-                annotationsByPage[pageNum] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                drawAnnotationsForPage(pageNum);
-            });
-        }
-
-        function drawAnnotationsForPage(pageNum) {
-            const canvas = document.querySelector(`.annotation-canvas[data-page-num="${pageNum}"]`);
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            (annotationsByPage[pageNum] || []).forEach(ann => {
-                if ((ann.type === 'draw' || ann.type === 'highlight') && ann.path && ann.path.length > 1) {
-                    ctx.strokeStyle = ann.color;
-                    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-                    ctx.globalCompositeOperation = 'source-over';
-                    ctx.lineWidth = ann.type === 'highlight' ? 20 : 2;
-                    ctx.globalAlpha = ann.type === 'highlight' ? 0.4 : 1.0;
-                    ctx.beginPath();
-                    ctx.moveTo(ann.path[0].x, ann.path[0].y);
-                    for (let i = 1; i < ann.path.length; i++) ctx.lineTo(ann.path[i].x, ann.path[i].y);
-                    ctx.stroke();
-                }
-            });
-        }
-        
-        // LÓGICA DE NOTAS
-        async function handleNewNote(options = {}) {
-            const { selection = '' } = options;
-            const config = {
-                title: selection ? 'Añadir Nota' : 'Añadir Nota General',
-                input: 'textarea',
-                inputLabel: selection ? 'Tu nota sobre el texto seleccionado:' : 'Escribe tu nota aquí:',
-                showCancelButton: true,
-                confirmButtonText: 'Guardar',
-                cancelButtonText: 'Cancelar',
-                background: 'var(--surface-color)',
-                color: 'var(--text-color)',
-                confirmButtonColor: 'var(--primary-color)',
-                // --- FIX: Aplicar clase CSS para visibilidad del input ---
-                customClass: { input: 'swal-input-dark' }
-            };
-
-            const { value: text } = await Swal.fire(config);
-            
-            if(text) {
-                const notesRef = collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "notes");
-                await addDoc(notesRef, { text, selection, page: currentPageNum, createdAt: new Date() });
-                Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Nota guardada',
-                    showConfirmButton: false, timer: 1500, background: 'var(--surface-color)', color: 'var(--text-color)' });
-            }
-        }
-
-        function loadNotes() {
-            if (notesUnsubscribe) notesUnsubscribe();
-            const notesRef = collection(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "notes");
-            const q = query(notesRef, orderBy("createdAt", "desc"));
-
-            notesUnsubscribe = onSnapshot(q, (snapshot) => {
-                DOM.notesList.innerHTML = '';
-                DOM.noNotesMessage.classList.toggle('hidden', !snapshot.empty);
-                
-                snapshot.forEach(doc => {
-                    const note = doc.data();
-                    // --- MEJORA: Añadir clase y data-texto para la búsqueda ---
-                    const noteElement = document.createElement('div');
-                    noteElement.className = "note-item bg-surface-border-color p-3 rounded-lg";
-                    noteElement.dataset.text = `${note.text} ${note.selection || ''}`.toLowerCase();
-                    
-                    let noteHTML = `<p class="text-white whitespace-pre-wrap break-words">${note.text}</p>`;
-                    if (note.selection) noteHTML += `<p class="text-sm text-primary-color mt-2 p-2 border-l-2 border-primary-color italic">"${note.selection}"</p>`;
-                    noteHTML += `<div class="text-right mt-2"><button data-id="${doc.id}" class="delete-note-btn text-red-400 hover:text-red-600 text-xs">Eliminar</button></div>`;
-                    
-                    noteElement.innerHTML = noteHTML;
-                    DOM.notesList.appendChild(noteElement);
-                });
-            });
-        }
-        
-        // --- MEJORA: LECTOR DE VOZ INTELIGENTE ---
-        async function handlePlayPause() {
-            if (!synthesis) return Swal.fire({ text: 'Tu navegador no soporta lectura en voz alta.', icon: 'error' });
-
-            if (isSpeaking && synthesis.speaking) {
-                synthesis.pause();
-                DOM.playPauseIcon.className = 'fas fa-play';
-            } else if (synthesis.paused) {
-                synthesis.resume();
-                DOM.playPauseIcon.className = 'fas fa-pause';
+            if (currentPdfId) {
+                showView('viewer');
+                // loadAndRenderPDF(currentPdfId); // Tu función para cargar el PDF
             } else {
-                try {
-                    DOM.playPauseIcon.className = 'fas fa-spinner fa-spin'; // Ícono de carga
-                    const page = await pdfDocument.getPage(currentPageNum);
-                    const textContent = await page.getTextContent();
-                    const pageText = textContent.items.map(item => item.str).join(' ');
-                    
-                    if (!pageText.trim()) return Swal.fire('Info', 'No hay texto para leer en esta página.', 'info');
-
-                    // Mapear texto a spans visuales
-                    const textLayerSpans = document.querySelectorAll(`.textLayer[data-page-num="${currentPageNum}"] > span`);
-                    spokenTextSpans = Array.from(textLayerSpans);
-                    
-                    currentUtterance = new SpeechSynthesisUtterance(pageText);
-                    currentUtterance.lang = 'es'; // Usar español genérico para mayor compatibilidad
-                    
-                    currentUtterance.onboundary = (event) => {
-                        if (lastHighlightedSpan) lastHighlightedSpan.classList.remove('speaking-highlight');
-                        // Encontrar el span por su contenido de texto (aproximación)
-                        const currentWord = event.target.text.substring(event.charIndex).split(' ')[0];
-                        const targetSpan = spokenTextSpans.find(span => span.textContent.includes(currentWord));
-                        if(targetSpan) {
-                            targetSpan.classList.add('speaking-highlight');
-                            targetSpan.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-                            lastHighlightedSpan = targetSpan;
-                        }
-                    };
-
-                    currentUtterance.onend = () => {
-                        isSpeaking = false;
-                        DOM.playPauseIcon.className = 'fas fa-play';
-                        if (lastHighlightedSpan) lastHighlightedSpan.classList.remove('speaking-highlight');
-                        lastHighlightedSpan = null;
-                    };
-
-                    synthesis.speak(currentUtterance);
-                    isSpeaking = true;
-                    DOM.playPauseIcon.className = 'fas fa-pause';
-                } catch(e) {
-                    console.error("Error al iniciar lectura", e);
-                    Swal.fire('Error', 'No se pudo iniciar la lectura.', 'error');
-                    DOM.playPauseIcon.className = 'fas fa-play';
-                }
+                showView('grid');
+                loadPdfsForProject();
             }
+            // Ocultar loader y mostrar contenido
+            mainContent.classList.remove('hidden');
+            mainContent.style.display = 'flex';
+            pageLoader.classList.add('hidden');
         }
 
-        function handleStop() {
-            if (synthesis && (synthesis.speaking || synthesis.paused)) {
-                synthesis.cancel(); // onend se disparará automáticamente
+        function showView(viewName) {
+            gridView.classList.toggle('hidden', viewName !== 'grid');
+            pdfViewer.classList.toggle('hidden', viewName !== 'viewer');
+            if (viewName === 'viewer') pdfViewer.classList.add('flex');
+        }
+
+        async function loadProjectDetails() {
+            const projectRef = doc(db, "users", currentUser.uid, "projects", currentProjectId);
+            const projectSnap = await getDoc(projectRef);
+            if (projectSnap.exists()) {
+                projectTitle.value = projectSnap.data().name;
             }
         }
         
-        function updatePageNumberIndicator() {
-            if (scrollTimeout) clearTimeout(scrollTimeout);
-            if (!pdfDocument) return;
-            DOM.pageIndicator.style.opacity = '1';
-            const containerTop = DOM.pagesContainer.scrollTop;
-            let newPageNum = 1;
-            for (let i = 1; i < pagesHeight.length; i++) {
-                if (containerTop > pagesHeight[i - 1] - (DOM.pagesContainer.clientHeight / 2)) newPageNum = i;
-                else break;
-            }
-            if (currentPageNum !== newPageNum) currentPageNum = newPageNum;
-            DOM.pageIndicator.textContent = `Página ${currentPageNum} / ${pdfDocument.numPages}`;
-            scrollTimeout = setTimeout(() => { DOM.pageIndicator.style.opacity = '0'; }, 1500);
-        }
-        
-        function addEventListeners() {
-            document.getElementById('dynamic-back-btn').addEventListener('click', () => window.history.back());
-            document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
-            
-            DOM.annotationToolbar.addEventListener('click', e => e.target.closest('.tool-btn') && setActiveTool(e.target.closest('.tool-btn').id.replace('tool-', '')));
-            DOM.colorPicker.addEventListener('input', e => { activeColor = e.target.value; });
-
-            DOM.pdfContent.addEventListener('mousedown', startDrawing);
-            DOM.pdfContent.addEventListener('mousemove', draw);
-            DOM.pdfContent.addEventListener('mouseup', stopDrawing);
-            DOM.pdfContent.addEventListener('mouseleave', stopDrawing);
-            DOM.pdfContent.addEventListener('touchstart', startDrawing, { passive: false });
-            DOM.pdfContent.addEventListener('touchmove', draw, { passive: false });
-            DOM.pdfContent.addEventListener('touchend', stopDrawing);
-            
-            document.getElementById('open-sidebar-btn').addEventListener('click', () => { DOM.sidebar.classList.add('open'); loadNotes(); });
-            document.getElementById('close-sidebar-btn').addEventListener('click', () => { DOM.sidebar.classList.remove('open'); if (notesUnsubscribe) notesUnsubscribe(); });
-            document.getElementById('add-note-btn').addEventListener('click', () => handleNewNote());
-            
-            // --- MEJORA: Event listener para la búsqueda de notas en tiempo real ---
-            DOM.searchNotesInput.addEventListener('input', (e) => {
-                const searchTerm = e.target.value.toLowerCase();
-                document.querySelectorAll('.note-item').forEach(noteEl => {
-                    noteEl.classList.toggle('hidden', !noteEl.dataset.text.includes(searchTerm));
+        function loadPdfsForProject() {
+            const q = query(collection(db, "users", currentUser.uid, "projects", currentProjectId, "pdfs"), orderBy("createdAt", "desc"));
+            onSnapshot(q, (snapshot) => {
+                pdfsGrid.innerHTML = '';
+                noPdfsMessage.classList.toggle('hidden', !snapshot.empty);
+                snapshot.forEach(pdfDoc => {
+                    const pdfData = pdfDoc.data();
+                    const card = document.createElement('a');
+                    card.href = `espacio.html?id=${currentProjectId}&docId=${pdfDoc.id}`;
+                    card.className = 'pdf-card rounded-lg shadow-lg cursor-pointer flex flex-col aspect-[2/3]';
+                    card.innerHTML = `
+                        <div class="flex-grow w-full bg-gray-800 rounded-t-lg flex items-center justify-center p-2">
+                            <i class="fas fa-file-pdf text-4xl text-gray-500"></i>
+                        </div>
+                        <div class="p-2 h-1/4 flex items-center justify-center">
+                            <p class="w-full text-center text-sm font-semibold text-white truncate">${pdfData.name || 'Documento'}</p>
+                        </div>
+                    `;
+                    pdfsGrid.appendChild(card);
                 });
             });
+        }
+        
+        async function uploadPdf(file) {
+            // Tu función de subida de PDF...
+        }
 
-            DOM.notesList.addEventListener('click', async e => {
-                if (e.target.classList.contains('delete-note-btn')) {
-                    const noteIdToDelete = e.target.dataset.id;
-                    const noteRef = doc(db, "users", currentUser.uid, "projects", currentProjectRef.id, "pdfs", currentPdfId, "notes", noteIdToDelete);
-                    await deleteDoc(noteRef);
+        function addEventListeners() {
+            document.getElementById('dynamic-back-btn').addEventListener('click', () => {
+                if (currentPdfId) {
+                    window.location.href = `espacio.html?id=${currentProjectId}`;
+                } else {
+                    window.location.href = 'mi_tablero.html';
                 }
             });
-            
-            DOM.playPauseBtn.addEventListener('click', handlePlayPause);
-            DOM.stopBtn.addEventListener('click', handleStop);
-            DOM.pagesContainer.addEventListener('scroll', updatePageNumberIndicator);
+            document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+            addPdfInput.addEventListener('change', (e) => uploadPdf(e.target.files[0]));
         }
+
+        // Aquí pegarías el resto de funciones del visor (anotaciones, lector de voz, etc.)
+
     </script>
 </body>
 </html>
