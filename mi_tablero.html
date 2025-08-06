@@ -52,9 +52,14 @@
     </div>
 
     <script type="module">
-        import { auth, db } from './firebase-config.js';
-        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { collection, query, onSnapshot, addDoc, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        import { getFirestore, collection, query, onSnapshot, addDoc, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        
+        const firebaseConfig = { apiKey: "AIzaSyBYVYRdA_DB1Kob9b_wGd5Wd4JsYFMyBRc", authDomain: "papiro2025-d09e0.firebaseapp.com", projectId: "papiro2025-d09e0", storageBucket: "papiro2025-d09e0.firebasestorage.app", messagingSenderId: "1096335704864", appId: "1:1096335704864:web:75f1f27cd920df64554d45"};
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
         
         const pageLoader = document.getElementById('page-loader');
         const mainContent = document.getElementById('main-content');
@@ -109,4 +114,59 @@
                             <i class="fas fa-trash-alt"></i>
                         </button>
                     </div>
-                    <div class="h-1/4 p-2 flex items
+                    <div class="h-1/4 p-2 flex items-center justify-center">
+                        <input type="text" class="w-full text-center bg-transparent text-lg font-bold text-white focus:outline-none" value="${project.name || 'Proyecto sin nombre'}" data-id="${project.id}">
+                    </div>
+                `;
+                
+                const nameInput = card.querySelector('input');
+                nameInput.addEventListener('input', (e) => {
+                    const newName = e.target.value;
+                    clearTimeout(timer);
+                    timer = setTimeout(() => {
+                        const projectRef = doc(db, "users", currentUser.uid, "projects", project.id);
+                        updateDoc(projectRef, { name: newName });
+                    }, 1000);
+                });
+
+                card.addEventListener('click', (e) => {
+                    if (!e.target.closest('.delete-btn') && e.target.tagName.toLowerCase() !== 'input') {
+                        window.location.href = `espacio.html?id=${project.id}`;
+                    }
+                });
+
+                card.querySelector('.delete-btn').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    Swal.fire({
+                        title: '¿Estás seguro?', text: "¡No podrás revertir esto!", icon: 'warning',
+                        showCancelButton: true, confirmButtonColor: '#88c999', cancelButtonColor: '#d33',
+                        confirmButtonText: 'Sí, eliminarlo', cancelButtonText: 'Cancelar'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            deleteDoc(doc(db, "users", currentUser.uid, "projects", project.id));
+                        }
+                    });
+                });
+                projectsGrid.appendChild(card);
+            });
+        }
+
+        addProjectBtn.addEventListener('click', () => {
+             Swal.fire({
+                title: 'Nombre del nuevo tablero', input: 'text', inputPlaceholder: 'Ej: Tesis',
+                showCancelButton: true, confirmButtonText: 'Crear', confirmButtonColor: '#88c999',
+                cancelButtonText: 'Cancelar', background: '#181818', color: '#fff'
+            }).then((result) => {
+                if (result.isConfirmed && result.value) {
+                    addDoc(collection(db, "users", currentUser.uid, "projects"), {
+                        name: result.value,
+                        createdAt: new Date(),
+                    });
+                }
+            });
+        });
+
+        logoutBtn.addEventListener('click', () => signOut(auth));
+    </script>
+</body>
+</html>
