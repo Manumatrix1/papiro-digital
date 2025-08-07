@@ -11,74 +11,18 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        :root {
-            --primary-color: #88c999;
-            --background-color: #0f0f0f;
-            --surface-color: #181818;
-            --surface-border-color: #2a2a2a;
-            --text-color: #ffffff;
-            --text-muted-color: #9ca3af;
-        }
+        :root { --primary-color: #88c999; --background-color: #0f0f0f; --surface-color: #181818; --surface-border-color: #2a2a2a; --text-color: #ffffff; --text-muted-color: #9ca3af; }
         .hidden { display: none !important; }
         html { height: 100%; }
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--background-color);
-            color: white;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
-        }
-        main {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            padding: 1.5rem;
-        }
-        #pdf-viewer-container {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-        }
-        #pages-container {
-            overflow-y: auto;
-            flex-grow: 1;
-            -webkit-overflow-scrolling: touch;
-        }
-        .pdf-page-container {
-            position: relative;
-            margin: 0 auto 1rem auto;
-            max-width: 100%; /* FIX: Para que se ajuste al celular */
-        }
-        .pdf-page-container canvas, .textLayer {
-            width: 100% !important;
-            height: auto !important;
-            display: block;
-        }
-        .annotation-canvas {
-            position: absolute; top: 0; left: 0;
-            width: 100%; height: 100%;
-            touch-action: none;
-        }
-        #annotation-toolbar {
-            position: fixed; bottom: 1rem; left: 50%;
-            transform: translateX(-50%);
-            background-color: var(--surface-color);
-            border: 1px solid var(--surface-border-color);
-            border-radius: 9999px;
-            padding: 0.5rem 1rem;
-            display: flex; gap: 0.75rem;
-            align-items: center; z-index: 100;
-        }
-        #sidebar {
-            position: fixed; top: 0; right: -100%;
-            width: 100%; max-width: 350px;
-            height: 100%; background-color: var(--surface-color);
-            transition: right 0.3s ease-in-out; z-index: 110;
-            padding: 1.5rem; display: flex; flex-direction: column;
-        }
+        body { font-family: 'Inter', sans-serif; background-color: var(--background-color); color: white; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        main { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; padding: 1rem; }
+        #pdf-viewer-container { flex-grow: 1; display: flex; flex-direction: column; }
+        #pages-container { overflow-y: auto; flex-grow: 1; -webkit-overflow-scrolling: touch; }
+        .pdf-page-container { position: relative; margin: 0 auto 1rem auto; max-width: 100%; }
+        .pdf-page-container canvas, .textLayer { width: 100% !important; height: auto !important; display: block; }
+        .annotation-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; }
+        #annotation-toolbar { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background-color: var(--surface-color); border: 1px solid var(--surface-border-color); border-radius: 9999px; padding: 0.5rem 1rem; display: flex; gap: 0.75rem; align-items: center; z-index: 100; }
+        #sidebar { position: fixed; top: 0; right: -100%; width: 100%; max-width: 350px; height: 100%; background-color: var(--surface-color); transition: right 0.3s ease-in-out; z-index: 110; padding: 1.5rem; display: flex; flex-direction: column; }
         #sidebar.open { right: 0; }
         .tool-btn { background: none; border: none; color: var(--text-muted-color); cursor: pointer; transition: color 0.2s; padding: 0.5rem; }
         .tool-btn.active { color: var(--primary-color); }
@@ -99,43 +43,33 @@
         </header>
         <main>
             <div id="pdf-viewer-container">
-                <div id="pages-container">
-                    <div id="pdf-content"></div>
-                </div>
+                <div id="pages-container"><div id="pdf-content"></div></div>
             </div>
         </main>
     </div>
     
     <aside id="sidebar"></aside>
     <div id="annotation-toolbar" class="hidden">
-        <button class="tool-btn active" id="tool-select"><i class="fas fa-mouse-pointer"></i></button>
-        <button class="tool-btn" id="tool-draw"><i class="fas fa-pencil-alt"></i></button>
-        <button class="tool-btn" id="tool-highlight"><i class="fas fa-highlighter"></i></button>
-        <button class="tool-btn" id="tool-erase"><i class="fas fa-eraser"></i></button>
+        <button class="tool-btn active" id="tool-select" title="Seleccionar"><i class="fas fa-mouse-pointer"></i></button>
+        <button class="tool-btn" id="tool-draw" title="Dibujar"><i class="fas fa-pencil-alt"></i></button>
+        <button class="tool-btn" id="tool-highlight" title="Resaltar"><i class="fas fa-highlighter"></i></button>
+        <button class="tool-btn" id="tool-erase" title="Borrar"><i class="fas fa-eraser"></i></button>
         <input type="color" id="color-picker" value="#FFEB3B" style="background-color: transparent; border: none; width: 2rem; height: 2rem;">
-        <button id="open-sidebar-btn" class="tool-btn"><i class="fas fa-book"></i></button>
+        <button id="open-sidebar-btn" class="tool-btn" title="Notas"><i class="fas fa-book"></i></button>
     </div>
     <div id="page-number-indicator" class="fixed top-1/2 right-4 transform -translate-y-1/2 bg-black bg-opacity-70 text-white py-2 px-4 rounded-full z-50 opacity-0 pointer-events-none"></div>
 
     <script type="module">
-        import { auth, db, storage } from './firebase-config.js';
+        import { auth, db } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { collection, query, doc, onSnapshot, getDoc, orderBy, addDoc, deleteDoc, updateDoc, where } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { collection, query, doc, onSnapshot, getDoc, orderBy, addDoc, deleteDoc, where } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
 
         let currentUser, currentProjectId, currentPdfId, pdfDocument;
         let pagesHeight = [], currentPageNum = 1;
         let scrollTimeout;
 
         const DOM = {
-            pageLoader: document.getElementById('page-loader'),
-            mainContent: document.getElementById('main-content'),
-            projectTitle: document.getElementById('project-title'),
-            pdfContent: document.getElementById('pdf-content'),
-            pagesContainer: document.getElementById('pages-container'),
-            annotationToolbar: document.getElementById('annotation-toolbar'),
-            pageIndicator: document.getElementById('page-number-indicator'),
-            logoutBtn: document.getElementById('logout-btn'),
-            fullscreenBtn: document.getElementById('fullscreen-btn'),
+            pageLoader: document.getElementById('page-loader'), mainContent: document.getElementById('main-content'), projectTitle: document.getElementById('project-title'), pdfContent: document.getElementById('pdf-content'), pagesContainer: document.getElementById('pages-container'), annotationToolbar: document.getElementById('annotation-toolbar'), pageIndicator: document.getElementById('page-number-indicator'), logoutBtn: document.getElementById('logout-btn'), fullscreenBtn: document.getElementById('fullscreen-btn'),
         };
 
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.js';
@@ -146,15 +80,18 @@
                 const urlParams = new URLSearchParams(window.location.search);
                 currentProjectId = urlParams.get('id');
                 currentPdfId = urlParams.get('docId');
-                if (!currentProjectId || !currentPdfId) {
-                    window.location.href = 'mi_tablero.html';
-                    return;
-                }
-                initializePage();
+                
+                if (!currentProjectId) { window.location.href = 'mi_tablero.html'; return; }
+                
+                // Si no hay ID de PDF, lo mandamos al tablero. Esta es la lógica para el futuro visor de grilla.
+                if (!currentPdfId) { window.location.href = `mi_tablero.html`; return; }
+                
+                initializeViewer();
+
             } else { window.location.href = 'index.html'; }
         });
 
-        async function initializePage() {
+        async function initializeViewer() {
             await loadAndRenderPDF(currentPdfId);
             addEventListeners();
             DOM.mainContent.classList.remove('hidden');
@@ -171,8 +108,8 @@
                 pdfDocument = await pdfjsLib.getDocument(pdfDocSnap.data().url).promise;
                 DOM.pdfContent.innerHTML = '';
                 pagesHeight = [0];
+                
                 const fragment = document.createDocumentFragment();
-
                 for (let i = 1; i <= pdfDocument.numPages; i++) {
                     const page = await pdfDocument.getPage(i);
                     const viewport = page.getViewport({ scale: 1.5 });
@@ -217,7 +154,7 @@
                 if (containerTop > pagesHeight[i - 1] - (DOM.pagesContainer.clientHeight / 2)) newPageNum = i;
                 else break;
             }
-            if (currentPageNum !== newPageNum) currentPageNum = newPageNum;
+            currentPageNum = newPageNum;
             DOM.pageIndicator.textContent = `Página ${currentPageNum} / ${pdfDocument.numPages}`;
             scrollTimeout = setTimeout(() => { DOM.pageIndicator.style.opacity = '0'; }, 1500);
         }
@@ -225,12 +162,11 @@
         function addEventListeners() {
             DOM.logoutBtn.addEventListener('click', () => signOut(auth));
             DOM.fullscreenBtn.addEventListener('click', () => {
-                if (!document.fullscreenElement) { document.documentElement.requestFullscreen(); } 
-                else { document.exitFullscreen(); }
+                if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+                else document.exitFullscreen();
             });
             DOM.pagesContainer.addEventListener('scroll', updatePageNumberIndicator);
-
-            // Aquí van tus listeners originales para las herramientas (draw, highlight, etc.)
+            // Tus listeners de herramientas originales aquí...
         }
     </script>
 </body>
