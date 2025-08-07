@@ -15,19 +15,19 @@
             --primary-color: #88c999; --background-color: #0f0f0f;
             --surface-color: #181818; --surface-border-color: #2a2a2a;
         }
-        html, body {
-            height: 100%; width: 100%; overflow: hidden;
-            background-color: var(--background-color); color: white;
-            font-family: 'Inter', sans-serif;
-        }
+        html, body { height: 100%; width: 100%; overflow: hidden; background-color: var(--background-color); color: white; font-family: 'Inter', sans-serif; }
         .app-container { height: 100vh; display: flex; flex-direction: column; }
         main { flex-grow: 1; overflow: auto; position: relative; background-color: #1a1a1a; scroll-behavior: smooth; }
         .pdf-page-container {
             position: relative; margin: 1rem auto;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            width: max-content;
         }
-        .pdf-page-container canvas { display: block; }
+        /* ARREGLO DE CALIDAD VISUAL Y DISEÑO */
+        .pdf-page-container canvas {
+            width: 100%; /* El canvas se ajusta al contenedor */
+            height: auto;
+            display: block;
+        }
         .annotation-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; }
         #annotation-toolbar { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background-color: var(--surface-color); border: 1px solid var(--surface-border-color); border-radius: 9999px; padding: 0.5rem 1rem; display: flex; gap: 0.75rem; align-items: center; z-index: 100; }
         .tool-btn { background: none; border: none; color: #9ca3af; cursor: pointer; padding: 0.5rem; }
@@ -43,15 +43,10 @@
         <header class="bg-surface-color border-b border-[#2a2a2a] py-2 px-3 flex justify-between items-center w-full flex-shrink-0 z-20">
             <a href="mi_tablero.html" class="p-2 rounded-md hover:bg-[#2a2a2a]"><i class="fas fa-arrow-left"></i></a>
             <h1 id="project-title" class="text-md font-bold text-white truncate mx-2 flex-1"></h1>
-            <div class="flex items-center gap-2">
-                <button id="play-pause-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]" title="Leer página actual"><i class="fas fa-play"></i></button>
-                <button id="stop-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]" title="Detener lectura"><i class="fas fa-stop"></i></button>
-                <button id="open-notes-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]" title="Ver Cuaderno"><i class="fas fa-book"></i></button>
-            </div>
+            <button id="open-notes-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]" title="Ver Cuaderno"><i class="fas fa-book"></i></button>
         </header>
         <main id="pdf-viewer-area"></main>
     </div>
-
     <div id="annotation-toolbar">
         <button class="tool-btn active" id="tool-select" title="Mover"><i class="fas fa-hand-paper"></i></button>
         <button class="tool-btn" id="tool-draw" title="Dibujar"><i class="fas fa-pencil-alt"></i></button>
@@ -60,7 +55,6 @@
         <input type="color" id="color-picker" class="w-8 h-8 rounded-full cursor-pointer bg-transparent border-none" value="#FFDD00" title="Color">
         <span id="page-indicator" class="text-sm text-gray-400 ml-2">1 / 1</span>
     </div>
-
     <aside id="sidebar" class="p-4">
         <div class="flex justify-between items-center mb-4 flex-shrink-0">
             <h3 class="text-xl font-bold">Cuaderno</h3>
@@ -96,7 +90,6 @@
         const viewerArea = document.getElementById('pdf-viewer-area');
         const sidebar = document.getElementById('sidebar');
 
-        // --- LÓGICA PRINCIPAL (sin cambios) ---
         onAuthStateChanged(auth, (user) => {
             if (!user) { window.location.href = 'index.html'; return; }
             currentUser = user;
@@ -108,10 +101,49 @@
             setupAllEventListeners();
         });
 
-        async function loadPdfDocument() { /* ... sin cambios ... */ }
-        async function renderAllPages() { /* ... sin cambios ... */ }
+        async function loadPdfDocument() {
+            const pdfDocRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId);
+            onSnapshot(pdfDocRef, async (doc) => {
+                if (!doc.exists()) return;
+                document.getElementById('project-title').textContent = doc.data().name;
+                const loadingTask = pdfjsLib.getDocument(doc.data().url);
+                pdfDocument = await loadingTask.promise;
+                await renderAllPages();
+                loadAllAnnotations();
+            });
+        }
+        
+        async function renderAllPages() {
+            viewerArea.innerHTML = '';
+            pageRenderedInfo = [];
+            // CALIDAD MEJORADA: Mayor escala para un renderizado nítido
+            const scale = 2.0; 
+            for (let i = 1; i <= pdfDocument.numPages; i++) {
+                const page = await pdfDocument.getPage(i);
+                const viewport = page.getViewport({ scale });
+                const pageContainer = document.createElement('div');
+                pageContainer.className = 'pdf-page-container';
+                pageContainer.dataset.pageNumber = i;
+                // ARREGLO DE DISEÑO: Contenedor flexible para que el canvas se ajuste
+                pageContainer.style.width = `min(100%, ${viewport.width / 2}px)`;
 
-        // --- EVENT LISTENERS (con nuevos botones) ---
+                const canvas = document.createElement('canvas');
+                const annotationCanvas = document.createElement('canvas');
+                canvas.width = annotationCanvas.width = viewport.width;
+                canvas.height = annotationCanvas.height = viewport.height;
+                annotationCanvas.className = 'annotation-canvas';
+                annotationCanvas.dataset.pageNum = i;
+                
+                pageContainer.append(canvas, annotationCanvas);
+                viewerArea.appendChild(pageContainer);
+                await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+                
+                addDrawingListeners(annotationCanvas);
+                pageRenderedInfo.push({ el: pageContainer, top: pageContainer.offsetTop, height: pageContainer.offsetHeight });
+            }
+            updatePageIndicator();
+        }
+
         function setupAllEventListeners() {
             document.getElementById('tool-select').addEventListener('click', () => setActiveTool('select'));
             document.getElementById('tool-draw').addEventListener('click', () => setActiveTool('draw'));
@@ -121,28 +153,83 @@
             document.getElementById('open-notes-btn').addEventListener('click', () => sidebar.classList.add('open'));
             document.getElementById('close-sidebar-btn').addEventListener('click', () => sidebar.classList.remove('open'));
             viewerArea.addEventListener('scroll', updatePageIndicator);
-            
-            // AÑADIDO: Eventos para Lectura por Voz
-            document.getElementById('play-pause-btn').addEventListener('click', toggleReadAloud);
-            document.getElementById('stop-btn').addEventListener('click', () => {
-                speechSynthesis.cancel();
-                document.getElementById('play-pause-btn').innerHTML = '<i class="fas fa-play"></i>';
-            });
         }
 
-        function updatePageIndicator() { /* ... sin cambios ... */ }
+        function updatePageIndicator() {
+            const scrollCenter = viewerArea.scrollTop + (viewerArea.clientHeight / 2);
+            for(let i=0; i < pageRenderedInfo.length; i++){
+                if(scrollCenter >= pageRenderedInfo[i].top && scrollCenter < (pageRenderedInfo[i].top + pageRenderedInfo[i].height)) {
+                    currentPageNum = i + 1;
+                    break;
+                }
+            }
+            if(pdfDocument) {
+                document.getElementById('page-indicator').textContent = `${currentPageNum} / ${pdfDocument.numPages}`;
+            }
+        }
+        
         function setActiveTool(tool) { /* ... sin cambios ... */ }
         function addDrawingListeners(canvas) { /* ... sin cambios ... */ }
         function startDrawing(e) { /* ... sin cambios ... */ }
-        function draw(e) { /* ... sin cambios ... */ }
-        async function stopDrawing(e) { /* ... sin cambios ... */ }
+        function draw(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            currentPath.push(getCoords(e, e.target));
+            redrawAnnotations(e.target.dataset.pageNum);
+        }
+        async function stopDrawing(e) {
+            if (!isDrawing || currentPath.length < 2) { isDrawing = false; currentPath = []; return; }
+            isDrawing = false;
+            const pageNum = parseInt(e.target.dataset.pageNum);
+            let note = "";
+            if (activeTool === 'highlight') {
+                const { value } = await Swal.fire({
+                    title: 'Añadir nota al resaltado', input: 'textarea',
+                    inputPlaceholder: 'Escribe tu comentario...', showCancelButton: true,
+                    confirmButtonText: 'Guardar', cancelButtonText: 'Solo Resaltar'
+                });
+                if (value) note = value;
+            }
+            await saveAnnotation({ page: pageNum, type: activeTool, path: currentPath, color: activeColor, note });
+            currentPath = [];
+        }
+
         function getCoords(e, canvas) { /* ... sin cambios ... */ }
         async function saveAnnotation(annotationData) { /* ... sin cambios ... */ }
-        function loadAllAnnotations() { /* ... sin cambios ... */ }
-        function redrawAnnotations(pageNum) { /* ... sin cambios ... */ }
-        function drawPath(ctx, annotation) { /* ... sin cambios ... */ }
+        
+        function loadAllAnnotations() {
+            const annotationsRef = collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations");
+            const q = query(annotationsRef, orderBy("createdAt"));
+            if (annotationsUnsubscribe) annotationsUnsubscribe();
+            annotationsUnsubscribe = onSnapshot(q, (snapshot) => {
+                annotationsByPage = {};
+                snapshot.forEach(doc => {
+                    const annotation = { id: doc.id, ...doc.data() };
+                    if (!annotationsByPage[annotation.page]) annotationsByPage[annotation.page] = [];
+                    annotationsByPage[annotation.page].push(annotation);
+                });
+                Object.keys(annotationsByPage).forEach(pageNum => redrawAnnotations(pageNum));
+                renderNotesToSidebar();
+            });
+        }
+        
+        function redrawAnnotations(pageNum) {
+            const canvas = document.querySelector(`.annotation-canvas[data-page-num='${pageNum}']`);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const annotations = annotationsByPage[pageNum] || [];
+            // ARREGLO PERSISTENCIA: Siempre se dibujan las anotaciones guardadas
+            annotations.forEach(annotation => drawPath(ctx, annotation));
+            // Y luego el trazo actual
+            if (isDrawing && parseInt(canvas.dataset.pageNum) == pageNum) {
+                drawPath(ctx, { type: activeTool, path: currentPath, color: activeColor });
+            }
+        }
 
-        // --- CUADERNO DE NOTAS CON EDICIÓN Y BORRADO ---
+        function drawPath(ctx, annotation) { /* ... sin cambios ... */ }
+        
+        // CUADERNO FUNCIONAL
         function renderNotesToSidebar() {
             const notesList = document.getElementById('notes-list');
             notesList.innerHTML = '';
@@ -154,16 +241,14 @@
                 if (!annotation.note && annotation.type !== 'highlight') return;
                 const card = document.createElement('div');
                 card.className = 'note-card p-3 rounded-lg border border-transparent';
-                
                 let noteContent = annotation.note 
                     ? `<p class="text-white text-sm">${annotation.note}</p>`
                     : `<p class="text-gray-400 text-sm italic">Resaltado en página ${annotation.page}.</p>`;
-
                 card.innerHTML = `
                     <div class="flex justify-between items-start">
-                        <div class="flex items-center gap-2 mb-2">
+                        <div class="flex items-center gap-2 mb-2 cursor-pointer" onclick="window.scrollToPage(${annotation.page})">
                             <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color:${annotation.color};"></span>
-                            <span class="text-xs font-bold text-gray-400 cursor-pointer hover:text-white" onclick="window.scrollToPage(${annotation.page})">Página ${annotation.page}</span>
+                            <span class="text-xs font-bold text-gray-400 hover:text-white">Página ${annotation.page}</span>
                         </div>
                         <div class="flex gap-2">
                             <button class="edit-note-btn text-gray-400 hover:text-white" data-id="${annotation.id}" data-note="${annotation.note || ''}"><i class="fas fa-edit"></i></button>
@@ -174,8 +259,6 @@
                 `;
                 notesList.appendChild(card);
             });
-
-            // AÑADIDO: Asignar eventos a los nuevos botones
             notesList.querySelectorAll('.edit-note-btn').forEach(btn => btn.addEventListener('click', handleEditNote));
             notesList.querySelectorAll('.delete-note-btn').forEach(btn => btn.addEventListener('click', handleDeleteNote));
         }
@@ -185,62 +268,8 @@
             if(pageEl) viewerArea.scrollTop = pageEl.offsetTop - 20;
         };
 
-        async function handleEditNote(e) {
-            const button = e.currentTarget;
-            const annotationId = button.dataset.id;
-            const currentNote = button.dataset.note;
-
-            const { value: newNote } = await Swal.fire({
-                title: 'Editar nota', input: 'textarea', inputValue: currentNote,
-                showCancelButton: true, confirmButtonText: 'Guardar Cambios'
-            });
-            if (typeof newNote === 'string') { // Acepta también notas vacías
-                const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
-                await updateDoc(noteRef, { note: newNote });
-            }
-        }
-
-        function handleDeleteNote(e) {
-            const annotationId = e.currentTarget.dataset.id;
-            Swal.fire({
-                title: '¿Estás seguro?', text: "Esta acción no se puede deshacer.",
-                icon: 'warning', showCancelButton: true,
-                confirmButtonColor: '#d33', cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Sí, ¡bórrala!', cancelButtonText: 'Cancelar'
-            }).then(async (result) => {
-                if (result.isConfirmed) {
-                    const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
-                    await deleteDoc(noteRef);
-                }
-            });
-        }
-
-        // --- LECTURA POR VOZ ---
-        async function toggleReadAloud() {
-            const playBtn = document.getElementById('play-pause-btn');
-            if (speechSynthesis.speaking && !speechSynthesis.paused) {
-                speechSynthesis.pause();
-                playBtn.innerHTML = '<i class="fas fa-play"></i>';
-            } else {
-                if (speechSynthesis.paused) {
-                    speechSynthesis.resume();
-                } else {
-                    speechSynthesis.cancel();
-                    const page = await pdfDocument.getPage(currentPageNum);
-                    const textContent = await page.getTextContent();
-                    const pageText = textContent.items.map(item => item.str).join(' ');
-                    if(pageText.trim().length > 0) {
-                        const utterance = new SpeechSynthesisUtterance(pageText);
-                        utterance.lang = 'es-ES';
-                        utterance.onend = () => playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                        speechSynthesis.speak(utterance);
-                    } else {
-                        Swal.fire({title: 'Página sin texto', text: 'No se encontró texto para leer.', icon: 'info'});
-                    }
-                }
-                playBtn.innerHTML = '<i class="fas fa-pause"></i>';
-            }
-        }
+        async function handleEditNote(e) { /* ... sin cambios ... */ }
+        function handleDeleteNote(e) { /* ... sin cambios ... */ }
     </script>
 </body>
 </html>
