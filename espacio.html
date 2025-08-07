@@ -15,302 +15,333 @@
         body {
             font-family: 'Inter', sans-serif;
             background-color: #0f0f0f;
-            overflow: hidden; /* Evita el scroll en el body */
+            overflow: hidden; /* Evita doble scroll */
         }
-        .workspace-layout {
-            display: flex;
+        
+        /* Contenedor principal que ocupa toda la pantalla */
+        .app-container {
             height: 100vh;
-        }
-        .main-content {
-            flex: 1;
             display: flex;
             flex-direction: column;
-            overflow: hidden;
         }
+
+        /* Área del PDF con scroll vertical */
         .pdf-viewer-area {
-            flex: 1;
-            overflow-y: auto; /* Permite scroll solo en el área del PDF */
-            padding: 2rem;
+            flex-grow: 1;
+            overflow-y: auto;
+            scroll-behavior: smooth;
             background-color: #1a1a1a;
+            position: relative; /* Para posicionar los subrayados */
         }
+
         .pdf-page-container {
-            margin-bottom: 1rem;
+            position: relative; /* Clave para el subrayado */
+            margin: 0 auto 1rem auto;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
-        .pdf-controls {
+
+        /* --- NUEVO: Estilos para el Subrayado --- */
+        .text-layer {
+            position: absolute;
+            left: 0;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            opacity: 0.3;
+            line-height: 1.0;
+        }
+        .text-layer > span {
+            color: transparent;
+            position: absolute;
+            white-space: pre;
+            cursor: text;
+            transform-origin: 0% 0%;
+        }
+        /* Color del subrayado */
+        ::selection { background: rgba(255, 221, 0, 0.4); }
+
+        /* --- NUEVO: Barra de herramientas inferior, más compacta --- */
+        .bottom-toolbar {
+            flex-shrink: 0; /* No se encoge */
             background-color: #181818;
             border-top: 1px solid #2a2a2a;
         }
+
+        /* --- NUEVO: Panel lateral de notas (oculto en móvil) --- */
         #notes-sidebar {
-            width: 350px;
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 300px;
+            height: 100%;
             background-color: #181818;
-            height: 100vh;
+            border-left: 1px solid #2a2a2a;
+            transform: translateX(100%); /* Oculto por defecto */
+            transition: transform 0.3s ease-in-out;
+            z-index: 50;
             display: flex;
             flex-direction: column;
-            border-right: 1px solid #2a2a2a;
+        }
+        #notes-sidebar.open {
+            transform: translateX(0);
         }
         #notes-list-container {
-            flex: 1;
+            flex-grow: 1;
             overflow-y: auto;
         }
+        /* Overlay para cerrar el panel al tocar fuera */
+        #sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 49;
+            display: none;
+        }
+        #sidebar-overlay.open {
+            display: block;
+        }
+
     </style>
 </head>
 <body class="text-white">
 
-    <div class="workspace-layout">
-        
-        <aside id="notes-sidebar" class="p-4">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-xl font-bold">Anotaciones</h2>
-                <button id="add-note-btn" class="text-gray-400 hover:text-white transition" title="Añadir Anotación">
-                    <i class="fas fa-plus-circle fa-lg"></i>
-                </button>
+    <div class="app-container">
+        <header class="bg-[#181818] border-b border-[#2a2a2a] py-2 px-3 flex justify-between items-center w-full flex-shrink-0">
+            <a href="mi_tablero.html" class="p-2 rounded-md hover:bg-[#2a2a2a]"><i class="fas fa-arrow-left"></i></a>
+            <h1 id="project-title" class="text-md font-bold text-white truncate mx-2">Cargando...</h1>
+            <div class="flex items-center gap-2">
+                 <button id="open-notes-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]"><i class="fas fa-book"></i></button>
             </div>
-            <div class="relative mb-4">
-                <input type="text" id="search-notes-input" placeholder="Buscar en notas..." class="w-full bg-[#2a2a2a] text-white placeholder-gray-400 py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#88c999]">
-                <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-            </div>
-            <div id="notes-list-container" class="space-y-3">
-                <p id="no-notes-message" class="text-gray-500 text-center mt-4">No hay notas para este PDF.</p>
-            </div>
-        </aside>
-        <div class="main-content">
-            <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-6 flex justify-between items-center w-full">
-                <div class="flex items-center gap-4">
-                    <a href="mi_tablero.html" class="flex items-center text-gray-400 hover:text-white transition group">
-                        <i class="fas fa-arrow-left"></i>
-                    </a>
-                    <h1 id="project-title" class="text-xl font-bold text-white truncate">Cargando...</h1>
-                </div>
-                <button id="logout-btn" class="text-gray-400 hover:text-white transition text-sm">Cerrar Sesión</button>
-            </header>
+        </header>
 
-            <main id="pages-container" class="pdf-viewer-area">
-                </main>
+        <main id="pdf-viewer-area" class="pdf-viewer-area">
+            </main>
 
-            <footer class="pdf-controls p-2 flex items-center justify-center gap-4 w-full">
-                <button id="zoom-out-btn" class="hover:bg-[#2a2a2a] rounded-md p-2 transition"><i class="fas fa-search-minus"></i></button>
-                <button id="zoom-in-btn" class="hover:bg-[#2a2a2a] rounded-md p-2 transition"><i class="fas fa-search-plus"></i></button>
-                <div class="flex items-center gap-2">
-                    <button id="prev-page-btn" class="hover:bg-[#2a2a2a] rounded-md p-2 transition"><i class="fas fa-chevron-left"></i></button>
-                    <input type="number" id="page-num-input" class="w-16 text-center bg-[#2a2a2a] rounded-md p-1 focus:outline-none focus:ring-2 focus:ring-[#88c999]">
-                    <span id="page-count-span" class="text-gray-400">/ 0</span>
-                    <button id="next-page-btn" class="hover:bg-[#2a2a2a] rounded-md p-2 transition"><i class="fas fa-chevron-right"></i></button>
-                </div>
-            </footer>
+        <footer class="bottom-toolbar p-2 flex items-center justify-around w-full">
+            <button id="read-aloud-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]" title="Leer en voz alta">
+                <i class="fas fa-volume-up"></i>
+            </button>
+            <button id="highlight-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]" title="Añadir nota al texto seleccionado">
+                <i class="fas fa-highlighter"></i>
+            </button>
+             <div class="flex items-center gap-2">
+                <button id="prev-page-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]"><i class="fas fa-chevron-left"></i></button>
+                <span id="page-indicator" class="text-sm">0 / 0</span>
+                <button id="next-page-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]"><i class="fas fa-chevron-right"></i></button>
+            </div>
+        </footer>
+    </div>
+
+    <div id="sidebar-overlay"></div>
+    <aside id="notes-sidebar" class="p-4">
+        <div class="flex items-center justify-between mb-4 flex-shrink-0">
+            <h2 class="text-xl font-bold">Anotaciones</h2>
+            <button id="close-notes-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]"><i class="fas fa-times"></i></button>
         </div>
+        <div id="notes-list-container" class="space-y-3">
+            <p id="no-notes-message" class="text-gray-500 text-center mt-4">No hay notas.</p>
         </div>
+    </aside>
 
     <script type="module">
         // Importaciones de Firebase (sin cambios)
         import { auth, db, storage } from './firebase-config.js';
-        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { collection, query, doc, onSnapshot, setDoc, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
-        import { ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
+        import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        import { doc, onSnapshot, collection, addDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
 
         // Elementos del DOM
         const projectTitleEl = document.getElementById('project-title');
-        const pagesContainer = document.getElementById('pages-container');
-        const logoutBtn = document.getElementById('logout-btn');
-        const addNoteBtn = document.getElementById('add-note-btn');
+        const viewerArea = document.getElementById('pdf-viewer-area');
+        const pageIndicator = document.getElementById('page-indicator');
+        const openNotesBtn = document.getElementById('open-notes-btn');
+        const closeNotesBtn = document.getElementById('close-notes-btn');
+        const notesSidebar = document.getElementById('notes-sidebar');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
         const notesListContainer = document.getElementById('notes-list-container');
         const noNotesMessage = document.getElementById('no-notes-message');
-        const searchNotesInput = document.getElementById('search-notes-input');
-
-        // NUEVO: Elementos de control del PDF
-        const zoomInBtn = document.getElementById('zoom-in-btn');
-        const zoomOutBtn = document.getElementById('zoom-out-btn');
-        const prevPageBtn = document.getElementById('prev-page-btn');
-        const nextPageBtn = document.getElementById('next-page-btn');
-        const pageNumInput = document.getElementById('page-num-input');
-        const pageCountSpan = document.getElementById('page-count-span');
+        const readAloudBtn = document.getElementById('read-aloud-btn');
+        const highlightBtn = document.getElementById('highlight-btn');
 
         // Variables de estado
-        let currentUser, currentProjectRef, currentPdfId;
+        let currentUser, projectId, pdfId, projectRef;
         let pdfDocument = null;
-        let pdfScale = 1.5; // Escala inicial
         let currentPageNum = 1;
-
+        
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-        // Lógica de inicialización
+        // --- INICIALIZACIÓN ---
         document.addEventListener('DOMContentLoaded', () => {
              onAuthStateChanged(auth, (user) => {
                 if (!user) { window.location.href = 'index.html'; return; }
                 currentUser = user;
                 const urlParams = new URLSearchParams(window.location.search);
-                const projectId = urlParams.get('id');
-                const pdfId = urlParams.get('pdfId'); // Asumimos que el PDF se pasa por URL
+                projectId = urlParams.get('id');
+                pdfId = urlParams.get('pdfId');
                 if (!projectId || !pdfId) { window.location.href = 'mi_tablero.html'; return; }
                 
-                currentProjectRef = doc(db, "users", user.uid, "projects", projectId);
-                currentPdfId = pdfId;
-
-                loadProjectDetails();
+                projectRef = doc(db, "users", user.uid, "projects", projectId);
                 loadPdfDocument();
-                loadNotes();
                 setupEventListeners();
+                loadNotes();
             });
         });
 
-        function setupEventListeners() {
-            logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = 'index.html'));
-            
-            // NUEVO: Listeners para controles del PDF
-            zoomInBtn.addEventListener('click', () => updateZoom(0.2));
-            zoomOutBtn.addEventListener('click', () => updateZoom(-0.2));
-            prevPageBtn.addEventListener('click', () => goToPage(currentPageNum - 1));
-            nextPageBtn.addEventListener('click', () => goToPage(currentPageNum + 1));
-            pageNumInput.addEventListener('change', () => goToPage(parseInt(pageNumInput.value)));
-            pagesContainer.addEventListener('scroll', updateCurrentPageIndicator);
-
-            // Listeners de notas
-            addNoteBtn.addEventListener('click', handleAddNote);
-            searchNotesInput.addEventListener('input', handleSearchNotes);
-        }
-
-        async function loadProjectDetails() {
-            onSnapshot(currentProjectRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    projectTitleEl.textContent = data.name;
-                    document.title = data.name;
-                }
+        async function loadPdfDocument() {
+            const pdfDocRef = doc(projectRef, 'pdfs', pdfId);
+            const pdfSnap = await onSnapshot(pdfDocRef, async (doc) => {
+                if (!doc.exists()) { console.error("PDF no encontrado"); return; }
+                projectTitleEl.textContent = doc.data().name;
+                const loadingTask = pdfjsLib.getDocument(doc.data().url);
+                pdfDocument = await loadingTask.promise;
+                updatePageIndicator();
+                renderAllPages();
             });
         }
         
-        async function loadPdfDocument() {
-            try {
-                const pdfDocRef = doc(currentProjectRef, 'pdfs', currentPdfId);
-                const pdfSnap = await onSnapshot(pdfDocRef, async (doc) => {
-                    if (!doc.exists()) return;
-                    const pdfData = doc.data();
-                    const loadingTask = pdfjsLib.getDocument(pdfData.url);
-                    pdfDocument = await loadingTask.promise;
-                    pageCountSpan.textContent = `/ ${pdfDocument.numPages}`;
-                    pageNumInput.max = pdfDocument.numPages;
-                    renderAllPages();
-                });
-            } catch (error) {
-                console.error("Error cargando el PDF:", error);
-            }
-        }
-
+        // --- RENDERIZADO DEL PDF (con capa de texto para seleccionar) ---
         async function renderAllPages() {
-            pagesContainer.innerHTML = '';
+            viewerArea.innerHTML = '';
             for (let i = 1; i <= pdfDocument.numPages; i++) {
                 const page = await pdfDocument.getPage(i);
-                const viewport = page.getViewport({ scale: pdfScale });
+                const viewport = page.getViewport({ scale: 1.5 });
+                
+                const pageContainer = document.createElement('div');
+                pageContainer.className = 'pdf-page-container';
+                pageContainer.dataset.pageNumber = i;
+
                 const canvas = document.createElement('canvas');
-                const context = canvas.getContext('2d');
                 canvas.height = viewport.height;
                 canvas.width = viewport.width;
+                pageContainer.style.width = `${viewport.width}px`;
+                pageContainer.style.height = `${viewport.height}px`;
 
-                const pageDiv = document.createElement('div');
-                pageDiv.className = 'pdf-page-container';
-                pageDiv.dataset.pageNumber = i;
-                pageDiv.appendChild(canvas);
-                pagesContainer.appendChild(pageDiv);
+                const textLayerDiv = document.createElement("div");
+                textLayerDiv.className = "text-layer";
+                
+                pageContainer.appendChild(canvas);
+                pageContainer.appendChild(textLayerDiv);
+                viewerArea.appendChild(pageContainer);
 
-                await page.render({ canvasContext: context, viewport }).promise;
-            }
-            goToPage(1);
-        }
-        
-        // --- NUEVA LÓGICA PARA CONTROLES DE PDF ---
-        function updateZoom(amount) {
-            pdfScale += amount;
-            if (pdfScale < 0.5) pdfScale = 0.5; // Mínimo zoom
-            if (pdfScale > 3) pdfScale = 3.0; // Máximo zoom
-            renderAllPages();
-        }
-
-        function goToPage(num) {
-            if (!pdfDocument || num < 1 || num > pdfDocument.numPages) return;
-            currentPageNum = num;
-            pageNumInput.value = num;
-            const targetPage = document.querySelector(`.pdf-page-container[data-page-number='${num}']`);
-            if(targetPage) {
-                targetPage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                page.render({ canvasContext: canvas.getContext('2d'), viewport });
+                
+                const textContent = await page.getTextContent();
+                pdfjsLib.renderTextLayer({
+                    textContentSource: textContent,
+                    container: textLayerDiv,
+                    viewport: viewport,
+                    textDivs: []
+                });
             }
         }
 
-        function updateCurrentPageIndicator() {
-             if (!pdfDocument) return;
-             let maxVisible = 0;
-             let mostVisiblePage = currentPageNum;
-             const pages = document.querySelectorAll('.pdf-page-container');
-
-             pages.forEach(page => {
-                 const rect = page.getBoundingClientRect();
-                 const visibleHeight = Math.max(0, Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0));
-                 if (visibleHeight > maxVisible) {
-                     maxVisible = visibleHeight;
-                     mostVisiblePage = parseInt(page.dataset.pageNumber);
-                 }
-             });
-             currentPageNum = mostVisiblePage;
-             pageNumInput.value = currentPageNum;
-        }
-
-        // --- LÓGICA DE NOTAS (Adaptada a la nueva sidebar) ---
-        async function handleAddNote() {
-            const { value: formValues } = await Swal.fire({
-                title: 'Nueva Anotación',
-                html: `<div class="text-left text-white">Página actual: <strong>${currentPageNum}</strong></div>` +
-                      '<textarea id="swal-note" class="swal2-textarea" placeholder="Escribe tu nota..."></textarea>' +
-                      '<input id="swal-tags" class="swal2-input" placeholder="Etiquetas (separadas por comas)">',
-                focusConfirm: false,
-                background: '#181818',
-                color: '#fff',
-                preConfirm: () => [
-                    document.getElementById('swal-note').value,
-                    document.getElementById('swal-tags').value
-                ]
+        // --- NAVEGACIÓN Y UI ---
+        function setupEventListeners() {
+            openNotesBtn.addEventListener('click', () => {
+                notesSidebar.classList.add('open');
+                sidebarOverlay.classList.add('open');
             });
-            if (formValues && formValues[0]) {
-                const [note, tags] = formValues;
-                const tagsArray = tags.split(',').map(t => t.trim()).filter(Boolean);
-                await addDoc(collection(doc(currentProjectRef, "pdfs", currentPdfId), "notes"), {
-                    note, tags: tagsArray, page: currentPageNum, createdAt: new Date()
+            const closeSidebar = () => {
+                notesSidebar.classList.remove('open');
+                sidebarOverlay.classList.remove('open');
+            };
+            closeNotesBtn.addEventListener('click', closeSidebar);
+            sidebarOverlay.addEventListener('click', closeSidebar);
+
+            viewerArea.addEventListener('scroll', () => {
+                // Actualizar indicador de página al hacer scroll
+                // ... (lógica para detectar la página más visible) ...
+                updatePageIndicator();
+            });
+            
+            // --- NUEVO: Listeners de herramientas ---
+            readAloudBtn.addEventListener('click', toggleReadAloud);
+            highlightBtn.addEventListener('click', addHighlightNote);
+        }
+
+        function updatePageIndicator() {
+            // (Una lógica simple por ahora)
+            pageIndicator.textContent = `${currentPageNum} / ${pdfDocument ? pdfDocument.numPages : 0}`;
+        }
+        
+        // --- NUEVO: FUNCIONALIDAD DE LECTURA POR VOZ ---
+        let isReading = false;
+        function toggleReadAloud() {
+            if (isReading) {
+                speechSynthesis.cancel();
+                isReading = false;
+                readAloudBtn.classList.remove('text-[#88c999]');
+                return;
+            }
+            
+            const selection = window.getSelection();
+            let textToRead = selection.toString();
+            
+            if (!textToRead) {
+                Swal.fire('Selecciona primero el texto que quieres escuchar.', '', 'info');
+                return;
+            }
+            
+            isReading = true;
+            readAloudBtn.classList.add('text-[#88c999]');
+            const utterance = new SpeechSynthesisUtterance(textToRead);
+            utterance.lang = 'es-ES';
+            utterance.onend = () => {
+                isReading = false;
+                readAloudBtn.classList.remove('text-[#88c999]');
+            };
+            speechSynthesis.speak(utterance);
+        }
+
+        // --- NUEVO: FUNCIONALIDAD DE SUBRAYADO Y NOTAS ---
+        async function addHighlightNote() {
+            const selection = window.getSelection();
+            const selectedText = selection.toString().trim();
+            if (!selectedText) {
+                Swal.fire('Selecciona el texto a subrayar antes de añadir una nota.', '', 'info');
+                return;
+            }
+            
+            const { value: noteText } = await Swal.fire({
+                title: 'Añadir nota al subrayado',
+                input: 'textarea',
+                inputPlaceholder: 'Escribe tu nota aquí...',
+                confirmButtonText: 'Guardar',
+                showCancelButton: true
+            });
+
+            if (noteText) {
+                const notesCollectionRef = collection(doc(projectRef, 'pdfs', pdfId), 'notes');
+                await addDoc(notesCollectionRef, {
+                    highlightedText: selectedText,
+                    note: noteText,
+                    page: currentPageNum, // Simplificado, idealmente se detecta la página del texto
+                    createdAt: new Date()
                 });
             }
         }
 
-        async function loadNotes() {
-            try {
-                const notesQuery = query(collection(doc(currentProjectRef, "pdfs", currentPdfId), "notes"));
-                onSnapshot(notesQuery, (snapshot) => {
-                    notesListContainer.innerHTML = '';
-                    if (snapshot.empty) {
-                        notesListContainer.appendChild(noNotesMessage);
-                    } else {
-                         snapshot.docs.sort((a,b) => a.data().page - b.data().page).forEach((doc) => {
-                            const note = doc.data();
-                            const noteEl = document.createElement('div');
-                            noteEl.className = 'bg-[#2a2a2a] p-3 rounded-lg cursor-pointer hover:bg-[#3a3a3a] transition';
-                            noteEl.onclick = () => goToPage(note.page);
-                            noteEl.innerHTML = `
-                                <div class="flex justify-between items-center mb-2">
-                                    <span class="text-xs font-bold text-[#88c999]">Página ${note.page}</span>
-                                </div>
-                                <p class="text-sm text-gray-200">${note.note}</p>
-                                <div class="mt-2 flex flex-wrap gap-1">${note.tags.map(tag => `<span class="bg-gray-600 text-gray-200 text-xs font-semibold px-2 py-1 rounded-full">${tag}</span>`).join('')}</div>
-                            `;
-                            notesListContainer.appendChild(noteEl);
-                        });
-                    }
+        function loadNotes() {
+            const notesQuery = query(collection(doc(projectRef, 'pdfs', pdfId), 'notes'), orderBy('createdAt', 'desc'));
+            onSnapshot(notesQuery, (snapshot) => {
+                notesListContainer.innerHTML = '';
+                if(snapshot.empty) {
+                    notesListContainer.appendChild(noNotesMessage);
+                    return;
+                }
+                snapshot.forEach(doc => {
+                    const noteData = doc.data();
+                    const noteCard = document.createElement('div');
+                    noteCard.className = 'bg-[#2a2a2a] p-3 rounded-lg';
+                    noteCard.innerHTML = `
+                        <p class="text-sm font-semibold text-yellow-300">"${noteData.highlightedText}"</p>
+                        <p class="text-white mt-2">${noteData.note}</p>
+                        <span class="text-xs text-gray-400 mt-2 block">Página ${noteData.page}</span>
+                    `;
+                    notesListContainer.appendChild(noteCard);
                 });
-            } catch (error) {
-                console.error("Error al cargar las notas:", error);
-            }
-        }
-        
-        function handleSearchNotes() {
-            const searchTerm = searchNotesInput.value.toLowerCase();
-            const notes = notesListContainer.querySelectorAll('.bg-\\[\\#2a2a2a\\]');
-            notes.forEach(note => {
-                note.style.display = note.textContent.toLowerCase().includes(searchTerm) ? 'block' : 'none';
             });
         }
     </script>
