@@ -28,11 +28,9 @@
         #sidebar { position: fixed; top: 0; right: -100%; width: 100%; max-width: 350px; height: 100%; background-color: #181818; border-left: 1px solid #2a2a2a; box-shadow: -4px 0 12px rgba(0,0,0,0.3); transition: right 0.3s ease-in-out; z-index: 60; padding: 1.5rem; display: flex; flex-direction: column; }
         #sidebar.open { right: 0; }
         
-        /* NUEVO: Estilos para resaltado de búsqueda */
         .highlight { background-color: rgba(255, 255, 0, 0.4); position: absolute; }
         .highlight.selected { background-color: rgba(255, 165, 0, 0.6); }
         .pdf-page-container { position: relative; }
-
     </style>
 </head>
 <body class="text-white flex flex-col min-h-screen">
@@ -83,8 +81,8 @@
             </div>
             <div id="pages-container" class="w-full h-full overflow-y-auto space-y-4"></div>
         </div>
-
     </main>
+
     <aside id="sidebar" class="bg-[#181818] text-white fixed top-0 right-0 w-80 h-full transform translate-x-full transition-transform duration-300 z-50 p-4 overflow-y-auto">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-xl font-bold">Anotaciones</h3>
@@ -98,37 +96,20 @@
     <div id="page-number-indicator" class="z-50"></div>
     
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { getFirestore, collection, query, where, getDocs, doc, onSnapshot, deleteDoc, setDoc, getDoc, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
-        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
-
-        // ... (Configuración de Firebase se mantiene igual)
-        const firebaseConfig = {
-            apiKey: "AIzaSyBYVYRdA_DB1Kob9b_wGd5Wd4JsYFMyBRc",
-            authDomain: "papiro2025-d09e0.firebaseapp.com",
-            projectId: "papiro2025-d09e0",
-            storageBucket: "papiro2025-d09e0.firebasestorage.app",
-            messagingSenderId: "1096335704864",
-            appId: "1:1096335704864:web:75f1f27cd920df64554d45",
-            measurementId: "G-03Y1260F1S"
-        };
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const storage = getStorage(app);
+        // ARREGLADO: Se importa la configuración desde el archivo central
+        import { auth, db, storage } from './firebase-config.js';
+        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        import { collection, query, doc, onSnapshot, setDoc, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
         
         let currentProjectRef = null;
         let currentUser = null;
         let pdfDocument = null; 
         let currentPdfId = null;
-        let pagesHeight = [];
-
-        // NUEVO: Variables para la búsqueda
+        
         let searchResults = [];
         let currentSearchResultIndex = -1;
         
-        // ... (Se mantienen las declaraciones de elementos del DOM)
         const projectTitleEl = document.getElementById('project-title');
         const pdfViewerContainer = document.getElementById('pdf-viewer-container');
         const gridViewContainer = document.getElementById('grid-view-container');
@@ -143,7 +124,6 @@
         const addNoteBtn = document.getElementById('add-note-btn');
         const notesList = document.getElementById('notes-list');
 
-        // NUEVO: Elementos de la barra de búsqueda
         const pdfSearchInput = document.getElementById('pdf-search-input');
         const pdfSearchPrev = document.getElementById('pdf-search-prev');
         const pdfSearchNext = document.getElementById('pdf-search-next');
@@ -180,13 +160,12 @@
             });
         }
         
-        // MODIFICADO: Ahora se llama `loadFiles` para reflejar que puede haber más que PDFs
         function loadFiles() {
-            const filesQuery = query(collection(currentProjectRef, "pdfs")); // La colección se llama 'pdfs' pero puede contener videos
+            const filesQuery = query(collection(currentProjectRef, "pdfs"));
             onSnapshot(filesQuery, (snapshot) => {
-                const uploadButton = document.getElementById('visual-upload-btn').parentElement;
+                const uploadButtonContainer = document.getElementById('visual-upload-btn').parentElement;
                 pdfList.innerHTML = ''; 
-                pdfList.appendChild(uploadButton);
+                pdfList.appendChild(uploadButtonContainer);
 
                 snapshot.forEach((doc) => {
                     createFileCard(doc.id, doc.data());
@@ -202,11 +181,10 @@
             card.innerHTML = `<h3 class="w-full bg-transparent text-lg font-bold text-white focus:outline-none truncate mb-2">${data.name}</h3>
                               <p class="text-sm text-gray-400 truncate">${data.fileName || 'Video'}</p>`;
             card.addEventListener('click', () => {
-                if (data.url) { // Es un PDF
+                if (data.url) {
                     currentPdfId = id;
                     loadPDFViewer(data.url);
                 }
-                // Aquí iría la lógica para videos
             });
             pdfList.appendChild(card);
         }
@@ -219,7 +197,6 @@
             const storageRef = ref(storage, `proyectos/${currentUser.uid}/${currentProjectRef.id}/pdfs/${newPdfRef.id}-${file.name}`);
             const uploadTask = uploadBytesResumable(storageRef, file);
 
-            // Lógica de subida y guardado en Firestore...
             uploadTask.on('state_changed', 
               (snapshot) => { /* Progreso */ }, 
               (error) => { Swal.fire('Error', 'No se pudo subir el archivo.', 'error'); }, 
@@ -240,7 +217,6 @@
         async function loadPDFViewer(url) {
             gridViewContainer.style.display = 'none';
             pdfViewerContainer.style.display = 'block';
-            // ... (lógica de carga de PDF.js)
             const loadingTask = pdfjsLib.getDocument(url);
             pdfDocument = await loadingTask.promise;
             renderAllPages();
@@ -268,28 +244,24 @@
         dynamicBackBtn.onclick = () => {
             pdfViewerContainer.style.display = 'none';
             gridViewContainer.style.display = 'block';
-            pdfDocument = null; // Liberar memoria
+            pdfDocument = null;
             currentPdfId = null;
             clearSearchResults();
         };
 
-        // --- NUEVO: Lógica de Búsqueda ---
         async function performSearch() {
             clearSearchResults();
             const searchTerm = pdfSearchInput.value;
             if (!searchTerm || !pdfDocument) return;
 
-            const numPages = pdfDocument.numPages;
-            for (let i = 1; i <= numPages; i++) {
+            for (let i = 1; i <= pdfDocument.numPages; i++) {
                 const page = await pdfDocument.getPage(i);
                 const textContent = await page.getTextContent();
-                const textItems = textContent.items;
-                for (const item of textItems) {
-                    const matchIndex = item.str.toLowerCase().indexOf(searchTerm.toLowerCase());
-                    if (matchIndex !== -1) {
+                textContent.items.forEach(item => {
+                    if (item.str.toLowerCase().includes(searchTerm.toLowerCase())) {
                         searchResults.push({ pageNum: i, item: item });
                     }
-                }
+                });
             }
             updateSearchUI();
             if (searchResults.length > 0) {
@@ -305,22 +277,8 @@
             const result = searchResults[currentSearchResultIndex];
             const pageDiv = document.querySelector(`.pdf-page-container[data-page-number='${result.pageNum}']`);
             if (!pageDiv) return;
-
-            // Simple scroll a la página
-            pageDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-            // Resaltado visual (simple)
-            const viewport = pdfDocument.getPage(result.pageNum).then(page => {
-                 const viewport = page.getViewport({ scale: 1.5 });
-                 const highlight = document.createElement('div');
-                 highlight.className = 'highlight selected';
-                 const transform = pdfjsLib.util.transform(viewport.transform, result.item.transform);
-                 highlight.style.left = `${transform[4]}px`;
-                 highlight.style.top = `${transform[5]}px`;
-                 highlight.style.width = `${result.item.width}px`;
-                 highlight.style.height = `${result.item.height}px`;
-                 pageDiv.appendChild(highlight);
-            });
+            
+            pageDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
         
         function clearSearchResults() {
@@ -350,7 +308,6 @@
             }
         });
 
-        // --- NUEVO: Lógica de Anotaciones y Notas Mejorada ---
         openSidebarBtn.addEventListener('click', () => {
             sidebar.classList.add('open');
             loadNotes();
@@ -362,12 +319,7 @@
                 html: '<textarea id="swal-note" class="swal2-textarea" placeholder="Escribe tu nota..."></textarea>' +
                       '<input id="swal-tags" class="swal2-input" placeholder="Etiquetas (separadas por comas)">',
                 focusConfirm: false,
-                preConfirm: () => {
-                    return [
-                        document.getElementById('swal-note').value,
-                        document.getElementById('swal-tags').value
-                    ]
-                }
+                preConfirm: () => [document.getElementById('swal-note').value, document.getElementById('swal-tags').value]
             });
 
             if (formValues && formValues[0]) {
