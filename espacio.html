@@ -17,12 +17,14 @@
         }
         html, body { height: 100%; width: 100%; overflow: hidden; background-color: var(--background-color); color: white; font-family: 'Inter', sans-serif; }
         .app-container { height: 100vh; display: flex; flex-direction: column; }
-        /* ARREGLO SCROLL Y ZOOM: Contenedor principal permite scroll y gestos táctiles */
+        
+        /* MODIFICACIÓN AQUÍ */
         main { 
             flex-grow: 1; overflow: auto; position: relative; 
             background-color: #1a1a1a; -webkit-overflow-scrolling: touch; 
-            display: flex; justify-content: center;
+            display: flex; justify-content: center; align-items: center; /* CENTRADO VERTICAL AÑADIDO */
         }
+
         #pdf-content-wrapper {
             position: relative;
             width: max-content; /* Se ajusta al contenido con zoom */
@@ -84,6 +86,7 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
     </script>
     <script type="module">
+        // Tu JavaScript (sin cambios) va aquí
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
         import { getFirestore, doc, onSnapshot, collection, addDoc, query, orderBy, where, serverTimestamp, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
@@ -338,7 +341,7 @@
                 let noteContent = annotation.note 
                     ? `<p class="text-white text-sm break-words">${annotation.note}</p>`
                     : `<p class="text-gray-400 text-sm italic">Resaltado en página ${annotation.page}.</p>`;
-                card.innerHTML = `
+                card.innerHTML = \`
                     <div class="flex justify-between items-start">
                         <div class="flex items-center gap-2 mb-2 cursor-pointer flex-grow" onclick="window.scrollToPage(${annotation.page})">
                             <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color:${annotation.color};"></span>
@@ -350,7 +353,7 @@
                         </div>
                     </div>
                     ${noteContent}
-                `;
+                \`;
                 notesList.appendChild(card);
             });
             notesList.querySelectorAll('.edit-note-btn').forEach(btn => btn.addEventListener('click', handleEditNote));
@@ -358,7 +361,7 @@
         }
 
         window.scrollToPage = (pageNum) => {
-            const pageEl = document.querySelector(`.pdf-page-container[data-page-number='${pageNum}']`);
+            const pageEl = document.querySelector(\`.pdf-page-container[data-page-number='${pageNum}']\`);
             if(pageEl) viewerArea.scrollTop = pageEl.offsetTop * scale;
         };
 
@@ -469,7 +472,7 @@
                     const newDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
                     const scaleAmount = newDistance / initialDistance;
                     scale = Math.min(Math.max(0.5, scale * scaleAmount), 5.0);
-                    pdfWrapper.style.transform = `scale(${scale})`;
+                    pdfWrapper.style.transform = \`scale(${scale})\`;
                     initialDistance = newDistance;
                 } else if (isPanning && e.touches.length === 1) {
                     viewerArea.scrollLeft -= e.touches[0].clientX - lastX;
