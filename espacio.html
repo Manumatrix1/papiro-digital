@@ -15,10 +15,10 @@
         .hidden { display: none !important; }
         html { height: 100%; }
         body { font-family: 'Inter', sans-serif; background-color: var(--background-color); color: white; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        main { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; padding: 1rem; }
-        #pdf-viewer-container { flex-grow: 1; display: flex; flex-direction: column; }
-        #pages-container { overflow-y: auto; flex-grow: 1; -webkit-overflow-scrolling: touch; }
-        .pdf-page-container { position: relative; margin: 0 auto 1rem auto; max-width: 100%; }
+        main { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
+        #grid-view-container, #pdf-viewer-container { padding: 1.5rem; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        #pdf-viewer-container { padding: 0.5rem; }
+        .pdf-page-container { position: relative; margin: 0 auto 1rem auto; max-width: 100%; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
         .pdf-page-container canvas, .textLayer { width: 100% !important; height: auto !important; display: block; }
         .annotation-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; }
         #annotation-toolbar { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background-color: var(--surface-color); border: 1px solid var(--surface-border-color); border-radius: 9999px; padding: 0.5rem 1rem; display: flex; gap: 0.75rem; align-items: center; z-index: 100; }
@@ -48,21 +48,20 @@
         </main>
     </div>
     
-    <aside id="sidebar"></aside>
     <div id="annotation-toolbar" class="hidden">
-        <button class="tool-btn active" id="tool-select" title="Seleccionar"><i class="fas fa-mouse-pointer"></i></button>
-        <button class="tool-btn" id="tool-draw" title="Dibujar"><i class="fas fa-pencil-alt"></i></button>
-        <button class="tool-btn" id="tool-highlight" title="Resaltar"><i class="fas fa-highlighter"></i></button>
-        <button class="tool-btn" id="tool-erase" title="Borrar"><i class="fas fa-eraser"></i></button>
+        <button class="tool-btn active" id="tool-select"><i class="fas fa-mouse-pointer"></i></button>
+        <button class="tool-btn" id="tool-draw"><i class="fas fa-pencil-alt"></i></button>
+        <button class="tool-btn" id="tool-highlight"><i class="fas fa-highlighter"></i></button>
+        <button class="tool-btn" id="tool-erase"><i class="fas fa-eraser"></i></button>
         <input type="color" id="color-picker" value="#FFEB3B" style="background-color: transparent; border: none; width: 2rem; height: 2rem;">
-        <button id="open-sidebar-btn" class="tool-btn" title="Notas"><i class="fas fa-book"></i></button>
+        <button id="open-sidebar-btn" class="tool-btn"><i class="fas fa-book"></i></button>
     </div>
     <div id="page-number-indicator" class="fixed top-1/2 right-4 transform -translate-y-1/2 bg-black bg-opacity-70 text-white py-2 px-4 rounded-full z-50 opacity-0 pointer-events-none"></div>
 
     <script type="module">
         import { auth, db } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { collection, query, doc, onSnapshot, getDoc, orderBy, addDoc, deleteDoc, where } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { collection, query, doc, onSnapshot, getDoc, orderBy } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
 
         let currentUser, currentProjectId, currentPdfId, pdfDocument;
         let pagesHeight = [], currentPageNum = 1;
@@ -83,11 +82,14 @@
                 
                 if (!currentProjectId) { window.location.href = 'mi_tablero.html'; return; }
                 
-                // Si no hay ID de PDF, lo mandamos al tablero. Esta es la lógica para el futuro visor de grilla.
-                if (!currentPdfId) { window.location.href = `mi_tablero.html`; return; }
+                // Si no hay ID de PDF, por ahora lo mandamos al tablero.
+                // Aquí se podría construir la vista de grilla en el futuro.
+                if (!currentPdfId) { 
+                    window.location.href = `mi_tablero.html`; 
+                    return; 
+                }
                 
                 initializeViewer();
-
             } else { window.location.href = 'index.html'; }
         });
 
@@ -109,7 +111,6 @@
                 DOM.pdfContent.innerHTML = '';
                 pagesHeight = [0];
                 
-                const fragment = document.createDocumentFragment();
                 for (let i = 1; i <= pdfDocument.numPages; i++) {
                     const page = await pdfDocument.getPage(i);
                     const viewport = page.getViewport({ scale: 1.5 });
@@ -127,15 +128,14 @@
                     annotationCanvas.height = viewport.height; annotationCanvas.width = viewport.width;
                     annotationCanvas.dataset.pageNum = i;
                     pageContainer.append(canvas, textLayerDiv, annotationCanvas);
-                    fragment.appendChild(pageContainer);
+                    DOM.pdfContent.appendChild(pageContainer);
                     
                     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
                     const textContent = await page.getTextContent();
                     await pdfjsLib.renderTextLayer({ textContentSource: textContent, container: textLayerDiv, viewport }).promise;
                 }
-                DOM.pdfContent.appendChild(fragment);
                 
-                const pageElements = DOM.pdfContent.children;
+                const pageElements = document.getElementById('pdf-content').children;
                 for (let i = 0; i < pageElements.length; i++) {
                     pagesHeight[i + 1] = (pagesHeight[i] || 0) + pageElements[i].offsetHeight + 16;
                 }
@@ -166,7 +166,7 @@
                 else document.exitFullscreen();
             });
             DOM.pagesContainer.addEventListener('scroll', updatePageNumberIndicator);
-            // Tus listeners de herramientas originales aquí...
+            // Listeners para tus herramientas de anotación originales...
         }
     </script>
 </body>
