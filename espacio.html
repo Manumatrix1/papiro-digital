@@ -59,6 +59,10 @@
             <h3 class="text-xl font-bold">Cuaderno</h3>
             <button id="close-sidebar-btn" class="text-gray-400 hover:text-white p-2"><i class="fas fa-times"></i></button>
         </div>
+        <div class="mb-4 relative">
+            <input type="text" id="search-notes-input" placeholder="Buscar en notas..." class="w-full bg-[#2a2a2a] text-white placeholder-gray-400 py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-color">
+            <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
+        </div>
         <div id="notes-list" class="space-y-4 flex-grow overflow-y-auto"></div>
     </aside>
 
@@ -149,8 +153,8 @@
             document.getElementById('color-picker').addEventListener('input', (e) => activeColor = e.target.value);
             document.getElementById('open-notes-btn').addEventListener('click', () => sidebar.classList.add('open'));
             document.getElementById('close-sidebar-btn').addEventListener('click', () => sidebar.classList.remove('open'));
+            document.getElementById('search-notes-input').addEventListener('input', handleSearchNotes);
             viewerArea.addEventListener('scroll', updatePageIndicator);
-
             document.getElementById('play-pause-btn').addEventListener('click', toggleReadAloud);
             document.getElementById('stop-btn').addEventListener('click', () => {
                 speechSynthesis.cancel();
@@ -325,7 +329,6 @@
             const button = e.currentTarget;
             const annotationId = button.dataset.id;
             const currentNote = button.dataset.note;
-
             const { value: newNote } = await Swal.fire({
                 title: 'Editar nota', input: 'textarea', inputValue: currentNote,
                 showCancelButton: true, confirmButtonText: 'Guardar Cambios'
@@ -375,6 +378,19 @@
                 }
                 playBtn.innerHTML = '<i class="fas fa-pause"></i>';
             }
+        }
+
+        function handleSearchNotes() {
+            const searchTerm = document.getElementById('search-notes-input').value.toLowerCase();
+            const notes = document.querySelectorAll('#notes-list .note-card');
+            notes.forEach(note => {
+                const noteText = note.textContent.toLowerCase();
+                if (noteText.includes(searchTerm)) {
+                    note.style.display = 'block';
+                } else {
+                    note.style.display = 'none';
+                }
+            });
         }
     </script>
 </body>
