@@ -11,19 +11,36 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        :root { --primary-color: #88c999; --background-color: #0f0f0f; --surface-color: #181818; }
-        html, body { height: 100%; width: 100%; overflow: hidden; background-color: var(--background-color); color: white; }
-        body { font-family: 'Inter', sans-serif; display: flex; flex-direction: column; }
+        :root {
+            --primary-color: #88c999; --background-color: #0f0f0f;
+            --surface-color: #181818; --surface-border-color: #2a2a2a;
+        }
+        html, body {
+            height: 100%; width: 100%; overflow: hidden;
+            background-color: var(--background-color); color: white;
+            font-family: 'Inter', sans-serif;
+        }
         .app-container { height: 100vh; display: flex; flex-direction: column; }
         main { flex-grow: 1; overflow-y: auto; position: relative; background-color: #1a1a1a; scroll-behavior: smooth; }
-        .pdf-page-container { position: relative; margin: 0 auto 1rem auto; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        .pdf-page-container canvas { display: block; }
-        .textLayer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        
+        /* Contenedor de la página del PDF */
+        .pdf-page-container {
+            position: relative;
+            margin: 1rem auto;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        /* ARREGLO DE CALIDAD: El canvas del PDF se ajusta al 100% de su contenedor */
+        .pdf-page-container canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        
         .annotation-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; }
-        #annotation-toolbar { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background-color: var(--surface-color); border: 1px solid #2a2a2a; border-radius: 9999px; padding: 0.5rem 1rem; display: flex; gap: 0.75rem; align-items: center; z-index: 100; }
-        .tool-btn { background: none; border: none; color: #9ca3af; cursor: pointer; transition: color 0.2s, transform 0.2s; padding: 0.5rem; }
+        #annotation-toolbar { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background-color: var(--surface-color); border: 1px solid var(--surface-border-color); border-radius: 9999px; padding: 0.5rem 1rem; display: flex; gap: 0.75rem; align-items: center; z-index: 100; }
+        .tool-btn { background: none; border: none; color: #9ca3af; cursor: pointer; padding: 0.5rem; }
         .tool-btn.active { color: var(--primary-color); }
-        #sidebar { position: fixed; top: 0; right: -100%; width: 100%; max-width: 350px; height: 100%; background-color: var(--surface-color); transition: transform 0.3s ease-in-out; z-index: 110; display: flex; flex-direction: column; border-left: 1px solid #2a2a2a; }
+        #sidebar { position: fixed; top: 0; right: -100%; width: 100%; max-width: 350px; height: 100%; background-color: var(--surface-color); transition: transform 0.3s ease-in-out; z-index: 110; display: flex; flex-direction: column; border-left: 1px solid var(--surface-border-color); }
         #sidebar.open { transform: translateX(-100%); }
         .note-card { transition: background-color 0.2s; }
         .note-card:hover { background-color: #2a2a2a; }
@@ -34,14 +51,11 @@
         <header class="bg-surface-color border-b border-[#2a2a2a] py-2 px-3 flex justify-between items-center w-full flex-shrink-0 z-20">
             <a href="mi_tablero.html" class="p-2 rounded-md hover:bg-[#2a2a2a]"><i class="fas fa-arrow-left"></i></a>
             <h1 id="project-title" class="text-md font-bold text-white truncate mx-2 flex-1"></h1>
-            <div class="flex items-center gap-2">
-                <button id="play-pause-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]" title="Leer página actual"><i class="fas fa-play"></i></button>
-                <button id="stop-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]" title="Detener lectura"><i class="fas fa-stop"></i></button>
-                <button id="open-notes-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]" title="Ver Cuaderno"><i class="fas fa-book"></i></button>
-            </div>
+            <button id="open-notes-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]" title="Ver Cuaderno"><i class="fas fa-book"></i></button>
         </header>
         <main id="pdf-viewer-area"></main>
     </div>
+
     <div id="annotation-toolbar">
         <button class="tool-btn active" id="tool-select" title="Seleccionar"><i class="fas fa-mouse-pointer"></i></button>
         <button class="tool-btn" id="tool-draw" title="Dibujar"><i class="fas fa-pencil-alt"></i></button>
@@ -50,6 +64,7 @@
         <input type="color" id="color-picker" class="w-8 h-8 rounded-full cursor-pointer bg-transparent border-none" value="#FFDD00" title="Color">
         <span id="page-indicator" class="text-sm text-gray-400 ml-2">1 / 1</span>
     </div>
+
     <aside id="sidebar" class="p-4">
         <div class="flex justify-between items-center mb-4 flex-shrink-0">
             <h3 class="text-xl font-bold">Cuaderno</h3>
@@ -59,9 +74,7 @@
     </aside>
 
     <script>
-        if (window.pdfjsLib) {
-            window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-        }
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
     </script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
@@ -69,7 +82,7 @@
         import { getFirestore, doc, onSnapshot, collection, addDoc, query, orderBy, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
         
         const firebaseConfig = {
-             apiKey: "AIzaSyBYVYRdA_DB1Kob9b_wGd5Wd4JsYFMyBRc",
+            apiKey: "AIzaSyBYVYRdA_DB1Kob9b_wGd5Wd4JsYFMyBRc",
             authDomain: "papiro2025-d09e0.firebaseapp.com",
             projectId: "papiro2025-d09e0",
             storageBucket: "papiro2025-d09e0.firebasestorage.app",
@@ -79,6 +92,7 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+
         let currentUser, projectId, pdfId, pdfDocument, annotationsUnsubscribe;
         let activeTool = 'select', activeColor = '#FFDD00', isDrawing = false;
         let annotationsByPage = {}, currentPath = [];
@@ -105,43 +119,66 @@
                 const loadingTask = pdfjsLib.getDocument(doc.data().url);
                 pdfDocument = await loadingTask.promise;
                 await renderAllPages();
-                loadAllAnnotations(); // Carga todas las notas una vez
+                loadAllAnnotations();
             });
         }
         
         async function renderAllPages() {
             viewerArea.innerHTML = '';
             pageRenderedInfo = [];
-            // CALIDAD MEJORADA: Mayor escala para un renderizado más nítido
-            const scale = window.devicePixelRatio > 1 ? 2.5 : 1.5;
+            // CALIDAD MEJORADA: Mayor escala para un renderizado nítido
+            const scale = 2.0; 
             for (let i = 1; i <= pdfDocument.numPages; i++) {
                 const page = await pdfDocument.getPage(i);
                 const viewport = page.getViewport({ scale });
                 const pageContainer = document.createElement('div');
                 pageContainer.className = 'pdf-page-container';
                 pageContainer.dataset.pageNumber = i;
-                pageContainer.style.width = `${viewport.width}px`;
+                // ARREGLO DE DISEÑO: Se ajusta el contenedor al ancho del visor, no al del canvas
+                pageContainer.style.width = `90%`; 
+                pageContainer.style.maxWidth = `1000px`;
+                
                 const canvas = document.createElement('canvas');
                 const annotationCanvas = document.createElement('canvas');
-                const textLayerDiv = document.createElement('div');
-                textLayerDiv.className = 'textLayer';
-                annotationCanvas.className = 'annotation-canvas';
-                annotationCanvas.dataset.pageNum = i;
                 canvas.width = annotationCanvas.width = viewport.width;
                 canvas.height = annotationCanvas.height = viewport.height;
-                pageContainer.append(canvas, textLayerDiv, annotationCanvas);
+                annotationCanvas.className = 'annotation-canvas';
+                annotationCanvas.dataset.pageNum = i;
+                
+                pageContainer.append(canvas, annotationCanvas);
                 viewerArea.appendChild(pageContainer);
                 await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-                const textContent = await page.getTextContent();
-                pdfjsLib.renderTextLayer({ textContentSource: textContent, container: textLayerDiv, viewport, textDivs: [] });
+                
                 addDrawingListeners(annotationCanvas);
                 pageRenderedInfo.push({ el: pageContainer, top: pageContainer.offsetTop, height: pageContainer.offsetHeight });
             }
             updatePageIndicator();
         }
 
-        function setupAllEventListeners() { /* ... */ }
-        function updatePageIndicator() { /* ... */ }
+        function setupAllEventListeners() {
+            document.getElementById('tool-select').addEventListener('click', () => setActiveTool('select'));
+            document.getElementById('tool-draw').addEventListener('click', () => setActiveTool('draw'));
+            document.getElementById('tool-highlight').addEventListener('click', () => setActiveTool('highlight'));
+            document.getElementById('tool-erase').addEventListener('click', () => setActiveTool('erase'));
+            document.getElementById('color-picker').addEventListener('input', (e) => activeColor = e.target.value);
+            document.getElementById('open-notes-btn').addEventListener('click', () => sidebar.classList.add('open'));
+            document.getElementById('close-sidebar-btn').addEventListener('click', () => sidebar.classList.remove('open'));
+            viewerArea.addEventListener('scroll', updatePageIndicator);
+        }
+
+        function updatePageIndicator() {
+            const scrollCenter = viewerArea.scrollTop + (viewerArea.clientHeight / 2);
+            for(let i=0; i < pageRenderedInfo.length; i++){
+                if(scrollCenter >= pageRenderedInfo[i].top && scrollCenter < (pageRenderedInfo[i].top + pageRenderedInfo[i].height)) {
+                    currentPageNum = i + 1;
+                    break;
+                }
+            }
+            if(pdfDocument) {
+                document.getElementById('page-indicator').textContent = `${currentPageNum} / ${pdfDocument.numPages}`;
+            }
+        }
+        
         function setActiveTool(tool) {
             activeTool = tool;
             document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
@@ -149,8 +186,23 @@
             viewerArea.style.cursor = (tool === 'select') ? 'default' : 'crosshair';
         }
 
-        function addDrawingListeners(canvas) { /* ... */ }
-        function startDrawing(e) { /* ... */ }
+        function addDrawingListeners(canvas) {
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseleave', stopDrawing);
+            canvas.addEventListener('touchstart', startDrawing, { passive: false });
+            canvas.addEventListener('touchmove', draw, { passive: false });
+            canvas.addEventListener('touchend', stopDrawing);
+        }
+
+        function startDrawing(e) {
+            if (activeTool === 'select') return;
+            e.preventDefault();
+            isDrawing = true;
+            currentPath = [getCoords(e, e.target)];
+        }
+
         function draw(e) {
             if (!isDrawing) return;
             e.preventDefault();
@@ -166,23 +218,33 @@
             if (activeTool === 'highlight') {
                 const { value } = await Swal.fire({
                     title: 'Añadir nota al resaltado', input: 'textarea',
-                    inputPlaceholder: 'Escribe tu comentario aquí...', showCancelButton: true,
-                    confirmButtonText: 'Guardar Nota', cancelButtonText: 'Solo Resaltar'
+                    inputPlaceholder: 'Escribe tu comentario...', showCancelButton: true,
+                    confirmButtonText: 'Guardar', cancelButtonText: 'Solo Resaltar'
                 });
                 if (value) note = value;
             }
-            const annotationData = { page: pageNum, type: activeTool, path: currentPath, color: activeColor, note };
-            await saveAnnotation(annotationData);
+            await saveAnnotation({ page: pageNum, type: activeTool, path: currentPath, color: activeColor, note });
             currentPath = [];
         }
 
-        function getCoords(e, canvas) { /* ... */ }
-        async function saveAnnotation(annotationData) { /* ... */ }
+        function getCoords(e, canvas) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.clientX || e.touches[0].clientX;
+            const clientY = e.clientY || e.touches[0].clientY;
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+        }
+
+        async function saveAnnotation(annotationData) {
+            const annotationsRef = collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations");
+            await addDoc(annotationsRef, { ...annotationData, createdAt: serverTimestamp() });
+        }
         
         function loadAllAnnotations() {
             const annotationsRef = collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations");
             const q = query(annotationsRef, orderBy("createdAt"));
-            if (annotationsUnsubscribe) annotationsUnsubscribe(); // Cancela la escucha anterior
+            if (annotationsUnsubscribe) annotationsUnsubscribe();
             annotationsUnsubscribe = onSnapshot(q, (snapshot) => {
                 annotationsByPage = {};
                 snapshot.forEach(doc => {
@@ -190,9 +252,8 @@
                     if (!annotationsByPage[annotation.page]) annotationsByPage[annotation.page] = [];
                     annotationsByPage[annotation.page].push(annotation);
                 });
-                // Redibuja todas las páginas que tengan anotaciones
                 Object.keys(annotationsByPage).forEach(pageNum => redrawAnnotations(pageNum));
-                renderNotesToSidebar(); // Actualiza el cuaderno
+                renderNotesToSidebar();
             });
         }
         
@@ -202,54 +263,57 @@
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             const annotations = annotationsByPage[pageNum] || [];
-            // ARREGLO PERSISTENCIA: Siempre dibuja las anotaciones guardadas primero
             annotations.forEach(annotation => drawPath(ctx, annotation));
-            // Luego, si se está dibujando, dibuja el trazo actual encima
             if (isDrawing && parseInt(canvas.dataset.pageNum) == pageNum) {
                 drawPath(ctx, { type: activeTool, path: currentPath, color: activeColor });
             }
         }
 
-        function drawPath(ctx, annotation) { /* ... */ }
+        function drawPath(ctx, annotation) {
+            if (!annotation.path || annotation.path.length < 2) return;
+            ctx.strokeStyle = annotation.color;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(annotation.path[0].x, annotation.path[0].y);
+            for (let i = 1; i < annotation.path.length; i++) {
+                ctx.lineTo(annotation.path[i].x, annotation.path[i].y);
+            }
+            if (annotation.type === 'erase') {
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.lineWidth = 20;
+            } else {
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.lineWidth = annotation.type === 'highlight' ? 20 : 2;
+                ctx.globalAlpha = annotation.type === 'highlight' ? 0.4 : 1.0;
+            }
+            ctx.stroke();
+            ctx.globalAlpha = 1.0;
+        }
         
-        // --- CUADERNO DE NOTAS FUNCIONAL ---
         function renderNotesToSidebar() {
             const notesList = document.getElementById('notes-list');
             notesList.innerHTML = '';
-            const allAnnotations = Object.values(annotationsByPage).flat().sort((a,b) => a.createdAt?.toMillis() - b.createdAt?.toMillis());
-            
+            const allAnnotations = Object.values(annotationsByPage).flat().sort((a,b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0));
             if (allAnnotations.length === 0) {
                 notesList.innerHTML = `<p class="text-gray-500 text-center">Aún no hay notas.</p>`;
                 return;
             }
-
             allAnnotations.forEach(annotation => {
-                if(annotation.type !== 'highlight' && !annotation.note) return; // Opcional: mostrar solo resaltados con notas
+                if (!annotation.note && annotation.type !== 'highlight') return;
                 const card = document.createElement('div');
                 card.className = 'note-card p-3 rounded-lg cursor-pointer border border-transparent hover:border-primary-color';
                 card.onclick = () => {
                     const pageEl = document.querySelector(`.pdf-page-container[data-page-number='${annotation.page}']`);
-                    if(pageEl) viewerArea.scrollTop = pageEl.offsetTop;
+                    if(pageEl) viewerArea.scrollTop = pageEl.offsetTop - 20; // -20 for a bit of margin
                 };
-
                 let noteContent = annotation.note 
                     ? `<p class="text-white text-sm">${annotation.note}</p>`
-                    : `<p class="text-gray-400 text-sm italic">Resaltado sin nota.</p>`;
-
-                card.innerHTML = `
-                    <div class="flex items-center gap-2 mb-2">
-                        <span class="w-3 h-3 rounded-full" style="background-color:${annotation.color};"></span>
-                        <span class="text-xs font-bold text-gray-400">Página ${annotation.page}</span>
-                    </div>
-                    ${noteContent}
-                `;
+                    : `<p class="text-gray-400 text-sm italic">Resaltado en página ${annotation.page}.</p>`;
+                card.innerHTML = `<div class="flex items-center gap-2 mb-2"><span class="w-3 h-3 rounded-full" style="background-color:${annotation.color};"></span><span class="text-xs font-bold text-gray-400">Página ${annotation.page}</span></div>${noteContent}`;
                 notesList.appendChild(card);
             });
         }
-
-        // --- LECTURA POR VOZ MEJORADA ---
-        async function toggleReadAloud() { /* ... */ }
-
     </script>
 </body>
 </html>
