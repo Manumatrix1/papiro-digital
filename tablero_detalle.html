@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="project-name-title">Cargando Tablero...</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f0f0f; }
+        .pdf-card { transition: transform 0.2s ease-in-out; background-color: #181818; }
+        .pdf-card:hover { transform: translateY(-5px); }
+    </style>
+</head>
+<body class="text-white flex flex-col min-h-screen">
+    <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-6 flex justify-between items-center">
+        <div class="flex items-center gap-4">
+            <a href="mi_tablero.html" class="flex items-center text-gray-400 hover:text-white transition group">
+                <i class="fas fa-arrow-left"></i>
+                <span class="ml-2 font-medium hidden sm:inline">Volver a Mis Tableros</span>
+            </a>
+            <h1 id="project-name-header" class="text-xl font-bold text-white truncate">Cargando...</h1>
+        </div>
+        <button id="logout-btn" class="text-gray-400 hover:text-white transition">Cerrar Sesión</button>
+    </header>
+
+    <main class="flex-1 p-6">
+        <div class="w-full max-w-4xl mx-auto">
+            <div id="pdf-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                <div id="upload-card" class="pdf-card flex flex-col items-center justify-center rounded-lg p-6 border-2 border-dashed border-gray-600 transition hover:bg-[#2a2a2a] cursor-pointer" style="aspect-ratio: 1/1;">
+                    <i class="fas fa-plus fa-2x text-gray-400"></i>
+                    <span class="mt-4 font-semibold text-gray-400 text-center">Añadir PDF</span>
+                </div>
+                <input type="file" id="pdf-file-input" class="hidden" accept="application/pdf">
+            </div>
+            <div id="no-pdfs-message" class="text-gray-400 text-center mt-8 hidden">
+                <p>Este tablero no tiene archivos PDF. ¡Sube el primero!</p>
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        import { auth, db, storage } from './firebase-config.js';
+        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        import { doc, getDoc, collection, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
+
+        const projectNameTitle = document.getElementById('project-name-title');
+        const projectNameHeader = document.getElementById('project-name-header');
+        const pdfGrid = document.getElementById('pdf-grid');
+        const uploadCard = document.getElementById('upload-card');
+        const pdfFileInput = document.getElementById('pdf-file-input');
+        const noPdfsMessage = document.getElementById('no-pdfs-message');
+        const logoutBtn = document.getElementById('logout-btn');
+
+        let currentUser, projectId, projectRef;
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                const urlParams = new URLSearchParams(window.location.search);
+                projectId = urlParams.get('id');
+                if (!projectId) { window.location.href = 'mi_tablero.html'; return; }
+                
+                projectRef = doc(db, "users", currentUser.uid, "projects", projectId);
+                loadProjectName();
+                loadPdfs();
+
+                uploadCard.addEventListener('click', () => pdfFileInput.click());
+                pdfFileInput.addEventListener('change', handlePdfUpload);
+            } else {
+                window.location.href = 'index.html';
+            }
+        });
+
+        async function loadProjectName() {
+            const docSnap = await getDoc(projectRef);
+            if (docSnap.exists()) {
+                const name = docSnap.data().name;
+                projectNameTitle.textContent = name;
+                projectNameHeader.textContent = name;
+            }
+        }
+
+        function loadPdfs() {
+            const pdfsCollectionRef = collection(projectRef, "pdfs");
+            onSnapshot(pdfsCollectionRef, (snapshot) => {
+                // Limpiar grid excepto el botón de subir
+                document.querySelectorAll('.pdf-card-item').forEach(el => el.remove());
+
+                if(snapshot.empty) {
+                    noPdfsMessage.classList.remove('hidden');
+                } else {
+                    noPdfsMessage.classList.add('hidden');
+                }
+
+                snapshot.forEach(pdfDoc => {
+                    const pdfData = pdfDoc.data();
+                    const pdfId = pdfDoc.id;
+
+                    const card = document.createElement('div');
+                    card.className = 'pdf-card-item pdf-card rounded-lg p-4 flex flex-col justify-between cursor-pointer';
+                    card.style.aspectRatio = '1/1';
+                    card.innerHTML = `<h3 class="font-bold text-white truncate">${pdfData.name || 'Sin nombre'}</h3>
+                                      <p class="text-sm text-gray-500 truncate">${pdfData.fileName}</p>`;
+                    
+                    // ESTE ES EL ENLACE CORRECTO AHORA
+                    card.addEventListener('click', () => {
+                        window.location.href = `espacio.html?id=${projectId}&pdfId=${pdfId}`;
+                    });
+                    
+                    pdfGrid.appendChild(card);
+                });
+            });
+        }
+        
+        async function handlePdfUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const newPdfRef = doc(collection(projectRef, 'pdfs'));
+            const storageRef = ref(storage, `proyectos/${currentUser.uid}/${projectId}/pdfs/${newPdfRef.id}-${file.name}`);
+            const uploadTask = uploadBytesResumable(storageRef, file);
+            
+            Swal.fire({ title: 'Subiendo PDF...', text: 'Por favor, espera.', didOpen: () => { Swal.showLoading() } });
+
+            uploadTask.on('state_changed', 
+              (snapshot) => {}, 
+              (error) => { Swal.fire('Error', 'No se pudo subir el archivo.', 'error'); },
+              () => {
+                getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
+                  await setDoc(newPdfRef, {
+                    name: file.name.replace(/\.[^/.]+$/, ""),
+                    fileName: file.name,
+                    url: downloadURL,
+                    createdAt: new Date()
+                  });
+                  Swal.fire('¡Éxito!', 'Archivo subido correctamente.', 'success');
+                });
+              }
+            );
+        }
+
+        logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = 'index.html'));
+    </script>
+</body>
+</html>
