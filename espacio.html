@@ -23,12 +23,7 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
         .pdf-page-container canvas { display: block; width: 100%; height: auto; }
-        .annotation-canvas {
-            position: absolute; top: 0; left: 0;
-            width: 100%; height: 100%;
-            touch-action: none;
-            z-index: 10;
-        }
+        .annotation-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; z-index: 10; }
         #annotation-toolbar { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background-color: var(--surface-color); border: 1px solid var(--surface-border-color); border-radius: 9999px; padding: 0.5rem 1rem; display: flex; gap: 0.75rem; align-items: center; z-index: 100; }
         .tool-btn { background: none; border: none; color: #9ca3af; cursor: pointer; padding: 0.5rem; }
         .tool-btn.active { color: var(--primary-color); }
@@ -73,7 +68,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, collection, addDoc, query, orderBy, where, serverTimestamp, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, collection, addDoc, query, orderBy, where, serverTimestamp, deleteDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
         
         const firebaseConfig = {
             apiKey: "AIzaSyBYVYRdA_DB1Kob9b_wGd5Wd4JsYFMyBRc",
@@ -153,6 +148,7 @@
             document.getElementById('tool-erase').addEventListener('click', () => setActiveTool('erase'));
             document.getElementById('color-picker').addEventListener('input', (e) => activeColor = e.target.value);
             document.getElementById('open-notes-btn').addEventListener('click', () => sidebar.classList.add('open'));
+            // AÑADIDO: Evento para cerrar el panel de notas
             document.getElementById('close-sidebar-btn').addEventListener('click', () => sidebar.classList.remove('open'));
             viewerArea.addEventListener('scroll', updatePageIndicator);
 
@@ -309,8 +305,7 @@
                             <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color:${annotation.color};"></span>
                             <span class="text-xs font-bold text-gray-400 hover:text-white">Página ${annotation.page}</span>
                         </div>
-                        <div class="note-actions flex gap-2">
-                            <button class="edit-note-btn text-gray-400 hover:text-white" data-id="${annotation.id}" data-note="${annotation.note || ''}"><i class="fas fa-edit"></i></button>
+                        <div class="note-actions">
                             <button class="delete-note-btn text-gray-400 hover:text-red-500" data-id="${annotation.id}"><i class="fas fa-trash"></i></button>
                         </div>
                     </div>
@@ -318,7 +313,7 @@
                 `;
                 notesList.appendChild(card);
             });
-            notesList.querySelectorAll('.edit-note-btn').forEach(btn => btn.addEventListener('click', handleEditNote));
+            // AÑADIDO: Asignar evento al nuevo botón de borrar
             notesList.querySelectorAll('.delete-note-btn').forEach(btn => btn.addEventListener('click', handleDeleteNote));
         }
 
@@ -327,28 +322,15 @@
             if(pageEl) viewerArea.scrollTop = pageEl.offsetTop - 20;
         };
 
-        async function handleEditNote(e) {
-            const button = e.currentTarget;
-            const annotationId = button.dataset.id;
-            const currentNote = button.dataset.note;
-
-            const { value: newNote } = await Swal.fire({
-                title: 'Editar nota', input: 'textarea', inputValue: currentNote,
-                showCancelButton: true, confirmButtonText: 'Guardar Cambios'
-            });
-            if (typeof newNote === 'string') {
-                const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
-                await updateDoc(noteRef, { note: newNote });
-            }
-}
-
+        // AÑADIDO: Función para borrar la nota
         function handleDeleteNote(e) {
             const annotationId = e.currentTarget.dataset.id;
             Swal.fire({
                 title: '¿Estás seguro?', text: "Esta acción no se puede deshacer.",
                 icon: 'warning', showCancelButton: true,
                 confirmButtonColor: '#d33', cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Sí, ¡bórrala!', cancelButtonText: 'Cancelar'
+                confirmButtonText: 'Sí, ¡bórrala!', cancelButtonText: 'Cancelar',
+                background: '#181818', color: '#fff'
             }).then(async (result) => {
                 if (result.isConfirmed) {
                     const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
@@ -357,6 +339,7 @@
             });
         }
 
+        // AÑADIDO: Función de Lectura por Voz
         async function toggleReadAloud() {
             const playBtn = document.getElementById('play-pause-btn');
             if (speechSynthesis.speaking && !speechSynthesis.paused) {
@@ -376,7 +359,7 @@
                         utterance.onend = () => playBtn.innerHTML = '<i class="fas fa-play"></i>';
                         speechSynthesis.speak(utterance);
                     } else {
-                        Swal.fire({title: 'Página sin texto', text: 'No se encontró texto para leer.', icon: 'info'});
+                        Swal.fire({title: 'Página sin texto', text: 'No se encontró texto para leer.', icon: 'info', background: '#181818', color: '#fff'});
                     }
                 }
                 playBtn.innerHTML = '<i class="fas fa-pause"></i>';
