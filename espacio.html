@@ -17,7 +17,7 @@
         }
         html, body { height: 100%; width: 100%; overflow: hidden; background-color: var(--background-color); color: white; font-family: 'Inter', sans-serif; }
         .app-container { height: 100vh; display: flex; flex-direction: column; }
-        /* ARREGLO SCROLL: El contenedor principal ahora permite scroll en ambas direcciones y es suave en móviles */
+        /* ARREGLADO: El contenedor principal ahora permite scroll y gestos táctiles de forma nativa */
         main { 
             flex-grow: 1; overflow: auto; position: relative; 
             background-color: #1a1a1a; -webkit-overflow-scrolling: touch; 
@@ -43,7 +43,12 @@
         <header class="bg-surface-color border-b border-[#2a2a2a] py-2 px-3 flex justify-between items-center w-full flex-shrink-0 z-20">
             <a href="mi_tablero.html" class="p-2 rounded-md hover:bg-[#2a2a2a]"><i class="fas fa-arrow-left"></i></a>
             <h1 id="project-title" class="text-md font-bold text-white truncate mx-2 flex-1"></h1>
-            <button id="open-notes-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]" title="Ver Cuaderno"><i class="fas fa-book"></i></button>
+            <div class="flex items-center gap-2">
+                <button id="fullscreen-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]" title="Pantalla Completa"><i class="fas fa-expand"></i></button>
+                <button id="play-pause-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]" title="Leer página actual"><i class="fas fa-play"></i></button>
+                <button id="stop-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]" title="Detener lectura"><i class="fas fa-stop"></i></button>
+                <button id="open-notes-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]" title="Ver Cuaderno"><i class="fas fa-book"></i></button>
+            </div>
         </header>
         <main id="pdf-viewer-area"></main>
     </div>
@@ -163,6 +168,7 @@
             document.getElementById('search-notes-input').addEventListener('input', handleSearchNotes);
             document.getElementById('zoom-in-btn').addEventListener('click', () => zoom(0.25));
             document.getElementById('zoom-out-btn').addEventListener('click', () => zoom(-0.25));
+            document.getElementById('fullscreen-btn').addEventListener('click', toggleFullscreen);
             viewerArea.addEventListener('scroll', updatePageIndicator);
             
             const openNotesBtn = document.getElementById('open-notes-btn');
@@ -178,6 +184,12 @@
             openNotesBtn.addEventListener('click', openSidebar);
             closeNotesBtn.addEventListener('click', closeSidebar);
             sidebarOverlay.addEventListener('click', closeSidebar);
+            
+            document.getElementById('play-pause-btn').addEventListener('click', toggleReadAloud);
+            document.getElementById('stop-btn').addEventListener('click', () => {
+                speechSynthesis.cancel();
+                document.getElementById('play-pause-btn').innerHTML = '<i class="fas fa-play"></i>';
+            });
             
             addPanListeners();
         }
@@ -374,6 +386,32 @@
             });
         }
         
+        async function toggleReadAloud() {
+            const playBtn = document.getElementById('play-pause-btn');
+            if (speechSynthesis.speaking && !speechSynthesis.paused) {
+                speechSynthesis.pause();
+                playBtn.innerHTML = '<i class="fas fa-play"></i>';
+            } else {
+                if (speechSynthesis.paused) {
+                    speechSynthesis.resume();
+                } else {
+                    speechSynthesis.cancel();
+                    const page = await pdfDocument.getPage(currentPageNum);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    if(pageText.trim().length > 0) {
+                        const utterance = new SpeechSynthesisUtterance(pageText);
+                        utterance.lang = 'es-ES';
+                        utterance.onend = () => playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                        speechSynthesis.speak(utterance);
+                    } else {
+                        Swal.fire({title: 'Página sin texto', text: 'No se encontró texto para leer.', icon: 'info'});
+                    }
+                }
+                playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+            }
+        }
+
         function handleSearchNotes(e) {
             const searchTerm = e.target.value.toLowerCase();
             const notes = document.querySelectorAll('#notes-list .note-card');
@@ -382,12 +420,20 @@
                 note.style.display = noteText.includes(searchTerm) ? 'block' : 'none';
             });
         }
-
+        
         function zoom(amount) {
             currentScale += amount;
             if (currentScale < 0.5) currentScale = 0.5;
             if (currentScale > 3.0) currentScale = 3.0;
             renderAllPages();
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
         }
 
         function addPanListeners() {
