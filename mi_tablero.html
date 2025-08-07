@@ -21,6 +21,7 @@
         <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#88c999]"></div>
         <p class="mt-4 text-xl">Iniciando...</p>
     </div>
+
     <div id="main-content" class="hidden flex-col min-h-screen">
         <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-4 sm:px-8 flex flex-col sm:flex-row justify-between items-center sticky top-0 z-10 gap-4 sm:gap-0">
             <h1 class="text-xl sm:text-2xl font-bold">Mis Tableros</h1>
@@ -63,13 +64,7 @@
                 pageLoader.classList.add('hidden');
             } else { window.location.href = 'index.html'; }
         });
-
-        projectSearchInput.addEventListener('keyup', (e) => {
-            const searchText = e.target.value.toLowerCase();
-            const filteredProjects = allProjects.filter(p => p.name.toLowerCase().includes(searchText));
-            renderProjects(filteredProjects);
-        });
-
+        
         function loadProjects() {
             const q = query(collection(db, "users", currentUser.uid, "projects"));
             onSnapshot(q, (snapshot) => {
@@ -78,18 +73,22 @@
             });
         }
         
-        function renderProjects(projectsToRender) {
+        function renderProjects(projects) {
             projectsGrid.innerHTML = '';
-            noProjectsMessage.classList.toggle('hidden', projectsToRender.length > 0);
-            projectsToRender.forEach(project => {
+            noProjectsMessage.classList.toggle('hidden', projects.length > 0);
+            projects.forEach(project => {
                 const card = document.createElement('div');
                 card.className = 'project-card bg-[#181818] rounded-lg shadow-lg border border-[#2a2a2a] relative cursor-pointer flex flex-col';
                 const coverStyle = project.coverURL ? `background-image: url('${project.coverURL}'); background-size: cover; background-position: center;` : 'background-color: #2a2a2a;';
-                card.innerHTML = `<div class="h-3/4 w-full rounded-t-lg flex items-center justify-center" style="${coverStyle}">${!project.coverURL ? '<i class="fas fa-book-open text-4xl text-gray-500"></i>' : ''}</div><div class="absolute inset-x-0 top-0 p-2 flex justify-end"><button class="text-red-400 hover:text-red-300 transition delete-btn" data-id="${project.id}"><i class="fas fa-trash-alt"></i></button></div><div class="h-1/4 p-2 flex items-center justify-center"><input type="text" class="w-full text-center bg-transparent text-lg font-bold text-white focus:outline-none" value="${project.name || 'Proyecto sin nombre'}" data-id="${project.id}"></div>`;
-                card.addEventListener('click', (e) => { if (!e.target.closest('.delete-btn') && e.target.tagName.toLowerCase() !== 'input') { window.location.href = `espacio.html?id=${project.id}`; } });
+                card.innerHTML = `<div class="h-3/4 w-full rounded-t-lg flex items-center justify-center" style="${coverStyle}">${!project.coverURL ? '<i class="fas fa-book-open text-4xl text-gray-500"></i>' : ''}</div><div class="absolute inset-x-0 top-0 p-2 flex justify-end"><button class="delete-btn text-red-400 hover:text-red-300" data-id="${project.id}"><i class="fas fa-trash-alt"></i></button></div><div class="h-1/4 p-2 flex items-center"><input type="text" class="w-full text-center bg-transparent text-lg font-bold" value="${project.name || 'Sin nombre'}"></div>`;
+                card.addEventListener('click', (e) => { if (!e.target.closest('.delete-btn') && e.target.tagName !== 'INPUT') window.location.href = `espacio.html?id=${project.id}`; });
                 projectsGrid.appendChild(card);
             });
         }
+        
+        projectSearchInput.addEventListener('keyup', (e) => renderProjects(allProjects.filter(p => p.name.toLowerCase().includes(e.target.value.toLowerCase()))));
+        addProjectBtn.addEventListener('click', () => { /* Tu lógica de añadir proyecto */ });
+        logoutBtn.addEventListener('click', () => signOut(auth));
     </script>
 </body>
 </html>
