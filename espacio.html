@@ -21,8 +21,7 @@
         main { 
             flex-grow: 1; overflow: auto; position: relative; 
             background-color: #1a1a1a; -webkit-overflow-scrolling: touch; 
-            display: flex; /* Centra el contenido */
-            justify-content: center;
+            display: flex; justify-content: center;
         }
         #pdf-content-wrapper {
             position: relative;
@@ -70,7 +69,16 @@
 
     <div id="sidebar-overlay" class="hidden"></div>
     <aside id="sidebar" class="p-4">
-        </aside>
+        <div class="flex justify-between items-center mb-4 flex-shrink-0">
+            <h3 class="text-xl font-bold">Cuaderno</h3>
+            <button id="close-sidebar-btn" class="text-gray-400 hover:text-white p-2"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="mb-4 relative">
+            <input type="text" id="search-notes-input" placeholder="Buscar en notas..." class="w-full bg-[#2a2a2a] text-white py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-color">
+            <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
+        </div>
+        <div id="notes-list" class="space-y-4 flex-grow overflow-y-auto"></div>
+    </aside>
 
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
@@ -95,7 +103,7 @@
         let currentUser, projectId, pdfId, pdfDocument, annotationsUnsubscribe;
         let activeTool = 'select', activeColor = '#FFDD00', isDrawing = false;
         let annotationsByPage = {}, currentPath = [];
-        let currentPageNum = 1, pageRenderedInfo = [];
+        let currentPageNum = 1;
         let scale = 1.0;
         const viewerArea = document.getElementById('pdf-viewer-area');
         const pdfWrapper = document.getElementById('pdf-content-wrapper');
@@ -128,8 +136,7 @@
         async function renderAllPages() {
             pdfWrapper.innerHTML = '';
             pdfWrapper.style.transform = `scale(${scale})`;
-            pageRenderedInfo = [];
-            const renderScale = 2.0; // Renderiza a alta calidad siempre
+            const renderScale = 2.0;
             
             for (let i = 1; i <= pdfDocument.numPages; i++) {
                 const page = await pdfDocument.getPage(i);
@@ -156,7 +163,6 @@
                 
                 addDrawingListeners(annotationCanvas);
                 if(annotationsByPage[i]) redrawAnnotations(i);
-                pageRenderedInfo.push({ el: pageContainer, top: pageContainer.offsetTop, height: pageContainer.offsetHeight });
             }
             updatePageIndicator();
         }
@@ -172,15 +178,14 @@
             
             const openNotesBtn = document.getElementById('open-notes-btn');
             const closeNotesBtn = document.getElementById('close-sidebar-btn');
-            const openSidebar = () => {
+            openNotesBtn.addEventListener('click', () => {
                 sidebar.classList.add('open');
                 sidebarOverlay.classList.remove('hidden');
-            };
+            });
             const closeSidebar = () => {
                 sidebar.classList.remove('open');
                 sidebarOverlay.classList.add('hidden');
             };
-            openNotesBtn.addEventListener('click', openSidebar);
             closeNotesBtn.addEventListener('click', closeSidebar);
             sidebarOverlay.addEventListener('click', closeSidebar);
             
@@ -224,7 +229,6 @@
         function redrawAnnotations(pageNum) { /* ... sin cambios ... */ }
         function drawPath(ctx, annotation) { /* ... sin cambios ... */ }
         
-        // ARREGLADO: El cuaderno ahora tiene todas sus funciones
         function renderNotesToSidebar() {
             const notesList = document.getElementById('notes-list');
             notesList.innerHTML = '';
@@ -307,8 +311,12 @@
 
             viewerArea.addEventListener('touchstart', (e) => {
                 if (e.touches.length === 2) {
-                    isPanning = false; // Desactiva el pan si se está haciendo zoom
+                    isPanning = false;
                     initialDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+                } else if (e.touches.length === 1 && activeTool === 'select') {
+                    isPanning = true;
+                    lastX = e.touches[0].clientX;
+                    lastY = e.touches[0].clientY;
                 }
             }, { passive: true });
             viewerArea.addEventListener('touchmove', (e) => {
@@ -319,8 +327,17 @@
                     scale = Math.min(Math.max(0.5, scale * scaleAmount), 5.0);
                     pdfWrapper.style.transform = `scale(${scale})`;
                     initialDistance = newDistance;
+                } else if (isPanning && e.touches.length === 1) {
+                    viewerArea.scrollLeft -= e.touches[0].clientX - lastX;
+                    viewerArea.scrollTop -= e.touches[0].clientY - lastY;
+                    lastX = e.touches[0].clientX;
+                    lastY = e.touches[0].clientY;
                 }
             }, { passive: false });
+            viewerArea.addEventListener('touchend', () => {
+                isPanning = false;
+                initialDistance = null;
+            });
         }
     </script>
 </body>
