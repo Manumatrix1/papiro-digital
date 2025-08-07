@@ -22,21 +22,13 @@
         <p class="mt-4 text-xl">Iniciando...</p>
     </div>
     <div id="main-content" class="hidden flex-col min-h-screen">
-        <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-4 sm:px-8 flex flex-col sm:flex-row justify-between items-center sticky top-0 z-10 gap-4 sm:gap-0">
+        <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-4 sm:px-8 flex justify-between items-center sticky top-0 z-10">
             <h1 class="text-xl sm:text-2xl font-bold">Mis Tableros</h1>
-            <div class="flex items-center gap-4 w-full sm:w-auto">
-                <input type="text" id="project-search" placeholder="Buscar tableros..." class="w-full bg-[#2a2a2a] text-white py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#88c999]">
-                <button id="logout-btn" class="text-gray-400 hover:text-white transition">Cerrar Sesión</button>
-            </div>
+            <button id="logout-btn" class="text-gray-400 hover:text-white transition">Cerrar Sesión</button>
         </header>
         <main class="flex-1 p-4 sm:p-8">
             <div class="w-full max-w-4xl mx-auto">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-lg font-semibold">Tus Proyectos</h2>
-                    <button id="add-project-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-4 rounded-lg hover:brightness-110 transition text-sm flex items-center gap-2"><i class="fas fa-plus"></i> Nuevo Tablero</button>
-                </div>
                 <div id="projects-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4"></div>
-                <div id="no-projects-message" class="text-gray-400 text-center mt-8 hidden">No tienes tableros aún.</div>
             </div>
         </main>
     </div>
@@ -44,16 +36,13 @@
     <script type="module">
         import { auth, db } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { collection, query, onSnapshot, addDoc, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { collection, query, onSnapshot } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
         
         const pageLoader = document.getElementById('page-loader');
         const mainContent = document.getElementById('main-content');
         const projectsGrid = document.getElementById('projects-grid');
-        const addProjectBtn = document.getElementById('add-project-btn');
         const logoutBtn = document.getElementById('logout-btn');
-        const noProjectsMessage = document.getElementById('no-projects-message');
-        const projectSearchInput = document.getElementById('project-search');
-        let currentUser, allProjects = [], timer = null;
+        let currentUser;
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
@@ -63,30 +52,32 @@
                 pageLoader.classList.add('hidden');
             } else { window.location.href = 'index.html'; }
         });
-        
+
         function loadProjects() {
             const q = query(collection(db, "users", currentUser.uid, "projects"));
             onSnapshot(q, (snapshot) => {
-                allProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                renderProjects(allProjects);
+                projectsGrid.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const project = { id: doc.id, ...doc.data() };
+                    const card = document.createElement('div');
+                    card.className = 'project-card bg-[#181818] rounded-lg shadow-lg border border-[#2a2a2a] cursor-pointer flex flex-col items-center justify-center p-4';
+                    card.innerHTML = `<h3 class="text-lg font-bold text-center">${project.name}</h3>`;
+                    card.addEventListener('click', () => {
+                        // Asumimos que cada proyecto tiene al menos un PDF y vamos al primero que encontremos
+                        const pdfsQuery = query(collection(db, "users", currentUser.uid, "projects", project.id, "pdfs"));
+                        onSnapshot(pdfsQuery, (pdfsSnapshot) => {
+                            if (!pdfsSnapshot.empty) {
+                                const firstPdfId = pdfsSnapshot.docs[0].id;
+                                window.location.href = `espacio.html?id=${project.id}&docId=${firstPdfId}`;
+                            } else {
+                                Swal.fire('Vacío', 'Este tablero no tiene documentos.', 'info');
+                            }
+                        });
+                    });
+                    projectsGrid.appendChild(card);
+                });
             });
         }
-        
-        function renderProjects(projects) {
-            projectsGrid.innerHTML = '';
-            noProjectsMessage.classList.toggle('hidden', projects.length > 0);
-            projects.forEach(project => {
-                const card = document.createElement('div');
-                card.className = 'project-card bg-[#181818] rounded-lg shadow-lg border border-[#2a2a2a] relative cursor-pointer flex flex-col';
-                const coverStyle = project.coverURL ? `background-image: url('${project.coverURL}'); background-size: cover; background-position: center;` : 'background-color: #2a2a2a;';
-                card.innerHTML = `<div class="h-3/4 w-full rounded-t-lg flex items-center justify-center" style="${coverStyle}">${!project.coverURL ? '<i class="fas fa-book-open text-4xl text-gray-500"></i>' : ''}</div><div class="absolute inset-x-0 top-0 p-2 flex justify-end"><button class="delete-btn text-red-400 hover:text-red-300" data-id="${project.id}"><i class="fas fa-trash-alt"></i></button></div><div class="h-1/4 p-2 flex items-center"><input type="text" class="w-full text-center bg-transparent text-lg font-bold" value="${project.name || 'Sin nombre'}"></div>`;
-                card.addEventListener('click', (e) => { if (!e.target.closest('.delete-btn') && e.target.tagName !== 'INPUT') window.location.href = `espacio.html?id=${project.id}`; });
-                projectsGrid.appendChild(card);
-            });
-        }
-        
-        projectSearchInput.addEventListener('keyup', (e) => renderProjects(allProjects.filter(p => p.name.toLowerCase().includes(e.target.value.toLowerCase()))));
-        addProjectBtn.addEventListener('click', () => { /* Tu lógica de añadir proyecto */ });
         logoutBtn.addEventListener('click', () => signOut(auth));
     </script>
 </body>
