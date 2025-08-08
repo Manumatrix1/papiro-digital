@@ -3,244 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mis Tableros</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-    <style>
-        body { font-family: 'Inter', sans-serif; background-color: #0f0f0f; }
-        .project-card { transition: transform 0.2s ease-in-out; aspect-ratio: 1 / 1; }
-        .project-card:hover { transform: translateY(-5px); }
-        .hidden { display: none; }
-        .swal2-popup {
-            background-color: #181818 !important;
-            color: #fff !important;
-        }
-        .swal2-title {
-            color: #fff !important;
-        }
-        .swal2-input {
-            background-color: #2a2a2a !important;
-            color: #fff !important;
-        }
-    </style>
+    <title>Mis Proyectos</title>
+    <link rel="stylesheet" href="https://cdn.tailwindcss.com"></link>
+    <link rel="stylesheet" href="style.css">
 </head>
-<body class="text-white">
-    <div id="page-loader" class="fixed inset-0 bg-[#0f0f0f] flex flex-col items-center justify-center z-50">
-        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#88c999]"></div>
-        <p class="mt-4 text-xl">Iniciando...</p>
-    </div>
-
-    <div id="main-content" class="hidden flex-col min-h-screen">
-        <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-4 sm:px-8 flex flex-col sm:flex-row justify-between items-center sticky top-0 z-10 gap-4 sm:gap-0">
-            <h1 class="text-xl sm:text-2xl font-bold">Mis Tableros</h1>
-            <div class="flex items-center gap-4 w-full sm:w-auto">
-                <div class="relative w-full">
-                    <input type="text" id="project-search" placeholder="Buscar tableros..." class="w-full bg-[#2a2a2a] text-white placeholder-gray-400 py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#88c999]">
-                    <i class="fas fa-search absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                </div>
-                <button id="logout-btn" class="text-gray-400 hover:text-white transition whitespace-nowrap">Cerrar Sesión</button>
-            </div>
-        </header>
-
-        <main class="flex-1 p-4 sm:p-8">
-            <div class="w-full max-w-4xl mx-auto">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-lg font-semibold">Tus Proyectos</h2>
-                    <button id="add-project-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-4 rounded-lg hover:brightness-110 transition text-sm flex items-center gap-2">
-                        <i class="fas fa-plus"></i>
-                        Nuevo Tablero
-                    </button>
-                </div>
-                <div id="projects-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4"></div>
-                <div id="no-projects-message" class="text-gray-400 text-center mt-8 hidden">
-                    <p>No tienes tableros aún. ¡Crea uno para empezar!</p>
-                </div>
-            </div>
-        </main>
-    </div>
+<body class="bg-gray-900 text-white">
+    <header class="bg-gray-800 p-4 flex justify-between items-center">
+        <h1 class="text-xl">Mis Proyectos</h1>
+        <button id="logout-btn" class="bg-red-600 px-3 py-1 rounded">Cerrar Sesión</button>
+    </header>
+    <main class="p-4">
+        <div id="projects-container" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        </div>
+    </main>
 
     <script type="module">
-        // =================================================================
-        // 1. IMPORTACIONES DE FIREBASE (YA NO USA UN ARCHIVO EXTERNO)
-        // =================================================================
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { getFirestore, collection, query, onSnapshot, addDoc, doc, deleteDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
-        
-        // =================================================================
-        // 2. CONFIGURACIÓN DE FIREBASE (¡DEBES RELLENAR ESTO!)
-        //    Encuentra estos datos en tu consola de Firebase:
-        //    Project Settings > General > Your apps > SDK setup and configuration
-        // =================================================================
-        const firebaseConfig = {
-            apiKey: "TU_API_KEY",
-            authDomain: "TU_AUTH_DOMAIN",
-            projectId: "TU_PROJECT_ID",
-            storageBucket: "TU_STORAGE_BUCKET",
-            messagingSenderId: "TU_MESSAGING_SENDER_ID",
-            appId: "TU_APP_ID"
-        };
+        import { auth, db } from './firebase-config.js';
+        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        import { collection, query, getDocs } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
 
-        // =================================================================
-        // 3. INICIALIZACIÓN DE FIREBASE
-        // =================================================================
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        // =================================================================
-        // 4. LÓGICA DE LA APLICACIÓN (SIN CAMBIOS DE DISEÑO)
-        // =================================================================
-        const pageLoader = document.getElementById('page-loader');
-        const mainContent = document.getElementById('main-content');
-        const projectsGrid = document.getElementById('projects-grid');
-        const addProjectBtn = document.getElementById('add-project-btn');
+        const projectsContainer = document.getElementById('projects-container');
         const logoutBtn = document.getElementById('logout-btn');
-        const noProjectsMessage = document.getElementById('no-projects-message');
-        const projectSearchInput = document.getElementById('project-search');
-        let currentUser;
-        let allProjects = [];
-        
+
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                currentUser = user;
-                loadProjects();
-                mainContent.style.display = 'flex';
-                pageLoader.classList.add('hidden');
+                loadProjects(user.uid);
             } else {
                 window.location.href = 'index.html';
             }
         });
 
-        projectSearchInput.addEventListener('keyup', (e) => {
-            const searchText = e.target.value.toLowerCase();
-            const filteredProjects = allProjects.filter(project => project.name.toLowerCase().includes(searchText));
-            renderProjects(filteredProjects);
-        });
+        async function loadProjects(userId) {
+            try {
+                const projectsRef = collection(db, 'users', userId, 'projects');
+                const q = query(projectsRef);
+                const querySnapshot = await getDocs(q);
+                projectsContainer.innerHTML = '';
+                querySnapshot.forEach((doc) => {
+                    const project = doc.data();
+                    const projectEl = document.createElement('a');
+                    projectEl.href = `tablero_detalle.html?id=${doc.id}`; // O la página que corresponda
+                    projectEl.className = 'block bg-gray-800 p-4 rounded hover:bg-gray-700';
+                    projectEl.innerHTML = `<h3 class="font-semibold truncate">${project.name}</h3>`;
+                    projectsContainer.appendChild(projectEl);
+                });
+            } catch (error) {
+                console.error("Error al cargar proyectos:", error);
+            }
+        }
 
         logoutBtn.addEventListener('click', () => {
-            signOut(auth).catch(error => console.error('Error al cerrar sesión:', error));
+            signOut(auth);
         });
-
-        function loadProjects() {
-            const projectsRef = collection(db, "users", currentUser.uid, "projects");
-            const q = query(projectsRef);
-            onSnapshot(q, (snapshot) => {
-                allProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                allProjects.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)); // Ordenar por fecha
-                renderProjects(allProjects);
-            });
-        }
-        
-        function renderProjects(projectsToRender) {
-            projectsGrid.innerHTML = '';
-            noProjectsMessage.classList.toggle('hidden', projectsToRender.length === 0);
-
-            projectsToRender.forEach(project => {
-                const card = document.createElement('div');
-                card.className = 'project-card bg-[#181818] rounded-lg shadow-lg border border-[#2a2a2a] relative cursor-pointer flex flex-col';
-                card.addEventListener('click', (e) => {
-                    if (!e.target.closest('.delete-btn')) {
-                       // window.location.href = `editor.html?id=${project.id}`; // Descomentar si tienes una página de editor
-                       alert(`Ir al tablero: ${project.name}`); // Acción temporal
-                    }
-                });
-
-                const coverStyle = project.coverURL 
-                    ? `background-image: url('${project.coverURL}'); background-size: cover; background-position: center;` 
-                    : 'background-color: #2a2a2a;';
-                
-                card.innerHTML = `
-                    <div class="h-3/4 w-full rounded-t-lg flex items-center justify-center" style="${coverStyle}">
-                        ${!project.coverURL ? '<i class="fas fa-book-open text-4xl text-gray-500"></i>' : ''}
-                    </div>
-                    <div class="absolute inset-x-0 top-0 p-2 flex justify-end">
-                        <button class="delete-btn text-gray-400 hover:text-red-500 transition" data-id="${project.id}">
-                            <i class="fas fa-trash-alt"></i>
-                        </button>
-                    </div>
-                    <div class="h-1/4 p-3 flex items-center justify-center text-center">
-                         <p class="font-semibold truncate">${project.name || 'Sin Título'}</p>
-                    </div>
-                `;
-                
-                projectsGrid.appendChild(card);
-            });
-
-            // Añadir listener a los botones de borrado después de crearlos
-            document.querySelectorAll('.delete-btn').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    e.stopPropagation(); // Evita que se dispare el click de la tarjeta
-                    const projectId = e.currentTarget.dataset.id;
-                    deleteProject(projectId);
-                });
-            });
-        }
-
-        addProjectBtn.addEventListener('click', async () => {
-            const { value: projectName } = await Swal.fire({
-                title: 'Nuevo Tablero',
-                input: 'text',
-                inputLabel: 'Nombre del tablero',
-                inputPlaceholder: 'Ej: Proyecto de Marketing',
-                showCancelButton: true,
-                confirmButtonText: 'Crear',
-                cancelButtonText: 'Cancelar',
-                confirmButtonColor: '#88c999',
-                background: '#181818',
-                inputValidator: (value) => {
-                    if (!value) {
-                        return '¡Necesitas escribir un nombre!'
-                    }
-                }
-            });
-
-            if (projectName) {
-                try {
-                    await addDoc(collection(db, "users", currentUser.uid, "projects"), {
-                        name: projectName,
-                        createdAt: serverTimestamp(),
-                        coverURL: ''
-                    });
-                } catch (error) {
-                    console.error("Error al crear el proyecto: ", error);
-                    Swal.fire('Error', 'No se pudo crear el tablero.', 'error');
-                }
-            }
-        });
-
-        function deleteProject(id) {
-            Swal.fire({
-                title: '¿Estás seguro?',
-                text: "No podrás revertir esta acción.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Sí, ¡bórralo!',
-                cancelButtonText: 'Cancelar',
-                background: '#181818',
-            }).then(async (result) => {
-                if (result.isConfirmed) {
-                    try {
-                        await deleteDoc(doc(db, "users", currentUser.uid, "projects", id));
-                        Swal.fire({
-                           title: '¡Borrado!',
-                           text: 'Tu tablero ha sido eliminado.',
-                           icon: 'success',
-                           background: '#181818',
-                        });
-                    } catch (error) {
-                        console.error("Error al borrar el proyecto: ", error);
-                        Swal.fire('Error', 'No se pudo borrar el tablero.', 'error');
-                    }
-                }
-            });
-        }
     </script>
-
 </body>
 </html>
