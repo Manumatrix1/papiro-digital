@@ -19,13 +19,21 @@
         .app-container { height: 100vh; display: flex; flex-direction: column; }
         main {
             flex-grow: 1; position: relative;
-            overflow: hidden; display: grid; place-items: center;
+            overflow: hidden; /* El scroll lo maneja el wrapper */
         }
         .scroll-wrapper {
             width: 100%; height: 100%;
-            overflow: auto; -webkit-overflow-scrolling: touch; padding: 1rem;
+            overflow: auto; /* ESTE ES EL QUE PERMITE EL SCROLL */
+            -webkit-overflow-scrolling: touch;
+            /* Flexbox para centrar el contenido de forma más robusta en móviles */
+            display: flex;
+            justify-content: center;
         }
-        #pdf-content-wrapper { transition: width 0.1s ease-out; margin: auto; }
+        #pdf-content-wrapper {
+            transition: width 0.1s ease-out;
+            margin: 1rem 0; /* Margen vertical para que respire */
+            flex-shrink: 0; /* Evita que el contenedor se encoja */
+        }
         .pdf-page-container { position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin-bottom: 1rem; }
         .pdf-page-container:last-child { margin-bottom: 0; }
         .pdf-page-container canvas { display: block; width:100%; height:auto; }
@@ -50,7 +58,7 @@
         </header>
         <main id="pdf-viewer-area">
             <div class="scroll-wrapper">
-                <div id="status-indicator" class="text-white text-center p-8 flex flex-col items-center">
+                <div id="status-indicator" class="text-white text-center p-8 flex flex-col items-center m-auto">
                     <p id="status-text">Verificando sesión...</p>
                 </div>
                 <div id="pdf-content-wrapper" style="display: none;"></div>
@@ -202,7 +210,7 @@
             }, { passive: false });
 
             scrollContainer.addEventListener('touchmove', (e) => {
-                if (initialDistance && e.touches.length === 2) {
+                if (activeTool === 'select' && initialDistance && e.touches.length === 2) {
                     e.preventDefault();
                     const newDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
                     const scaleAmount = newDistance / initialDistance;
@@ -233,7 +241,7 @@
             const scrollCenter = scrollContainer.scrollTop + (scrollContainer.clientHeight / 2);
             let mostVisiblePage = 1;
             document.querySelectorAll('.pdf-page-container').forEach((pageEl, index) => {
-                const pageTop = pageEl.offsetTop; // No multiplicar por scale aquí
+                const pageTop = pageEl.offsetTop;
                 const pageBottom = pageTop + pageEl.offsetHeight;
                 if (scrollCenter >= pageTop && scrollCenter < pageBottom) {
                     mostVisiblePage = index + 1;
@@ -381,8 +389,34 @@
             if(pageEl) scrollContainer.scrollTop = pageEl.offsetTop;
         };
 
-        async function handleEditNote(e) { /* ... */ }
-        function handleDeleteNote(e) { /* ... */ }
+        async function handleEditNote(e) {
+            const button = e.currentTarget;
+            const annotationId = button.dataset.id;
+            const currentNote = button.dataset.note;
+            const { value: newNote } = await Swal.fire({
+                title: 'Editar nota', input: 'textarea', inputValue: currentNote,
+                showCancelButton: true, confirmButtonText: 'Guardar Cambios'
+            });
+            if (typeof newNote === 'string') {
+                const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
+                await updateDoc(noteRef, { note: newNote });
+            }
+        }
+        
+        function handleDeleteNote(e) {
+            const annotationId = e.currentTarget.dataset.id;
+            Swal.fire({
+                title: '¿Estás seguro?', text: "Esta acción no se puede deshacer.",
+                icon: 'warning', showCancelButton: true,
+                confirmButtonColor: '#d33', cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Sí, ¡bórrala!', cancelButtonText: 'Cancelar'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
+                    await deleteDoc(noteRef);
+                }
+            });
+        }
     </script>
 </body>
 </html>
