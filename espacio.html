@@ -19,17 +19,23 @@
         .app-container { height: 100vh; display: flex; flex-direction: column; }
         
         main {
-            flex-grow: 1; overflow: auto; position: relative;
-            background-color: #1a1a1a; -webkit-overflow-scrolling: touch;
-            display: flex; justify-content: center; align-items: center;
-            /* AJUSTE FINAL: Más espaciado lateral y vertical */
-            padding: 1rem 1.5rem; 
+            flex-grow: 1;
+            overflow: auto;
+            position: relative;
+            background-color: #1a1a1a;
+            -webkit-overflow-scrolling: touch;
+            padding: 1rem;
+
+            /* CAMBIO FINAL: Usamos Grid para un centrado más robusto que permite scroll con zoom */
+            display: grid;
+            place-items: center;
         }
         
         #pdf-content-wrapper {
-            position: relative; width: max-content; margin: 1rem 0;
-            /* AJUSTE FINAL: Zoom desde el centro */
-            transform-origin: center; 
+            position: relative;
+            width: max-content;
+            margin: 0; /* El margin ya no es necesario, 'place-items' y el padding de 'main' se encargan */
+            transform-origin: center;
             transition: transform 0.1s ease-out;
             display: flex;
             flex-direction: column;
@@ -132,7 +138,7 @@
             const statusText = document.getElementById('status-text');
             const statusIndicator = document.getElementById('status-indicator');
             pdfWrapper.style.display = 'none';
-            statusIndicator.style.display = 'block';
+            statusIndicator.style.display = 'grid'; // Usamos grid para centrar el texto
             statusText.textContent = 'Conectando...';
 
             try {
@@ -165,7 +171,7 @@
                     console.error("Error de Firestore al escuchar cambios: ", error);
                     statusText.textContent = `Error de conexión. Por favor, revisa tu internet y recarga la página. (Código: ${error.code})`;
                     pdfWrapper.style.display = 'none';
-                    statusIndicator.style.display = 'block';
+                    statusIndicator.style.display = 'grid';
                 });
             } catch (error) {
                 console.error("Error general en loadPdfDocument:", error);
