@@ -23,11 +23,8 @@
             display: flex; justify-content: center; align-items: center;
         }
         #pdf-content-wrapper {
-            position: relative;
-            width: max-content;
-            margin: 1rem 0;
-            transform-origin: top left;
-            transition: transform 0.1s ease-out;
+            position: relative; width: max-content; margin: 1rem 0;
+            transform-origin: top left; transition: transform 0.1s ease-out;
         }
         .pdf-page-container { position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin-bottom: 1rem; }
         .pdf-page-container canvas { display: block; }
@@ -54,6 +51,9 @@
             </div>
         </header>
         <main id="pdf-viewer-area">
+            <div id="status-indicator" class="text-white text-center p-8">
+                <p id="status-text">Cargando PDF...</p>
+            </div>
             <div id="pdf-content-wrapper"></div>
         </main>
     </div>
@@ -85,7 +85,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, collection, addDoc, query, orderBy, where, serverTimestamp, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, collection, addDoc, query, orderBy, serverTimestamp, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBYVYRdA_DB1Kob9b_wGd5Wd4JsYFMyBRc",
@@ -121,16 +121,51 @@
         });
 
         async function loadPdfDocument() {
-            const pdfDocRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId);
-            onSnapshot(pdfDocRef, async (doc) => {
-                if (!doc.exists()) { console.error("PDF no encontrado"); return; }
-                document.getElementById('project-title').textContent = doc.data().name;
-                const loadingTask = pdfjsLib.getDocument(doc.data().url);
-                pdfDocument = await loadingTask.promise;
-                await renderAllPages();
-                loadAllAnnotations();
-            });
+            const statusText = document.getElementById('status-text');
+            const statusIndicator = document.getElementById('status-indicator');
+            pdfWrapper.style.display = 'none';
+            statusIndicator.style.display = 'block';
+            statusText.textContent = 'Cargando PDF...';
+
+            try {
+                const pdfDocRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId);
+                
+                // onSnapshot ahora tiene un segundo argumento para manejar errores de conexión
+                annotationsUnsubscribe = onSnapshot(pdfDocRef, async (doc) => {
+                    if (!doc.exists()) {
+                        console.error("PDF no encontrado");
+                        statusText.textContent = 'Error: El documento PDF no fue encontrado.';
+                        return;
+                    }
+                    
+                    try {
+                        document.getElementById('project-title').textContent = doc.data().name;
+                        const loadingTask = pdfjsLib.getDocument(doc.data().url);
+                        pdfDocument = await loadingTask.promise;
+
+                        await renderAllPages();
+                        loadAllAnnotations();
+
+                        statusIndicator.style.display = 'none';
+                        pdfWrapper.style.display = 'block';
+                    } catch (renderError) {
+                         console.error("Error al renderizar el PDF:", renderError);
+                         statusText.textContent = `Ocurrió un error al mostrar el PDF. Intenta recargar.`;
+                    }
+
+                }, (error) => {
+                    console.error("Error de Firestore al escuchar cambios: ", error);
+                    statusText.textContent = `Error de conexión. Por favor, revisa tu internet y recarga la página. (Código: ${error.code})`;
+                    pdfWrapper.style.display = 'none';
+                    statusIndicator.style.display = 'block';
+                });
+            } catch (error) {
+                console.error("Error general en loadPdfDocument:", error);
+                statusText.textContent = 'Ocurrió un error inesperado al iniciar la carga.';
+            }
         }
+        
+        // ... El resto de tus funciones JavaScript (sin cambios)
         
         async function renderAllPages() {
             pdfWrapper.innerHTML = '';
@@ -198,6 +233,7 @@
         }
 
         function updatePageIndicator() {
+            if(!pdfWrapper || pdfWrapper.style.display === 'none') return;
             const scrollCenter = viewerArea.scrollTop + (viewerArea.clientHeight / 2);
             let mostVisiblePage = 1;
             document.querySelectorAll('.pdf-page-container').forEach((pageEl, index) => {
@@ -274,10 +310,8 @@
         }
         
         function loadAllAnnotations() {
-            const annotationsRef = collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations");
-            const q = query(annotationsRef, orderBy("createdAt"));
-            if (annotationsUnsubscribe) annotationsUnsubscribe();
-            annotationsUnsubscribe = onSnapshot(q, (snapshot) => {
+            const annotationsQuery = query(collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations"), orderBy("createdAt"));
+            onSnapshot(annotationsQuery, (snapshot) => {
                 annotationsByPage = {};
                 snapshot.forEach(doc => {
                     const annotation = { id: doc.id, ...doc.data() };
