@@ -9,14 +9,17 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #0f0f0f; }
-        .form-container { background-color: #181818; border: 1px solid #2a2a2a; }
+        .form-container { display: none; background-color: #181818; border: 1px solid #2a2a2a; }
         .password-container { position: relative; }
         .toggle-password { position: absolute; top: 50%; right: 1rem; transform: translateY(-50%); cursor: pointer; color: #9ca3af; }
     </style>
 </head>
 <body class="text-white">
-    <div class="min-h-screen flex items-center justify-center p-4">
-        <div class="form-container w-full max-w-md p-8 rounded-xl shadow-lg">
+    <div id="loader" class="min-h-screen flex items-center justify-center p-4">
+        <p>Verificando sesión...</p>
+    </div>
+    <div id="login-container" class="form-container min-h-screen items-center justify-center p-4">
+        <div class="w-full max-w-md p-8 rounded-xl shadow-lg">
             <div class="text-center mb-8">
                 <h1 class="text-3xl font-bold text-white">Iniciar Sesión</h1>
             </div>
@@ -34,9 +37,7 @@
                 <button type="submit" class="w-full mt-2 bg-[#88c999] text-[#1C1C1C] font-bold py-3 rounded-lg hover:brightness-110 transition">Ingresar</button>
             </form>
              <div class="mt-4 flex items-center justify-center">
-                 <hr class="w-full border-gray-600">
-                 <span class="px-2 text-gray-500">o</span>
-                 <hr class="w-full border-gray-600">
+                 <hr class="w-full border-gray-600"><span class="px-2 text-gray-500">o</span><hr class="w-full border-gray-600">
              </div>
             <div class="mt-4">
                 <button id="google-login-btn" class="w-full bg-white text-black font-semibold py-3 rounded-lg hover:bg-gray-200 transition flex items-center justify-center">
@@ -50,40 +51,23 @@
         import { auth } from './firebase-config.js';
         import { onAuthStateChanged, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
         
-        const loginForm = document.getElementById('login-form');
-        const googleLoginBtn = document.getElementById('google-login-btn');
-        const loginErrorMessage = document.getElementById('login-error-message');
+        const loader = document.getElementById('loader');
+        const loginContainer = document.getElementById('login-container');
 
         onAuthStateChanged(auth, user => {
-            if (user) window.location.href = 'mi_tablero.html';
-        });
-
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            loginErrorMessage.textContent = '';
-            try {
-                await signInWithEmailAndPassword(auth, loginForm['login-email'].value, loginForm['login-password'].value);
-            } catch (error) {
-                loginErrorMessage.textContent = 'Email o contraseña incorrectos.';
+            if (user) {
+                window.location.href = 'mi_tablero.html';
+            } else {
+                loader.style.display = 'none';
+                loginContainer.style.display = 'flex';
             }
         });
 
-        googleLoginBtn.addEventListener('click', async () => {
-            loginErrorMessage.textContent = '';
-            try {
-                await signInWithPopup(auth, new GoogleAuthProvider());
-            } catch (error) {
-                loginErrorMessage.textContent = 'No se pudo iniciar sesión con Google.';
-            }
-        });
-
-        function setupPasswordToggle(inputId, toggleId, eyeOpenId, eyeClosedId) {
-            const passwordInput = document.getElementById(inputId), toggle = document.getElementById(toggleId), eyeOpen = document.getElementById(eyeOpenId), eyeClosed = document.getElementById(eyeClosedId);
-            if (!passwordInput || !toggle || !eyeOpen || !eyeClosed) return;
-            toggle.addEventListener('click', () => {
-                if (passwordInput.type === 'password') { passwordInput.type = 'text'; eyeOpen.classList.add('hidden'); eyeClosed.classList.remove('hidden'); } else { passwordInput.type = 'password'; eyeOpen.classList.remove('hidden'); eyeClosed.classList.add('hidden'); }
-            });
-        }
+        // El resto del script de login (manejo de formulario, google, etc.)
+        const loginForm = document.getElementById('login-form'), googleLoginBtn = document.getElementById('google-login-btn'), loginErrorMessage = document.getElementById('login-error-message');
+        loginForm.addEventListener('submit', async (e) => { e.preventDefault(); loginErrorMessage.textContent = ''; try { await signInWithEmailAndPassword(auth, loginForm['login-email'].value, loginForm['login-password'].value); } catch (error) { loginErrorMessage.textContent = 'Email o contraseña incorrectos.'; } });
+        googleLoginBtn.addEventListener('click', async () => { loginErrorMessage.textContent = ''; try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch (error) { loginErrorMessage.textContent = 'No se pudo iniciar sesión con Google.'; } });
+        function setupPasswordToggle(inputId, toggleId, eyeOpenId, eyeClosedId) { const passwordInput = document.getElementById(inputId), toggle = document.getElementById(toggleId), eyeOpen = document.getElementById(eyeOpenId), eyeClosed = document.getElementById(eyeClosedId); if (!passwordInput || !toggle || !eyeOpen || !eyeClosed) return; toggle.addEventListener('click', () => { if (passwordInput.type === 'password') { passwordInput.type = 'text'; eyeOpen.classList.add('hidden'); eyeClosed.classList.remove('hidden'); } else { passwordInput.type = 'password'; eyeOpen.classList.remove('hidden'); eyeClosed.classList.add('hidden'); } }); }
         setupPasswordToggle('login-password', 'login-toggle', 'login-eye-open', 'login-eye-closed');
     </script>
 </body>
