@@ -65,12 +65,12 @@
         <main id="pdf-viewer-area">
             <div class="scroll-wrapper">
                 <div id="status-indicator" class="text-white text-center p-8 flex flex-col items-center">
-                    <p id="status-text">Cargando...</p>
+                    <p id="status-text">Verificando sesión...</p>
                     <div id="progress-container" class="w-full max-w-xs bg-gray-700 rounded-full h-2.5 mt-4 hidden">
                         <div id="progress-bar" class="bg-primary-color h-2.5 rounded-full transition-width duration-300" style="width: 0%"></div>
                     </div>
                 </div>
-                <div id="pdf-content-wrapper"></div>
+                <div id="pdf-content-wrapper" style="display: none;"></div>
             </div>
         </main>
     </div>
@@ -146,7 +146,7 @@
         };
 
         const firebaseConfig = {
-            apiKey: "AIzaSyB0kigSEw-8yTyBTdHeynPNVskxkr5H2W0", // <-- LA NUEVA LLAVE
+            apiKey: "AIzaSyB0kigSEw-8yTyBTdHeynPNVskxkr5H2W0",
             authDomain: "papiro2025-d09e0.firebaseapp.com",
             projectId: "papiro2025-d09e0",
             storageBucket: "papiro2025-d09e0.firebasestorage.app",
@@ -168,16 +168,41 @@
         const sidebar = document.getElementById('sidebar');
         const sidebarOverlay = document.getElementById('sidebar-overlay');
 
+        // --- LÓGICA DE AUTENTICACIÓN "PACIENTE" ---
+        let authInitialized = false;
         onAuthStateChanged(auth, (user) => {
-            if (!user) { window.location.href = 'index.html'; return; }
+            authInitialized = true;
+            if (user) {
+                // Si Firebase encuentra un usuario, iniciamos la app
+                iniciarAplicacion(user);
+            } else {
+                // Si Firebase confirma que NO hay usuario, redirigimos
+                window.location.href = 'index.html';
+            }
+        });
+
+        setTimeout(() => {
+            if (!authInitialized) {
+                console.log("Firebase auth timeout.");
+                window.location.href = 'index.html';
+            }
+        }, 3000);
+
+        function iniciarAplicacion(user) {
             currentUser = user;
             const urlParams = new URLSearchParams(window.location.search);
             projectId = urlParams.get('id');
             pdfId = urlParams.get('pdfId');
-            if (!projectId || !pdfId) { window.location.href = 'mi_tablero.html'; return; }
+            
+            if (!projectId || !pdfId) {
+                alert("Faltan datos en la URL para cargar el proyecto.");
+                window.location.href = 'mi_tablero.html';
+                return;
+            }
+            
             loadPdfDocument();
             setupAllEventListeners();
-        });
+        }
 
         async function loadPdfDocument() {
             const statusText = document.getElementById('status-text');
@@ -213,6 +238,7 @@
                 
                 const pdfUrl = docSnap.data().url;
                 const response = await fetch(pdfUrl);
+                if (!response.ok) throw new Error(`Error al descargar: ${response.statusText}`);
                 const totalBytes = Number(response.headers.get('content-length'));
                 let loadedBytes = 0;
                 
@@ -229,8 +255,10 @@
                                     return;
                                 }
                                 loadedBytes += value.byteLength;
-                                const percent = totalBytes ? ((loadedBytes / totalBytes) * 100).toFixed(0) : 0;
-                                progressBar.style.width = `${percent}%`;
+                                if (totalBytes) {
+                                     const percent = ((loadedBytes / totalBytes) * 100).toFixed(0);
+                                     progressBar.style.width = `${percent}%`;
+                                }
                                 controller.enqueue(value);
                                 read();
                             }).catch(error => {
@@ -302,10 +330,10 @@
             
             const openNotesBtn = document.getElementById('open-notes-btn');
             const closeNotesBtn = document.getElementById('close-sidebar-btn');
-            openNotesBtn.addEventListener('click', () => sidebar.classList.add('open'));
-            const closeSidebar = () => sidebar.classList.remove('open');
+            openNotesBtn.addEventListener('click', () => document.getElementById('sidebar').classList.add('open'));
+            const closeSidebar = () => document.getElementById('sidebar').classList.remove('open');
             closeNotesBtn.addEventListener('click', closeSidebar);
-            sidebarOverlay.addEventListener('click', closeSidebar);
+            document.getElementById('sidebar-overlay').addEventListener('click', closeSidebar);
             
             document.getElementById('play-pause-btn').addEventListener('click', toggleReadAloud);
             document.getElementById('stop-btn').addEventListener('click', () => speechSynthesis.cancel());
@@ -534,11 +562,32 @@
         };
 
         async function handleEditNote(e) {
-            // ... (función sin cambios) ...
+            const button = e.currentTarget;
+            const annotationId = button.dataset.id;
+            const currentNote = button.dataset.note;
+            const { value: newNote } = await Swal.fire({
+                title: 'Editar nota', input: 'textarea', inputValue: currentNote,
+                showCancelButton: true, confirmButtonText: 'Guardar Cambios'
+            });
+            if (typeof newNote === 'string') {
+                const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
+                await updateDoc(noteRef, { note: newNote });
+            }
         }
 
         function handleDeleteNote(e) {
-            // ... (función sin cambios) ...
+            const annotationId = e.currentTarget.dataset.id;
+            Swal.fire({
+                title: '¿Estás seguro?', text: "Esta acción no se puede deshacer.",
+                icon: 'warning', showCancelButton: true,
+                confirmButtonColor: '#d33', cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Sí, ¡bórrala!', cancelButtonText: 'Cancelar'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
+                    await deleteDoc(noteRef);
+                }
+            });
         }
         
         async function toggleReadAloud() {
