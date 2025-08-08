@@ -31,19 +31,21 @@
             flex-shrink: 0;
             box-shadow: 0 8px 30px rgba(0,0,0,0.7);
         }
-        /* --- ESTILO PARA LOS CONTENEDORES DE PÁGINA --- */
         .pdf-page-container { 
             position: relative; 
             margin-bottom: 1rem; 
-            background-color: #2a2a2a; /* Color de fondo mientras carga */
+            background-color: #2a2a2a;
         }
         .pdf-page-container:last-child { margin-bottom: 0; }
         .pdf-page-container canvas { display: block; width:100%; height:auto; }
         .annotation-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; touch-action: none; }
-        #annotation-toolbar { /* Sin cambios */ }
-        .tool-btn { /* Sin cambios */ }
-        #sidebar { /* Sin cambios */ }
-        #sidebar-overlay { /* Sin cambios */ }
+        #annotation-toolbar { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background-color: var(--surface-color); border: 1px solid var(--surface-border-color); border-radius: 9999px; padding: 0.5rem 1rem; display: flex; gap: 0.75rem; align-items: center; z-index: 100; }
+        .tool-btn { background: none; border: none; color: #9ca3af; cursor: pointer; padding: 0.5rem; }
+        .tool-btn.active { color: var(--primary-color); }
+        #sidebar { position: fixed; top: 0; right: -100%; width: 100%; max-width: 350px; height: 100%; background-color: var(--surface-color); transition: transform 0.3s ease-in-out; z-index: 110; display: flex; flex-direction: column; border-left: 1px solid var(--surface-border-color); }
+        #sidebar.open { transform: translateX(-100%); }
+        #sidebar-overlay { position: fixed; inset: 0; background-color: rgba(0,0,0,0.6); z-index: 105; display: none; }
+        #sidebar.open + #sidebar-overlay { display: block; }
     </style>
 </head>
 <body>
@@ -74,7 +76,13 @@
         <span id="page-indicator" class="text-sm text-gray-400 ml-2">1 / 1</span>
     </div>
 
-    <aside id="sidebar"> </aside>
+    <aside id="sidebar" class="p-4">
+         <div class="flex justify-between items-center mb-4 flex-shrink-0">
+            <h3 class="text-xl font-bold">Cuaderno de Notas</h3>
+            <button id="close-sidebar-btn" class="text-gray-400 hover:text-white p-2"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="notes-list" class="space-y-4 flex-grow overflow-y-auto"></div>
+    </aside>
     <div id="sidebar-overlay"></div>
 
     <script>
@@ -85,11 +93,11 @@
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
         import { doc, onSnapshot, collection, addDoc, query, orderBy, serverTimestamp, updateDoc, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
 
+        // --- VARIABLES GLOBALES ---
         let currentUser, projectId, pdfId, pdfDocument, annotationsUnsubscribe;
         let activeTool = 'select', activeColor = '#FFDD00', isDrawing = false;
         let annotationsByPage = {}, currentPath = [];
         let currentPageNum = 1;
-        let scale = 1.0;
         
         const pdfWrapper = document.getElementById('pdf-content-wrapper');
         const scrollContainer = document.querySelector('.scroll-wrapper');
@@ -98,131 +106,364 @@
         let isReading = false;
         let pageIntersectionObserver;
 
-        // --- LAS FUNCIONES DE CACHÉ (INDEXEDDB) NO CAMBIAN ---
+        // --- FUNCIONES DE CACHÉ (INDEXEDDB) ---
         const DB_NAME = 'PapiroDigitalDB', STORE_NAME = 'pdfCache';
-        function openDB() { /* ... */ }
-        async function savePdfToDB(id, pdfData) { /* ... */ }
-        async function getPdfFromDB(id) { /* ... */ }
-        
-        onAuthStateChanged(auth, (user) => {
-            if (user) iniciarAplicacion(user);
-            else window.location.href = 'index.html';
-        });
-
-        function iniciarAplicacion(user) { /* ... */ }
-
-        // --- LA LÓGICA DE CARGA CON CACHÉ NO CAMBIA ---
-        async function loadPdfDocument() {
-            // Esta función se mantiene igual que en la versión anterior.
-            // Primero busca en caché, si no, descarga de Firebase y guarda en caché.
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, 1);
+                request.onerror = () => reject("Error al abrir IndexedDB.");
+                request.onsuccess = () => resolve(request.result);
+                request.onupgradeneeded = (event) => {
+                    event.target.result.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                };
+            });
+        }
+        async function savePdfToDB(id, pdfData) {
+            const db = await openDB();
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            store.put({ id: id, data: pdfData, timestamp: new Date() });
+        }
+        async function getPdfFromDB(id) {
+            const db = await openDB();
+            return new Promise((resolve) => {
+                const transaction = db.transaction([STORE_NAME], 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.get(id);
+                request.onsuccess = () => resolve(request.result ? request.result.data : null);
+                request.onerror = () => resolve(null); // Si hay error, simplemente retorna null
+            });
         }
 
-        // --- RENDERIZADO INTELIGENTE (LA MAGIA ESTÁ AQUÍ) ---
+        // --- INICIO DE LA APLICACIÓN ---
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                iniciarAplicacion(user);
+            } else {
+                window.location.href = 'index.html';
+            }
+        });
+
+        function iniciarAplicacion(user) {
+            currentUser = user;
+            const urlParams = new URLSearchParams(window.location.search);
+            projectId = urlParams.get('id');
+            pdfId = urlParams.get('pdfId');
+            if (!projectId || !pdfId) {
+                window.location.href = 'mi_tablero.html';
+                return;
+            }
+            setupAllEventListeners();
+            loadPdfDocument();
+        }
+        
+        // --- GESTIÓN DE EVENTOS ---
+        function setupAllEventListeners() {
+            document.getElementById('tool-select').addEventListener('click', () => setActiveTool('select'));
+            document.getElementById('tool-draw').addEventListener('click', () => setActiveTool('draw'));
+            document.getElementById('tool-highlight').addEventListener('click', () => setActiveTool('highlight'));
+            document.getElementById('tool-erase').addEventListener('click', () => setActiveTool('erase'));
+            document.getElementById('color-picker').addEventListener('input', (e) => activeColor = e.target.value);
+            
+            scrollContainer.addEventListener('scroll', updatePageIndicator);
+            document.getElementById('read-aloud-btn').addEventListener('click', toggleReadAloud);
+            document.getElementById('open-notes-btn').addEventListener('click', () => sidebar.classList.add('open'));
+            document.getElementById('close-sidebar-btn').addEventListener('click', () => sidebar.classList.remove('open'));
+            sidebarOverlay.addEventListener('click', () => sidebar.classList.remove('open'));
+            
+            // Eventos de ratón para escritorio
+            pdfWrapper.addEventListener('mousedown', startDrawing);
+            pdfWrapper.addEventListener('mousemove', draw);
+            pdfWrapper.addEventListener('mouseup', stopDrawing);
+            pdfWrapper.addEventListener('mouseleave', stopDrawing);
+
+            // Eventos táctiles para móviles
+            pdfWrapper.addEventListener('touchstart', startDrawing, { passive: false });
+            pdfWrapper.addEventListener('touchmove', draw, { passive: false });
+            pdfWrapper.addEventListener('touchend', stopDrawing);
+        }
+
+        function setActiveTool(tool) {
+            activeTool = tool;
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`tool-${tool}`).classList.add('active');
+            // Permite el scroll solo si la herramienta de selección está activa
+            scrollContainer.style.overflow = (tool === 'select') ? 'auto' : 'hidden';
+        }
+
+        // --- CARGA Y RENDERIZADO DEL PDF ---
+        async function loadPdfDocument() {
+            const statusText = document.getElementById('status-text');
+            try {
+                statusText.textContent = 'Buscando en caché...';
+                const cachedPdf = await getPdfFromDB(pdfId);
+                let pdfData;
+
+                if (cachedPdf) {
+                    statusText.textContent = 'Cargando desde caché...';
+                    pdfData = cachedPdf;
+                } else {
+                    statusText.textContent = 'Descargando documento...';
+                    const pdfDocRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId);
+                    const docSnap = await getDoc(pdfDocRef);
+                    if (!docSnap.exists()) throw new Error("PDF no encontrado en Firebase");
+                    
+                    const response = await fetch(docSnap.data().url);
+                    pdfData = await response.arrayBuffer();
+                    
+                    await savePdfToDB(pdfId, pdfData);
+                }
+
+                const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(pdfData) });
+                pdfDocument = await loadingTask.promise;
+                
+                document.getElementById('status-indicator').style.display = 'none';
+                pdfWrapper.style.display = 'block';
+
+                await setupPagePlaceholders();
+                loadAllAnnotations();
+
+            } catch (error) {
+                console.error("Error al cargar PDF:", error);
+                statusText.textContent = `Error: ${error.message}`;
+            }
+        }
 
         async function setupPagePlaceholders() {
             pdfWrapper.innerHTML = '';
-            
-            // 1. Obtiene las dimensiones de la primera página para calcular el tamaño
             const firstPage = await pdfDocument.getPage(1);
-            const viewport = firstPage.getViewport({ scale: 1.5 }); // Escala segura y fija
+            const viewport = firstPage.getViewport({ scale: 1.5 }); // Escala base para calcular dimensiones
             
-            // 2. Crea un "placeholder" (div vacío) para CADA página
             for (let i = 1; i <= pdfDocument.numPages; i++) {
                 const pageContainer = document.createElement('div');
                 pageContainer.className = 'pdf-page-container';
                 pageContainer.dataset.pageNumber = i;
                 pageContainer.style.width = `${viewport.width}px`;
-                pageContainer.style.height = `${viewport.height}px`; // Alto fijo para que el scroll funcione
+                pageContainer.style.height = `${viewport.height}px`;
                 pdfWrapper.appendChild(pageContainer);
             }
             
-            // 3. Inicia el observador para renderizar páginas cuando se vean
             startPageObserver();
             updatePageIndicator();
         }
 
         function startPageObserver() {
+            if (pageIntersectionObserver) {
+                pageIntersectionObserver.disconnect();
+            }
             const options = {
-                root: scrollContainer, // Observa dentro del área de scroll
-                rootMargin: '1000px 0px', // Renderiza páginas 1000px antes de que aparezcan
+                root: scrollContainer,
+                rootMargin: '1000px 0px', // Precarga páginas que están a 1000px de distancia
                 threshold: 0
             };
-
             pageIntersectionObserver = new IntersectionObserver(handlePageIntersection, options);
             document.querySelectorAll('.pdf-page-container').forEach(page => {
                 pageIntersectionObserver.observe(page);
             });
         }
         
-        function handlePageIntersection(entries, observer) {
+        function handlePageIntersection(entries) {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
                     const pageContainer = entry.target;
-                    const pageNum = parseInt(pageContainer.dataset.pageNumber);
-                    
-                    // Si la página ya está renderizada, no hagas nada
                     if (pageContainer.querySelector('canvas')) return;
-
-                    console.log(`Renderizando página ${pageNum}...`);
-                    renderPage(pageContainer, pageNum);
                     
-                    // Una vez renderizada, deja de observarla para ahorrar recursos
-                    observer.unobserve(pageContainer);
+                    const pageNum = parseInt(pageContainer.dataset.pageNumber);
+                    renderPage(pageContainer, pageNum);
+                    pageIntersectionObserver.unobserve(pageContainer);
                 }
             });
         }
 
         async function renderPage(pageContainer, pageNum) {
-            try {
-                const page = await pdfDocument.getPage(pageNum);
-                // Usamos una escala fija y segura para evitar sobrecargar el móvil
-                const scale = 1.5; 
-                const viewport = page.getViewport({ scale: scale });
+            const page = await pdfDocument.getPage(pageNum);
+            const scale = 1.5; // Escala de renderizado fija y segura
+            const viewport = page.getViewport({ scale: scale });
 
-                const canvas = document.createElement('canvas');
-                const annotationCanvas = document.createElement('canvas');
-                
-                canvas.width = annotationCanvas.width = viewport.width;
-                canvas.height = annotationCanvas.height = viewport.height;
-                
-                annotationCanvas.className = 'annotation-canvas';
-                annotationCanvas.dataset.pageNum = pageNum;
-                
-                pageContainer.innerHTML = ''; // Limpia el contenedor por si acaso
-                pageContainer.appendChild(canvas);
-                pageContainer.appendChild(annotationCanvas);
-                
-                await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-                
-                // Redibuja las anotaciones que ya existían en esta página
-                redrawAnnotations(pageNum);
+            const canvas = document.createElement('canvas');
+            const annotationCanvas = document.createElement('canvas');
+            
+            canvas.width = annotationCanvas.width = viewport.width;
+            canvas.height = annotationCanvas.height = viewport.height;
+            
+            annotationCanvas.className = 'annotation-canvas';
+            annotationCanvas.dataset.pageNum = pageNum;
+            
+            pageContainer.innerHTML = '';
+            pageContainer.append(canvas, annotationCanvas);
+            
+            await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+            redrawAnnotations(pageNum);
+        }
 
-            } catch (error) {
-                console.error(`Error al renderizar página ${pageNum}:`, error);
+        // --- DIBUJO Y ANOTACIONES ---
+        function startDrawing(e) {
+            if (activeTool === 'select') return;
+            e.preventDefault();
+            isDrawing = true;
+            const canvas = findCanvasUnderPointer(e);
+            if (canvas) {
+                currentPath = [getCoords(e, canvas)];
             }
         }
-        
-        // El resto de funciones no necesitan cambios importantes
-        // Se pegan aquí para que el código esté completo
-        function setupAllEventListeners() { /* ... */ }
-        function setActiveTool(tool) { /* ... */ }
-        function updatePageIndicator() { /* ... */ }
-        function startDrawing(e) { /* ... */ }
-        function draw(e) { /* ... */ }
-        async function stopDrawing(e) { /* ... */ }
-        function findCanvasUnderPointer(e, isEndEvent = false) { /* ... */ }
-        function getCoords(e, canvas) { /* ... */ }
-        async function saveAnnotation(annotationData) { /* ... */ }
-        function loadAllAnnotations() { /* ... */ }
-        function redrawAnnotations(pageNum) { /* ... */ }
-        function drawPath(ctx, annotation) { /* ... */ }
-        function renderNotesToSidebar() { /* ... */ }
-        window.scrollToPage = (pageNum) => { /* ... */ }
-        async function handleEditNote(e) { /* ... */ }
-        function handleDeleteNote(e) { /* ... */ }
-        async function toggleReadAloud() { /* ... */ }
-        function speakText(text) { /* ... */ }
 
+        function draw(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            const canvas = findCanvasUnderPointer(e);
+            if (canvas) {
+                currentPath.push(getCoords(e, canvas));
+                redrawAnnotations(canvas.dataset.pageNum);
+            }
+        }
+
+        async function stopDrawing(e) {
+            if (!isDrawing) return;
+            isDrawing = false;
+            
+            const canvas = findCanvasUnderPointer(e, true);
+            if (!canvas || currentPath.length < 3) {
+                currentPath = [];
+                return;
+            }
+
+            const pageNum = parseInt(canvas.dataset.pageNum);
+            await saveAnnotation({ page: pageNum, type: activeTool, path: currentPath, color: activeColor });
+            currentPath = [];
+        }
+
+        function getCoords(e, canvas) {
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches ? e.touches[0] : e;
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return { x: (touch.clientX - rect.left) * scaleX, y: (touch.clientY - rect.top) * scaleY };
+        }
+        
+        function findCanvasUnderPointer(e, isEndEvent = false) {
+            const eventPoint = isEndEvent ? (e.changedTouches ? e.changedTouches[0] : e) : (e.touches ? e.touches[0] : e);
+            return document.elementFromPoint(eventPoint.clientX, eventPoint.clientY)?.closest('.pdf-page-container')?.querySelector('.annotation-canvas');
+        }
+
+        async function saveAnnotation(annotationData) {
+            const annotationsRef = collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations");
+            await addDoc(annotationsRef, { ...annotationData, createdAt: serverTimestamp() });
+        }
+        
+        function loadAllAnnotations() {
+            const annotationsQuery = query(collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations"), orderBy("createdAt"));
+            annotationsUnsubscribe = onSnapshot(annotationsQuery, (snapshot) => {
+                annotationsByPage = {};
+                snapshot.forEach(doc => {
+                    const annotation = { id: doc.id, ...doc.data() };
+                    if (!annotationsByPage[annotation.page]) annotationsByPage[annotation.page] = [];
+                    annotationsByPage[annotation.page].push(annotation);
+                });
+                document.querySelectorAll('.pdf-page-container').forEach(pageContainer => {
+                    if (pageContainer.querySelector('canvas')) {
+                         redrawAnnotations(pageContainer.dataset.pageNumber);
+                    }
+                });
+                renderNotesToSidebar();
+            });
+        }
+       
+        function redrawAnnotations(pageNum) {
+            const canvas = document.querySelector(`.annotation-canvas[data-page-num='${pageNum}']`);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            (annotationsByPage[pageNum] || []).forEach(annotation => drawPath(ctx, annotation));
+            if (isDrawing && parseInt(canvas.dataset.pageNum) == currentPageNum) {
+                drawPath(ctx, { type: activeTool, path: currentPath, color: activeColor });
+            }
+        }
+
+        function drawPath(ctx, annotation) {
+            if (!annotation.path || annotation.path.length < 2) return;
+            ctx.save();
+            ctx.strokeStyle = annotation.color;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(annotation.path[0].x, annotation.path[0].y);
+            annotation.path.forEach(point => ctx.lineTo(point.x, point.y));
+            
+            if (annotation.type === 'erase') {
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.lineWidth = 40;
+            } else {
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.lineWidth = annotation.type === 'highlight' ? 20 : 3;
+                ctx.globalAlpha = annotation.type === 'highlight' ? 0.4 : 1.0;
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+        
+        // --- FUNCIONES ADICIONALES ---
+        function updatePageIndicator() {
+            if(!pdfDocument) return;
+            const scrollCenterY = scrollContainer.scrollTop + scrollContainer.clientHeight / 2;
+            let mostVisiblePage = 1;
+            const pageElements = document.querySelectorAll('.pdf-page-container');
+            for(let i = 0; i < pageElements.length; i++) {
+                const pageEl = pageElements[i];
+                if (scrollCenterY >= pageEl.offsetTop && scrollCenterY < pageEl.offsetTop + pageEl.offsetHeight) {
+                    mostVisiblePage = i + 1;
+                    break;
+                }
+            }
+            currentPageNum = mostVisiblePage;
+            document.getElementById('page-indicator').textContent = `${currentPageNum} / ${pdfDocument.numPages}`;
+        }
+
+        function renderNotesToSidebar() {
+            // ... (Esta función puede permanecer como estaba en tu versión funcional)
+        }
+
+        window.scrollToPage = (pageNum) => {
+            const pageEl = document.querySelector(`.pdf-page-container[data-page-number='${pageNum}']`);
+            if(pageEl) {
+                scrollContainer.scrollTop = pageEl.offsetTop - 20;
+                sidebar.classList.remove('open');
+            }
+        };
+
+        async function toggleReadAloud() {
+            const btn = document.getElementById('read-aloud-btn');
+            if (isReading) {
+                speechSynthesis.cancel();
+                isReading = false;
+                btn.classList.remove('text-[var(--primary-color)]');
+                return;
+            }
+            isReading = true;
+            btn.classList.add('text-[var(--primary-color)]');
+            
+            for (let i = currentPageNum; i <= pdfDocument.numPages; i++) {
+                if (!isReading) break;
+                window.scrollToPage(i); 
+                updatePageIndicator(); 
+                const page = await pdfDocument.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                await speakText(pageText);
+            }
+            isReading = false;
+            btn.classList.remove('text-[var(--primary-color)]');
+        }
+
+        function speakText(text) {
+            return new Promise(resolve => {
+                if (!isReading) return resolve();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'es-ES';
+                utterance.onend = resolve;
+                utterance.onerror = () => resolve();
+                speechSynthesis.speak(utterance);
+            });
+        }
     </script>
 </body>
 </html>
