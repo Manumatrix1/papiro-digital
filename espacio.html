@@ -17,12 +17,15 @@
         }
         html, body { height: 100%; width: 100%; overflow: hidden; background-color: var(--background-color); color: white; font-family: 'Inter', sans-serif; }
         .app-container { height: 100vh; display: flex; flex-direction: column; }
+        
+        /* AJUSTE FINAL DE DISEÑO */
         main {
             flex-grow: 1; overflow: auto; position: relative;
             background-color: #1a1a1a; -webkit-overflow-scrolling: touch;
             display: flex; justify-content: center; align-items: center;
+            padding: 0 0.75rem; /* <-- Espaciado lateral añadido */
         }
-        /* CORRECCIÓN DE MAQUETACIÓN AQUÍ */
+        
         #pdf-content-wrapper {
             position: relative; width: max-content; margin: 1rem 0;
             transform-origin: top left; transition: transform 0.1s ease-out;
@@ -150,7 +153,7 @@
                         loadAllAnnotations();
 
                         statusIndicator.style.display = 'none';
-                        pdfWrapper.style.display = 'flex'; // Cambiado a flex para coincidir con CSS
+                        pdfWrapper.style.display = 'flex';
                     } catch (renderError) {
                          console.error("Error al renderizar el PDF:", renderError);
                          statusText.textContent = `Ocurrió un error al mostrar el PDF. Intenta recargar.`;
