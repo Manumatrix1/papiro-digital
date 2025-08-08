@@ -21,14 +21,23 @@
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#88c999]"></div>
         <p class="mt-4 text-lg">Cargando tus proyectos...</p>
     </div>
+
     <div id="app-content" class="hidden">
         <header class="bg-[#181818] border-b border-[#2a2a2a] p-4 flex justify-between items-center">
             <h1 id="user-greeting" class="text-xl font-bold"></h1>
             <div class="flex items-center gap-4">
-                <input id="search-bar" type="text" placeholder="Buscar proyectos..." class="bg-[#2a2a2a] text-white py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#88c999]">
+                
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3">
+                        <i class="fas fa-search text-gray-500"></i>
+                    </span>
+                    <input id="search-bar" type="text" placeholder="Buscar proyectos..." class="bg-[#2a2a2a] text-white py-2 pl-10 pr-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#88c999] transition-all">
+                </div>
+
                 <button id="logout-btn" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition">Cerrar Sesión</button>
             </div>
         </header>
+
         <main class="p-6">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-semibold">Tus Tableros</h2>
@@ -58,11 +67,18 @@
         const addProjectBtn = document.getElementById('add-project-btn');
         const searchBar = document.getElementById('search-bar');
         let allProjects = [];
+        let currentUserId = null;
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                userGreeting.textContent = `Hola, ${user.displayName || user.email}`;
-                loadProjects(user.uid);
+                currentUserId = user.uid;
+                
+                // CAMBIO ESTÉTICO: Saludo personalizado
+                const name = user.displayName ? user.displayName.split(' ')[0] : user.email.split('@')[0];
+                const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
+                userGreeting.textContent = `Hola, ${capitalizedName}`;
+                
+                loadProjects(currentUserId);
                 pageLoader.style.display = 'none';
                 appContent.classList.remove('hidden');
             } else {
@@ -92,7 +108,7 @@
                         ${!project.coverURL ? '<i class="fas fa-book-open text-4xl text-gray-500"></i>' : ''}
                     </div>
                     <div class="absolute inset-x-0 top-0 p-2 flex justify-end">
-                        <button class="text-red-400 hover:text-red-300 transition delete-btn" data-id="${project.id}">
+                        <button class="text-red-400 hover:text-red-300 transition opacity-0 group-hover:opacity-100 delete-btn" data-id="${project.id}">
                             <i class="fas fa-trash-alt"></i>
                         </button>
                     </div>
@@ -100,12 +116,14 @@
                         <h3 class="font-semibold truncate w-full">${project.name}</h3>
                     </div>
                 `;
+                card.addEventListener('click', (e) => {
+                    if (!e.target.closest('.delete-btn')) {
+                        window.location.href = `tablero_detalle.html?id=${project.id}`;
+                    }
+                });
                 card.querySelector('.delete-btn').addEventListener('click', (e) => {
                     e.preventDefault(); e.stopPropagation();
-                    deleteProject(auth.currentUser.uid, project.id);
-                });
-                card.addEventListener('click', () => {
-                    window.location.href = `tablero_detalle.html?id=${project.id}`;
+                    deleteProject(currentUserId, project.id, project.name);
                 });
                 projectsGrid.appendChild(card);
             });
@@ -119,14 +137,69 @@
         
         logoutBtn.addEventListener('click', () => signOut(auth));
 
-        // (Aquí irían las funciones addProject y deleteProject, adaptadas a v9)
-        async function deleteProject(userId, projectId) {
-            // Lógica de borrado con confirmación
-        }
-        async function addProject(userId, projectName) {
-            // Lógica para añadir proyecto
+        addProjectBtn.addEventListener('click', () => {
+             Swal.fire({
+                title: 'Nuevo Proyecto',
+                html: `
+                    <input id="swal-input1" class="swal2-input" placeholder="Nombre del proyecto">
+                    <input id="swal-input2" type="file" class="swal2-file" accept="image/*">
+                `,
+                focusConfirm: false,
+                preConfirm: () => {
+                    return {
+                        name: document.getElementById('swal-input1').value,
+                        file: document.getElementById('swal-input2').files[0]
+                    }
+                }
+            }).then(async (result) => {
+                if (result.isConfirmed && result.value.name) {
+                    await addProject(currentUserId, result.value.name, result.value.file);
+                }
+            });
+        });
+
+        async function addProject(userId, projectName, file) {
+            try {
+                let coverURL = '';
+                if (file) {
+                    const storageRef = ref(storage, `users/${userId}/covers/${Date.now()}_${file.name}`);
+                    await uploadBytes(storageRef, file);
+                    coverURL = await getDownloadURL(storageRef);
+                }
+                const projectsRef = collection(db, 'users', userId, 'projects');
+                await addDoc(projectsRef, {
+                    name: projectName,
+                    coverURL: coverURL,
+                    createdAt: serverTimestamp()
+                });
+            } catch (error) {
+                console.error("Error al crear proyecto:", error);
+                Swal.fire('Error', 'No se pudo crear el proyecto.', 'error');
+            }
         }
 
+        async function deleteProject(userId, projectId, projectName) {
+            Swal.fire({
+                title: `¿Borrar "${projectName}"?`,
+                text: "Esta acción no se puede deshacer.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Sí, ¡bórralo!',
+                cancelButtonText: 'Cancelar'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    try {
+                        await deleteDoc(doc(db, 'users', userId, 'projects', projectId));
+                        Swal.fire('¡Borrado!', 'El proyecto ha sido eliminado.', 'success');
+                    } catch (error) {
+                        console.error("Error al borrar proyecto:", error);
+                        Swal.fire('Error', 'No se pudo borrar el proyecto.', 'error');
+                    }
+                }
+            });
+        }
     </script>
 </body>
 </html>
