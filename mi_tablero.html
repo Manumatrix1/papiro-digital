@@ -14,7 +14,7 @@
     </header>
     <main class="p-4">
         <div id="projects-container" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            </div>
+        </div>
     </main>
 
     <script type="module">
@@ -42,7 +42,7 @@
                 querySnapshot.forEach((doc) => {
                     const project = doc.data();
                     const projectEl = document.createElement('a');
-                    projectEl.href = `tablero_detalle.html?id=${doc.id}`;
+                    projectEl.href = `tablero_detalle.html?id=${doc.id}`; // Asumo que esta es la página correcta
                     projectEl.className = 'block bg-gray-800 p-4 rounded hover:bg-gray-700';
                     projectEl.innerHTML = `<h3 class="font-semibold truncate">${project.name}</h3>`;
                     projectsContainer.appendChild(projectEl);
