@@ -5,7 +5,7 @@ import { getFirestore } from "https://www.gstatic.com/firebasejs/9.17.1/firebase
 import { getStorage } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyB0kigSEw-8yTyBTdHeynPNVskxkr5H2W0", // La llave nueva y limpia
+    apiKey: "AIzaSyB0kigSEw-8yTyBTdHeynPNVskxkr5H2W0", // La llave nueva
     authDomain: "papiro2025-d09e0.firebaseapp.com",
     projectId: "papiro2025-d09e0",
     storageBucket: "papiro2025-d09e0.firebasestorage.app",
