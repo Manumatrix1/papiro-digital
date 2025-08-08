@@ -3,129 +3,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mis Tableros</title>
+    <title>Detalle del Proyecto</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-    <style>
-        body { font-family: 'Inter', sans-serif; background-color: #0f0f0f; }
-        .project-card { transition: transform 0.2s ease-in-out; aspect-ratio: 1 / 1; }
-        .project-card:hover { transform: translateY(-5px); }
-        .card-actions { opacity: 0; transition: opacity 0.2s; }
-        .project-card:hover .card-actions { opacity: 1; }
-    </style>
 </head>
-<body class="text-white flex flex-col min-h-screen">
-    <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-4 sm:px-8 flex justify-between items-center sticky top-0 z-10">
-        <h1 class="text-xl sm:text-2xl font-bold">Mis Tableros</h1>
-        <div class="flex items-center gap-4">
-            <input type="text" id="project-search" placeholder="Buscar..." class="bg-[#2a2a2a] py-2 px-4 rounded-lg focus:outline-none">
-            <button id="logout-btn" class="text-gray-400 hover:text-white">Cerrar Sesión</button>
-        </div>
-    </header>
-    <main class="flex-1 p-4 sm:p-8">
-        <div class="w-full max-w-5xl mx-auto">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-lg font-semibold">Tus Proyectos</h2>
-                <button id="add-project-btn" class="bg-[#88c999] text-[#1C1C1C] font-bold py-2 px-4 rounded-lg hover:brightness-110">Nuevo Tablero</button>
-            </div>
-            <div id="projects-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6"></div>
-        </div>
-    </main>
+<body class="bg-[#0f0f0f] text-white">
+
+    <div id="loader" class="flex items-center justify-center h-screen">
+        <p>Cargando proyecto...</p>
+    </div>
+
+    <div id="app-content" class="hidden">
+        <header class="bg-[#181818] border-b border-[#2a2a2a] p-4 flex justify-between items-center">
+            <a href="mi_tablero.html" class="text-xl"><i class="fas fa-arrow-left"></i></a>
+            <h1 id="project-name" class="text-2xl font-bold"></h1>
+            <button id="logout-btn" class="text-xl"><i class="fas fa-sign-out-alt"></i></button>
+        </header>
+
+        <main class="p-6">
+            <div id="pdf-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                </div>
+        </main>
+    </div>
 
     <script type="module">
         import { auth, db } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { collection, query, onSnapshot, addDoc, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { doc, getDoc, collection, getDocs, query } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
 
-        // ARREGLO: Todo el script está reestructurado para incluir la funcionalidad de imagen
-        document.addEventListener('DOMContentLoaded', () => {
-            const projectsGrid = document.getElementById('projects-grid');
-            const addProjectBtn = document.getElementById('add-project-btn');
-            const logoutBtn = document.getElementById('logout-btn');
-            let currentUser;
+        const loader = document.getElementById('loader');
+        const appContent = document.getElementById('app-content');
+        const projectNameEl = document.getElementById('project-name');
+        const pdfListEl = document.getElementById('pdf-list');
+        const logoutBtn = document.getElementById('logout-btn');
 
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    currentUser = user;
-                    loadProjects();
-                } else {
-                    window.location.href = 'index.html';
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                const urlParams = new URLSearchParams(window.location.search);
+                const projectId = urlParams.get('id');
+                if (!projectId) {
+                    alert("No se especificó un ID de proyecto.");
+                    window.location.href = 'mi_tablero.html';
+                    return;
                 }
-            });
-
-            function loadProjects() {
-                const q = query(collection(db, "users", currentUser.uid, "projects"));
-                onSnapshot(q, (snapshot) => {
-                    projectsGrid.innerHTML = '';
-                    snapshot.forEach((doc) => createProjectCard(doc));
-                });
+                await loadProjectDetails(user.uid, projectId);
+                loader.style.display = 'none';
+                appContent.style.display = 'block';
+            } else {
+                window.location.href = 'index.html';
             }
+        });
 
-            function createProjectCard(projectDoc) {
-                const project = { id: projectDoc.id, ...projectDoc.data() };
-                const card = document.createElement('div');
-                card.className = 'project-card bg-[#181818] rounded-lg shadow-lg flex flex-col cursor-pointer';
+        async function loadProjectDetails(userId, projectId) {
+            try {
+                // Cargar nombre del proyecto
+                const projectRef = doc(db, 'users', userId, 'projects', projectId);
+                const projectSnap = await getDoc(projectRef);
+                if (projectSnap.exists()) {
+                    projectNameEl.textContent = projectSnap.data().name;
+                }
+
+                // Cargar lista de PDFs
+                const pdfsRef = collection(db, 'users', userId, 'projects', projectId, 'pdfs');
+                const pdfsQuery = query(pdfsRef);
+                const querySnapshot = await getDocs(pdfsQuery);
                 
-                const coverStyle = project.coverURL 
-                    ? `background-image: url('${project.coverURL}'); background-size: cover; background-position: center;`
-                    : 'background-color: #2a2a2a;';
-
-                card.innerHTML = `
-                    <div class="h-3/4 w-full rounded-t-lg relative" style="${coverStyle}">
-                        <div class="card-actions absolute top-2 right-2 flex gap-2">
-                            <button class="edit-cover-btn text-white bg-black bg-opacity-50 rounded-md w-8 h-8 hover:bg-opacity-75" title="Editar Portada">
-                                <i class="fas fa-image"></i>
-                            </button>
-                            <button class="delete-btn text-red-400 bg-black bg-opacity-50 rounded-md w-8 h-8 hover:bg-opacity-75" title="Eliminar Tablero">
-                                <i class="fas fa-trash-alt"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="h-1/4 p-3 flex items-center">
-                        <h3 class="font-bold text-white truncate">${project.name}</h3>
-                    </div>
-                `;
-
-                // Event listener para abrir el detalle del tablero
-                card.addEventListener('click', (e) => {
-                    if (!e.target.closest('button')) {
-                        window.location.href = `tablero_detalle.html?id=${project.id}`;
-                    }
+                pdfListEl.innerHTML = ''; // Limpiar la lista
+                querySnapshot.forEach((pdfDoc) => {
+                    const pdfData = pdfDoc.data();
+                    const pdfId = pdfDoc.id;
+                    const pdfCard = `
+                        <a href="espacio.html?id=${projectId}&pdfId=${pdfId}" class="block bg-[#181818] p-4 rounded-lg border border-[#2a2a2a] hover:border-[#88c999] transition-all">
+                            <i class="fas fa-file-pdf text-4xl text-red-500 mb-2"></i>
+                            <h3 class="font-semibold truncate">${pdfData.name}</h3>
+                        </a>`;
+                    pdfListEl.innerHTML += pdfCard;
                 });
 
-                // Event listener para editar portada
-                card.querySelector('.edit-cover-btn').addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    const { value: imageUrl } = await Swal.fire({
-                        title: 'URL de la nueva portada',
-                        input: 'url',
-                        inputPlaceholder: 'Pega la URL de una imagen aquí',
-                        confirmButtonText: 'Guardar',
-                        showCancelButton: true
-                    });
-
-                    if (imageUrl) {
-                        const projectRef = doc(db, "users", currentUser.uid, "projects", project.id);
-                        await updateDoc(projectRef, { coverURL: imageUrl });
-                    }
-                });
-
-                // Event listener para eliminar
-                card.querySelector('.delete-btn').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    // ... Lógica de SweetAlert para eliminar ...
-                });
-                
-                projectsGrid.appendChild(card);
+            } catch (error) {
+                console.error("Error al cargar detalles del proyecto:", error);
+                alert("No se pudieron cargar los detalles del proyecto.");
             }
-            
-            // Lógica para añadir y desloguear (sin cambios)
-            addProjectBtn.addEventListener('click', async () => { /* ... */ });
-            logoutBtn.addEventListener('click', () => { /* ... */ });
+        }
+
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                window.location.href = 'index.html';
+            } catch (error) {
+                console.error("Error al cerrar sesión:", error);
+            }
         });
     </script>
+
 </body>
 </html>
