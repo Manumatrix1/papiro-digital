@@ -3,58 +3,130 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mis Proyectos</title>
-    <link rel="stylesheet" href="https://cdn.tailwindcss.com"></link>
-    <link rel="stylesheet" href="style.css">
+    <title>Mis Tableros</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f0f0f; }
+        .project-card { transition: transform 0.2s ease-in-out; aspect-ratio: 1 / 1; }
+        .project-card:hover { transform: translateY(-5px); }
+        .hidden { display: none; }
+    </style>
 </head>
-<body class="bg-gray-900 text-white">
-    <header class="bg-gray-800 p-4 flex justify-between items-center">
-        <h1 class="text-xl">Mis Proyectos</h1>
-        <button id="logout-btn" class="bg-red-600 px-3 py-1 rounded">Cerrar Sesión</button>
-    </header>
-    <main class="p-4">
-        <div id="projects-container" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        </div>
-    </main>
+<body class="text-white">
+    <div id="page-loader" class="fixed inset-0 bg-[#0f0f0f] flex flex-col items-center justify-center z-50">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#88c999]"></div>
+        <p class="mt-4 text-lg">Cargando tus proyectos...</p>
+    </div>
+    <div id="app-content" class="hidden">
+        <header class="bg-[#181818] border-b border-[#2a2a2a] p-4 flex justify-between items-center">
+            <h1 id="user-greeting" class="text-xl font-bold"></h1>
+            <div class="flex items-center gap-4">
+                <input id="search-bar" type="text" placeholder="Buscar proyectos..." class="bg-[#2a2a2a] text-white py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#88c999]">
+                <button id="logout-btn" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition">Cerrar Sesión</button>
+            </div>
+        </header>
+        <main class="p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-semibold">Tus Tableros</h2>
+                <button id="add-project-btn" class="bg-[#88c999] text-black font-bold px-4 py-2 rounded-lg hover:brightness-110 transition">Nuevo Proyecto</button>
+            </div>
+            <div id="no-projects-message" class="hidden text-center py-12 bg-[#181818] rounded-lg">
+                <i class="fas fa-folder-open text-5xl text-gray-500 mb-4"></i>
+                <h3 class="text-xl font-semibold">No tenés proyectos</h3>
+                <p class="text-gray-400">Creá tu primer proyecto para empezar.</p>
+            </div>
+            <div id="projects-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6"></div>
+        </main>
+    </div>
 
     <script type="module">
-        import { auth, db } from './firebase-config.js';
+        import { auth, db, storage } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { collection, query, getDocs } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { collection, query, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
 
-        const projectsContainer = document.getElementById('projects-container');
+        const pageLoader = document.getElementById('page-loader');
+        const appContent = document.getElementById('app-content');
+        const userGreeting = document.getElementById('user-greeting');
+        const projectsGrid = document.getElementById('projects-grid');
+        const noProjectsMessage = document.getElementById('no-projects-message');
         const logoutBtn = document.getElementById('logout-btn');
+        const addProjectBtn = document.getElementById('add-project-btn');
+        const searchBar = document.getElementById('search-bar');
+        let allProjects = [];
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
+                userGreeting.textContent = `Hola, ${user.displayName || user.email}`;
                 loadProjects(user.uid);
+                pageLoader.style.display = 'none';
+                appContent.classList.remove('hidden');
             } else {
                 window.location.href = 'index.html';
             }
         });
 
-        async function loadProjects(userId) {
-            try {
-                const projectsRef = collection(db, 'users', userId, 'projects');
-                const q = query(projectsRef);
-                const querySnapshot = await getDocs(q);
-                projectsContainer.innerHTML = '';
-                querySnapshot.forEach((doc) => {
-                    const project = doc.data();
-                    const projectEl = document.createElement('a');
-                    projectEl.href = `tablero_detalle.html?id=${doc.id}`; // O la página que corresponda
-                    projectEl.className = 'block bg-gray-800 p-4 rounded hover:bg-gray-700';
-                    projectEl.innerHTML = `<h3 class="font-semibold truncate">${project.name}</h3>`;
-                    projectsContainer.appendChild(projectEl);
+        function loadProjects(userId) {
+            const projectsRef = collection(db, 'users', userId, 'projects');
+            const q = query(projectsRef);
+            onSnapshot(q, (snapshot) => {
+                allProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderProjects(allProjects);
+            });
+        }
+        
+        function renderProjects(projectsToRender) {
+            projectsGrid.innerHTML = '';
+            noProjectsMessage.classList.toggle('hidden', projectsToRender.length > 0);
+            projectsToRender.forEach(project => {
+                const card = document.createElement('div');
+                card.className = 'project-card bg-[#181818] rounded-lg shadow-lg border border-[#2a2a2a] relative cursor-pointer flex flex-col';
+                const coverStyle = project.coverURL ? `background-image: url('${project.coverURL}'); background-size: cover; background-position: center;` : 'background-color: #2a2a2a;';
+                
+                card.innerHTML = `
+                    <div class="h-3/4 w-full rounded-t-lg flex items-center justify-center" style="${coverStyle}">
+                        ${!project.coverURL ? '<i class="fas fa-book-open text-4xl text-gray-500"></i>' : ''}
+                    </div>
+                    <div class="absolute inset-x-0 top-0 p-2 flex justify-end">
+                        <button class="text-red-400 hover:text-red-300 transition delete-btn" data-id="${project.id}">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                    <div class="h-1/4 p-3 flex items-center">
+                        <h3 class="font-semibold truncate w-full">${project.name}</h3>
+                    </div>
+                `;
+                card.querySelector('.delete-btn').addEventListener('click', (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    deleteProject(auth.currentUser.uid, project.id);
                 });
-            } catch (error) {
-                console.error("Error al cargar proyectos:", error);
-            }
+                card.addEventListener('click', () => {
+                    window.location.href = `tablero_detalle.html?id=${project.id}`;
+                });
+                projectsGrid.appendChild(card);
+            });
         }
 
-        logoutBtn.addEventListener('click', () => {
-            signOut(auth);
+        searchBar.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const filteredProjects = allProjects.filter(p => p.name.toLowerCase().includes(searchTerm));
+            renderProjects(filteredProjects);
         });
+        
+        logoutBtn.addEventListener('click', () => signOut(auth));
+
+        // (Aquí irían las funciones addProject y deleteProject, adaptadas a v9)
+        async function deleteProject(userId, projectId) {
+            // Lógica de borrado con confirmación
+        }
+        async function addProject(userId, projectName) {
+            // Lógica para añadir proyecto
+        }
+
     </script>
 </body>
 </html>
