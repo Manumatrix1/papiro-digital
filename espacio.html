@@ -20,27 +20,32 @@
         
         main {
             flex-grow: 1;
-            overflow: auto;
             position: relative;
-            background-color: #1a1a1a;
-            -webkit-overflow-scrolling: touch;
-            padding: 1rem;
-
-            /* CAMBIO FINAL: Usamos Grid para un centrado más robusto que permite scroll con zoom */
+            overflow: hidden;
             display: grid;
             place-items: center;
         }
-        
+
+        .scroll-wrapper {
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+            display: grid;
+            place-items: center;
+            cursor: grab;
+        }
+
         #pdf-content-wrapper {
-            position: relative;
             width: max-content;
-            margin: 0; /* El margin ya no es necesario, 'place-items' y el padding de 'main' se encargan */
+            will-change: transform;
             transform-origin: center;
             transition: transform 0.1s ease-out;
             display: flex;
             flex-direction: column;
         }
         .pdf-page-container { position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin-bottom: 1rem; }
+        .pdf-page-container:last-child { margin-bottom: 0; }
         .pdf-page-container canvas { display: block; }
         .annotation-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; z-index: 10; }
         #annotation-toolbar { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background-color: var(--surface-color); border: 1px solid var(--surface-border-color); border-radius: 9999px; padding: 0.5rem 1rem; display: flex; gap: 0.75rem; align-items: center; z-index: 100; }
@@ -65,10 +70,12 @@
             </div>
         </header>
         <main id="pdf-viewer-area">
-            <div id="status-indicator" class="text-white text-center p-8">
-                <p id="status-text">Cargando PDF...</p>
+            <div class="scroll-wrapper">
+                <div id="status-indicator" class="text-white text-center p-8">
+                    <p id="status-text">Cargando PDF...</p>
+                </div>
+                <div id="pdf-content-wrapper"></div>
             </div>
-            <div id="pdf-content-wrapper"></div>
         </main>
     </div>
     <div id="annotation-toolbar">
@@ -118,7 +125,6 @@
         let annotationsByPage = {}, currentPath = [];
         let currentPageNum = 1;
         let scale = 1.0;
-        const viewerArea = document.getElementById('pdf-viewer-area');
         const pdfWrapper = document.getElementById('pdf-content-wrapper');
         const sidebar = document.getElementById('sidebar');
         const sidebarOverlay = document.getElementById('sidebar-overlay');
@@ -138,7 +144,7 @@
             const statusText = document.getElementById('status-text');
             const statusIndicator = document.getElementById('status-indicator');
             pdfWrapper.style.display = 'none';
-            statusIndicator.style.display = 'grid'; // Usamos grid para centrar el texto
+            statusIndicator.style.display = 'grid';
             statusText.textContent = 'Conectando...';
 
             try {
@@ -220,7 +226,7 @@
             document.getElementById('tool-erase').addEventListener('click', () => setActiveTool('erase'));
             document.getElementById('color-picker').addEventListener('input', (e) => activeColor = e.target.value);
             document.getElementById('fullscreen-btn').addEventListener('click', toggleFullscreen);
-            viewerArea.addEventListener('scroll', updatePageIndicator);
+            document.querySelector('.scroll-wrapper').addEventListener('scroll', updatePageIndicator);
             
             const openNotesBtn = document.getElementById('open-notes-btn');
             const closeNotesBtn = document.getElementById('close-sidebar-btn');
@@ -245,11 +251,12 @@
         }
 
         function updatePageIndicator() {
+            const scrollContainer = document.querySelector('.scroll-wrapper');
             if(!pdfWrapper || pdfWrapper.style.display === 'none') return;
-            const scrollCenter = viewerArea.scrollTop + (viewerArea.clientHeight / 2);
+            const scrollCenter = scrollContainer.scrollTop + (scrollContainer.clientHeight / 2);
             let mostVisiblePage = 1;
             document.querySelectorAll('.pdf-page-container').forEach((pageEl, index) => {
-                if (scrollCenter >= pageEl.offsetTop * scale && scrollCenter < (pageEl.offsetTop + pageEl.offsetHeight) * scale) {
+                if (scrollCenter >= pageEl.offsetTop && scrollCenter < (pageEl.offsetTop + pageEl.offsetHeight)) {
                     mostVisiblePage = index + 1;
                 }
             });
@@ -263,7 +270,6 @@
             activeTool = tool;
             document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById(`tool-${tool}`).classList.add('active');
-            viewerArea.style.cursor = (tool === 'select') ? 'grab' : 'crosshair';
         }
 
         function addDrawingListeners(canvas) {
@@ -311,8 +317,10 @@
             const rect = canvas.getBoundingClientRect();
             const clientX = e.clientX || e.touches[0].clientX;
             const clientY = e.clientY || e.touches[0].clientY;
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
+            const canvasRenderedWidth = rect.width;
+            const canvasRenderedHeight = rect.height;
+            const scaleX = canvas.width / canvasRenderedWidth;
+            const scaleY = canvas.height / canvasRenderedHeight;
             return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
         }
 
@@ -403,8 +411,9 @@
         }
 
         window.scrollToPage = (pageNum) => {
+            const scrollContainer = document.querySelector('.scroll-wrapper');
             const pageEl = document.querySelector(`.pdf-page-container[data-page-number='${pageNum}']`);
-            if(pageEl) viewerArea.scrollTop = pageEl.offsetTop * scale;
+            if(pageEl) scrollContainer.scrollTop = pageEl.offsetTop;
         };
 
         async function handleEditNote(e) {
@@ -480,53 +489,85 @@
         }
         
         function addPanAndZoomListeners() {
-            let isPanning = false, lastX, lastY, initialDistance = null;
-            viewerArea.addEventListener('mousedown', (e) => {
-                if (activeTool !== 'select') return;
-                isPanning = true;
-                lastX = e.clientX; lastY = e.clientY;
-                viewerArea.style.cursor = 'grabbing';
-            });
-            viewerArea.addEventListener('mousemove', (e) => {
-                if (!isPanning) return;
-                viewerArea.scrollLeft -= e.clientX - lastX;
-                viewerArea.scrollTop -= e.clientY - lastY;
-                lastX = e.clientX; lastY = e.clientY;
-            });
-            document.addEventListener('mouseup', () => {
-                isPanning = false;
-                if(activeTool === 'select') viewerArea.style.cursor = 'grab';
-            });
+            let isPanning = false;
+            let isZooming = false;
+            let lastX, lastY;
+            let initialDistance = null;
+            const scrollContainer = document.querySelector('.scroll-wrapper');
 
-            viewerArea.addEventListener('touchstart', (e) => {
+            const startPan = (e) => {
+                if (e.touches && e.touches.length > 1 || activeTool !== 'select') {
+                    isPanning = false;
+                    return;
+                }
+                isPanning = true;
+                lastX = (e.touches ? e.touches[0].clientX : e.clientX);
+                lastY = (e.touches ? e.touches[0].clientY : e.clientY);
+                scrollContainer.style.cursor = 'grabbing';
+            };
+
+            const startZoom = (e) => {
                 if (e.touches.length === 2) {
                     isPanning = false;
+                    isZooming = true;
                     initialDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-                } else if (e.touches.length === 1 && activeTool === 'select') {
-                    isPanning = true;
-                    lastX = e.touches[0].clientX;
-                    lastY = e.touches[0].clientY;
                 }
-            }, { passive: true });
-            viewerArea.addEventListener('touchmove', (e) => {
-                if (e.touches.length === 2) {
+            };
+
+            const move = (e) => {
+                if (isPanning) {
+                    e.preventDefault();
+                    const currentX = (e.touches ? e.touches[0].clientX : e.clientX);
+                    const currentY = (e.touches ? e.touches[0].clientY : e.clientY);
+                    scrollContainer.scrollLeft -= currentX - lastX;
+                    scrollContainer.scrollTop -= currentY - lastY;
+                    lastX = currentX;
+                    lastY = currentY;
+                } else if (isZooming && e.touches.length === 2) {
                     e.preventDefault();
                     const newDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
                     const scaleAmount = newDistance / initialDistance;
-                    scale = Math.min(Math.max(0.5, scale * scaleAmount), 5.0);
-                    pdfWrapper.style.transform = `scale(${scale})`;
+                    
+                    const newScale = Math.min(Math.max(0.5, scale * scaleAmount), 5.0);
+                    
+                    if (newScale !== scale) {
+                        scale = newScale;
+                        pdfWrapper.style.transform = `scale(${scale})`;
+                    }
                     initialDistance = newDistance;
-                } else if (isPanning && e.touches.length === 1) {
-                    viewerArea.scrollLeft -= e.touches[0].clientX - lastX;
-                    viewerArea.scrollTop -= e.touches[0].clientY - lastY;
-                    lastX = e.touches[0].clientX;
-                    lastY = e.touches[0].clientY;
                 }
-            }, { passive: false });
-            viewerArea.addEventListener('touchend', () => {
-                isPanning = false;
-                initialDistance = null;
+            };
+
+            const end = (e) => {
+                if (!e.touches || e.touches.length === 0) {
+                    isPanning = false;
+                    isZooming = false;
+                    initialDistance = null;
+                    scrollContainer.style.cursor = 'grab';
+                } 
+                else if (e.touches.length === 1) {
+                    isZooming = false;
+                    initialDistance = null;
+                    startPan(e);
+                }
+            };
+
+            scrollContainer.addEventListener('mousedown', startPan);
+            scrollContainer.addEventListener('mousemove', move);
+            document.addEventListener('mouseup', end);
+            scrollContainer.addEventListener('mouseleave', () => { 
+                if (isPanning) end(); 
             });
+
+            scrollContainer.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    startPan(e);
+                } else if (e.touches.length === 2) {
+                    startZoom(e);
+                }
+            }, { passive: true }); // passive:true para un inicio de scroll más suave
+            scrollContainer.addEventListener('touchmove', move, { passive: false });
+            scrollContainer.addEventListener('touchend', end);
         }
     </script>
 </body>
