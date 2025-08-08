@@ -14,9 +14,9 @@
         .project-card { transition: transform 0.2s ease-in-out, border-color 0.2s ease-in-out; aspect-ratio: 1 / 1; }
         .project-card:hover { transform: translateY(-5px); border-color: #88c999; }
         .hidden { display: none; }
-        /* Estilo para que el footer quede fijo abajo */
+        /* Estilo para que el contenido principal crezca y empuje el footer hacia abajo */
         body { display: flex; flex-direction: column; min-height: 100vh; }
-        .app-content { flex-grow: 1; }
+        #app-content { flex-grow: 1; }
     </style>
 </head>
 <body class="text-white">
@@ -25,10 +25,10 @@
         <p class="mt-4 text-lg">Cargando...</p>
     </div>
 
-    <div id="app-content" class="hidden w-full">
+    <div id="app-content" class="hidden w-full flex flex-col">
         <header class="bg-[#181818] border-b border-[#2a2a2a] p-4 flex justify-between items-center">
             <div>
-                <img src="tu-logo.png" alt="Papiro Digital Logo" class="h-8">
+                <img src="https://i.postimg.cc/g0HxbpQF/PAPIRO-1.png" alt="Papiro Digital Logo" class="h-8">
             </div>
             
             <div class="flex items-center gap-4">
@@ -37,29 +37,24 @@
             </div>
         </header>
 
-        <main class="p-6">
+        <main class="p-6 flex-grow">
             <h2 class="text-2xl font-semibold mb-6">Tus Tableros</h2>
-            <div id="no-projects-message" class="hidden text-center py-12 bg-[#181818] rounded-lg">
-                <i class="fas fa-folder-open text-5xl text-gray-500 mb-4"></i>
-                <h3 class="text-xl font-semibold">No tenés proyectos</h3>
-                <p class="text-gray-400">Creá tu primer proyecto para empezar.</p>
-            </div>
             <div id="projects-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
                 <div id="add-project-card" class="project-card bg-[#181818] rounded-lg shadow-lg border-2 border-dashed border-[#2a2a2a] cursor-pointer flex flex-col items-center justify-center text-gray-500 hover:text-[#88c999]">
                     <i class="fas fa-plus text-5xl"></i>
                 </div>
                 </div>
         </main>
-    </div>
 
-    <footer id="footer-search" class="bg-[#181818] border-t border-[#2a2a2a] p-4 mt-auto hidden">
-        <div class="relative w-full max-w-lg mx-auto">
-            <span class="absolute inset-y-0 left-0 flex items-center pl-4">
-                <i class="fas fa-search text-gray-500"></i>
-            </span>
-            <input id="search-bar" type="text" placeholder="Buscar proyectos..." class="bg-[#2a2a2a] text-white w-full py-3 pl-12 pr-4 rounded-full focus:outline-none focus:ring-2 focus:ring-[#88c999] transition-all">
-        </div>
-    </footer>
+        <footer id="footer-search" class="bg-[#181818] border-t border-[#2a2a2a] p-4">
+            <div class="relative w-full max-w-lg mx-auto">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-4">
+                    <i class="fas fa-search text-gray-500"></i>
+                </span>
+                <input id="search-bar" type="text" placeholder="Buscar proyectos..." class="bg-[#2a2a2a] text-white w-full py-3 pl-12 pr-4 rounded-full focus:outline-none focus:ring-2 focus:ring-[#88c999] transition-all">
+            </div>
+        </footer>
+    </div>
 
     <script type="module">
         import { auth, db, storage } from './firebase-config.js';
@@ -72,10 +67,9 @@
         const footerSearch = document.getElementById('footer-search');
         const userGreeting = document.getElementById('user-greeting');
         const projectsGrid = document.getElementById('projects-grid');
-        const noProjectsMessage = document.getElementById('no-projects-message');
-        const logoutBtn = document.getElementById('logout-btn');
         const addProjectCard = document.getElementById('add-project-card');
         const searchBar = document.getElementById('search-bar');
+        const logoutBtn = document.getElementById('logout-btn');
         let allProjects = [];
         let currentUserId = null;
 
@@ -89,8 +83,8 @@
                 
                 loadProjects(currentUserId);
                 pageLoader.style.display = 'none';
+                appContent.classList.add('flex', 'flex-col', 'min-h-screen');
                 appContent.classList.remove('hidden');
-                footerSearch.classList.remove('hidden');
 
             } else {
                 window.location.href = 'index.html';
@@ -107,13 +101,10 @@
         }
         
         function renderProjects(projectsToRender) {
-            // Limpiamos solo los proyectos, dejamos la tarjeta de "Añadir"
             while (projectsGrid.children.length > 1) {
                 projectsGrid.removeChild(projectsGrid.lastChild);
             }
             
-            noProjectsMessage.classList.toggle('hidden', projectsToRender.length > 0);
-
             projectsToRender.forEach(project => {
                 const card = document.createElement('div');
                 card.className = 'project-card bg-[#181818] rounded-lg shadow-lg border border-[#2a2a2a] relative cursor-pointer flex flex-col group';
@@ -123,8 +114,8 @@
                     <div class="h-3/4 w-full rounded-t-lg flex items-center justify-center" style="${coverStyle}">
                         ${!project.coverURL ? '<i class="fas fa-book-open text-4xl text-gray-500"></i>' : ''}
                     </div>
-                    <div class="absolute inset-x-0 top-0 p-2 flex justify-end">
-                        <button class="text-red-400 hover:text-red-300 transition opacity-0 group-hover:opacity-100 delete-btn" data-id="${project.id}">
+                    <div class="absolute inset-x-0 top-0 p-2 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button class="text-red-400 hover:text-red-300 delete-btn" data-id="${project.id}">
                             <i class="fas fa-trash-alt"></i>
                         </button>
                     </div>
@@ -132,3 +123,88 @@
                         <h3 class="font-semibold truncate w-full">${project.name}</h3>
                     </div>
                 `;
+                card.addEventListener('click', (e) => {
+                    if (!e.target.closest('.delete-btn')) {
+                        window.location.href = `tablero_detalle.html?id=${project.id}`;
+                    }
+                });
+                card.querySelector('.delete-btn').addEventListener('click', (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    deleteProject(currentUserId, project.id, project.name);
+                });
+                projectsGrid.appendChild(card);
+            });
+        }
+
+        searchBar.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const filteredProjects = allProjects.filter(p => p.name.toLowerCase().includes(searchTerm));
+            renderProjects(filteredProjects);
+        });
+        
+        logoutBtn.addEventListener('click', () => signOut(auth));
+
+        addProjectCard.addEventListener('click', () => {
+             Swal.fire({
+                title: 'Nuevo Proyecto',
+                html: `
+                    <input id="swal-input1" class="swal2-input" placeholder="Nombre del proyecto">
+                    <input id="swal-input2" type="file" class="swal2-file" accept="image/*" aria-label="Subir portada (opcional)">
+                `,
+                focusConfirm: false,
+                preConfirm: () => ({
+                    name: document.getElementById('swal-input1').value,
+                    file: document.getElementById('swal-input2').files[0]
+                })
+            }).then(async (result) => {
+                if (result.isConfirmed && result.value.name) {
+                    await addProject(currentUserId, result.value.name, result.value.file);
+                }
+            });
+        });
+
+        async function addProject(userId, projectName, file) {
+            try {
+                let coverURL = '';
+                if (file) {
+                    const storageRef = ref(storage, `users/${userId}/covers/${Date.now()}_${file.name}`);
+                    await uploadBytes(storageRef, file);
+                    coverURL = await getDownloadURL(storageRef);
+                }
+                const projectsRef = collection(db, 'users', userId, 'projects');
+                await addDoc(projectsRef, {
+                    name: projectName,
+                    coverURL: coverURL,
+                    createdAt: serverTimestamp()
+                });
+            } catch (error) {
+                console.error("Error al crear proyecto:", error);
+                Swal.fire('Error', 'No se pudo crear el proyecto.', 'error');
+            }
+        }
+
+        async function deleteProject(userId, projectId, projectName) {
+            Swal.fire({
+                title: `¿Borrar "${projectName}"?`,
+                text: "Esta acción no se puede deshacer.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Sí, ¡bórralo!',
+                cancelButtonText: 'Cancelar'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    try {
+                        await deleteDoc(doc(db, 'users', userId, 'projects', projectId));
+                        Swal.fire('¡Borrado!', 'El proyecto ha sido eliminado.', 'success');
+                    } catch (error) {
+                        console.error("Error al borrar proyecto:", error);
+                        Swal.fire('Error', 'No se pudo borrar el proyecto.', 'error');
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
