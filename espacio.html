@@ -382,6 +382,29 @@
                 });
             }
 
+            // CAMBIO: Lógica de guardado de la goma de borrar corregida
+            async function stopDrawing(e) {
+                if (!isDrawing) return;
+                isDrawing = false;
+                const canvas = findCanvasUnderPointer(e, true);
+                if (!canvas || currentPath.length < 2) {
+                    currentPath = [];
+                    return;
+                }
+                const pageNum = parseInt(canvas.dataset.pageNum);
+
+                // Lógica explícita para cada herramienta para evitar errores
+                if (activeTool === 'erase') {
+                    await saveAnnotation({ page: pageNum, type: 'erase', path: currentPath, color: '#000000' });
+                } else {
+                    await saveAnnotation({ 
+                        page: pageNum, type: activeTool, path: currentPath, 
+                        color: activeColor, note: "" 
+                    });
+                }
+                currentPath = [];
+            }
+            
             async function handleAddNewNote() {
                 const { value: formValues } = await Swal.fire({
                     target: '.app-container', title: 'Nueva Nota de Texto',
@@ -457,21 +480,27 @@
                 notesList.innerHTML = '';
                 const allAnnotations = Object.values(annotationsByPage)
                     .flat()
-                    .filter(a => a.id && (a.note || a.type === 'highlight'))
+                    .filter(a => a.id && (a.type === 'highlight' || a.type === 'text'))
                     .sort((a, b) => (a.page - b.page) || ((a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)));
+
                 const filteredAnnotations = lowerCaseSearchTerm ? 
                     allAnnotations.filter(a => a.note && a.note.toLowerCase().includes(lowerCaseSearchTerm)) : 
                     allAnnotations;
+
                 if (filteredAnnotations.length === 0) {
                     notesList.innerHTML = `<p class="text-gray-500 text-center p-4">No se encontraron notas.</p>`;
                     return;
                 }
+                
                 filteredAnnotations.forEach(annotation => {
                     const card = document.createElement('div');
                     card.className = 'note-card relative p-3 rounded-lg border border-transparent hover:border-gray-700 hover:bg-gray-800/50';
                     card.dataset.id = annotation.id; 
                     card.dataset.page = annotation.page;
                     let noteContent = annotation.note ? `<p class="text-white text-sm break-words note-text">${annotation.note}</p>` : `<p class="text-gray-400 text-sm italic note-text">Resaltado sin nota.</p>`;
+                    const hasNote = annotation.note && annotation.note.trim() !== '';
+                    const deleteButtonTitle = hasNote ? 'Borrar texto de la nota' : 'Borrar resaltado';
+                    const deleteButtonIcon = hasNote ? 'fa-comment-slash' : 'fa-trash-can';
                     card.innerHTML = `
                         <div class="flex justify-between items-start">
                             <div class="flex items-center gap-2 mb-2 cursor-pointer flex-grow pr-16">
@@ -479,8 +508,8 @@
                                 <span class="text-xs font-bold text-gray-400">Página ${annotation.page}</span>
                             </div>
                             <div class="note-actions absolute top-2 right-2 flex gap-1">
-                                <button class="edit-note-btn p-2 rounded-md bg-gray-700/80 hover:bg-gray-600 text-gray-300 hover:text-white" title="Editar Nota"><i class="fas fa-edit pointer-events-none"></i></button>
-                                <button class="delete-note-btn p-2 rounded-md bg-gray-700/80 hover:bg-red-500/80 text-gray-300 hover:text-white" title="Borrar Anotación"><i class="fas fa-trash pointer-events-none"></i></button>
+                                <button class="edit-note-btn p-2 rounded-md bg-gray-700/80 hover:bg-gray-600 text-gray-300 hover:text-white" title="Añadir/Editar Nota"><i class="fas fa-edit pointer-events-none"></i></button>
+                                <button class="delete-note-btn p-2 rounded-md bg-gray-700/80 hover:bg-red-500/80 text-gray-300 hover:text-white" title="${deleteButtonTitle}"><i class="fas ${deleteButtonIcon} pointer-events-none"></i></button>
                             </div>
                         </div>
                         ${noteContent}`;
@@ -493,7 +522,7 @@
                 const originalAnnotation = Object.values(annotationsByPage).flat().find(a => a.id === annotationId);
                 if (!originalAnnotation) return;
                 const { value: newNote } = await Swal.fire({
-                    target: '.app-container', title: 'Editar nota', input: 'textarea', 
+                    target: '.app-container', title: 'Añadir/Editar nota', input: 'textarea', 
                     inputValue: originalAnnotation.note || '', showCancelButton: true, 
                     confirmButtonText: 'Guardar', cancelButtonText: 'Cancelar'
                 });
@@ -503,15 +532,15 @@
                 }
             }
             
-            // FUNCIÓN DE BORRADO RESTAURADA
             function handleDeleteNote(annotationId) {
+                if (!annotationId) return;
                 const annotation = Object.values(annotationsByPage).flat().find(a => a.id === annotationId);
                 if (!annotation) return;
-
-                if (annotation.type === 'text') {
-                    handleDeleteAnnotation(annotationId);
-                } else {
+                const hasNote = annotation.note && annotation.note.trim() !== '';
+                if (hasNote) {
                     handleDeleteNoteText(annotationId);
+                } else {
+                    handleDeleteAnnotation(annotationId);
                 }
             }
 
@@ -519,20 +548,14 @@
                 Swal.fire({
                     target: '.app-container',
                     title: '¿Quitar nota del resaltado?',
-                    text: "El resaltado en el PDF permanecerá.",
+                    text: "El resaltado en el PDF permanecerá. La nota desaparecerá de esta lista.",
                     icon: 'warning',
                     showCancelButton: true,
-                    confirmButtonColor: '#d33',
                     confirmButtonText: 'Sí, quitar nota',
-                    cancelButtonText: 'Cancelar'
                 }).then(async (result) => {
                     if (result.isConfirmed) {
-                        try {
-                            const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
-                            await updateDoc(noteRef, { note: "" });
-                        } catch (error) {
-                            console.error("Error al quitar la nota:", error);
-                        }
+                        const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
+                        await updateDoc(noteRef, { note: "" });
                     }
                 });
             }
@@ -540,21 +563,16 @@
             function handleDeleteAnnotation(annotationId) {
                  Swal.fire({
                     target: '.app-container',
-                    title: '¿Borrar esta nota?',
+                    title: '¿Borrar esta anotación?',
                     text: "Esta acción no se puede deshacer.",
                     icon: 'warning',
                     showCancelButton: true,
                     confirmButtonColor: '#d33',
                     confirmButtonText: 'Sí, borrar',
-                    cancelButtonText: 'Cancelar'
                 }).then(async (result) => {
                     if (result.isConfirmed) {
-                        try {
-                            const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
-                            await deleteDoc(noteRef);
-                        } catch (error) {
-                            console.error("Error al borrar la anotación:", error);
-                        }
+                        const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
+                        await deleteDoc(noteRef);
                     }
                 });
             }
@@ -568,22 +586,18 @@
 
             function loadAllAnnotations() {
                 if (annotationsUnsubscribe) annotationsUnsubscribe();
-                const annotationsQuery = query(collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations"));
+                const annotationsQuery = query(collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations"), orderBy("createdAt"));
                 annotationsUnsubscribe = onSnapshot(annotationsQuery, (snapshot) => {
                     annotationsByPage = {};
                     snapshot.docs.forEach(doc => {
                         const annotation = { id: doc.id, ...doc.data() };
-                        if (!annotationsByPage[annotation.page]) {
-                            annotationsByPage[annotation.page] = [];
-                        }
+                        if (!annotationsByPage[annotation.page]) annotationsByPage[annotation.page] = [];
                         annotationsByPage[annotation.page].push(annotation);
                     });
                     const currentSearch = document.getElementById('note-search-input')?.value || '';
                     renderNotesToSidebar(currentSearch);
                     document.querySelectorAll('.pdf-page-container').forEach(pageContainer => {
-                        if (pageContainer.querySelector('canvas')) {
-                             redrawAnnotations(pageContainer.dataset.pageNumber);
-                        }
+                        if (pageContainer.querySelector('canvas')) redrawAnnotations(pageContainer.dataset.pageNumber);
                     });
                 });
             }
@@ -592,8 +606,7 @@
                 activeTool = tool;
                 document.querySelectorAll('#main-tools .tool-btn').forEach(btn => btn.classList.remove('active'));
                 document.getElementById(`tool-${tool}`).classList.add('active');
-                const canvases = document.querySelectorAll('.annotation-canvas');
-                canvases.forEach(canvas => {
+                document.querySelectorAll('.annotation-canvas').forEach(canvas => {
                     canvas.style.pointerEvents = (tool === 'select') ? 'none' : 'auto';
                 });
             }
@@ -603,9 +616,7 @@
                 e.preventDefault();
                 isDrawing = true;
                 const canvas = findCanvasUnderPointer(e);
-                if (canvas) {
-                    currentPath = [getCoords(e, canvas)];
-                }
+                if (canvas) currentPath = [getCoords(e, canvas)];
             }
             function draw(e) {
                 if (!isDrawing) return;
@@ -614,24 +625,6 @@
                     currentPath.push(getCoords(e, canvas));
                     redrawAnnotations(canvas.dataset.pageNum);
                 }
-            }
-            async function stopDrawing(e) {
-                if (!isDrawing) return;
-                isDrawing = false;
-                const canvas = findCanvasUnderPointer(e, true);
-                if (!canvas || currentPath.length < 2) {
-                    currentPath = [];
-                    return;
-                }
-                const pageNum = parseInt(canvas.dataset.pageNum);
-                if (activeTool === 'erase') {
-                    await saveAnnotation({ page: pageNum, type: 'erase', path: currentPath, color: '#000000' });
-                } else if (activeTool === 'highlight') {
-                    await saveAnnotation({ page: pageNum, type: activeTool, path: currentPath, color: activeColor, note: "" });
-                } else {
-                    await saveAnnotation({ page: pageNum, type: activeTool, path: currentPath, color: activeColor, note: "" });
-                }
-                currentPath = [];
             }
             function getCoords(e, canvas) {
                 const rect = canvas.getBoundingClientRect();
@@ -702,19 +695,19 @@
                 if (isReading) {
                     speechSynthesis.cancel();
                     btn.classList.remove('text-[var(--primary-color)]');
-                    return;
+                } else {
+                    btn.classList.add('text-[var(--primary-color)]');
+                    for (let i = currentPageNum; i <= pdfDocument.numPages; i++) {
+                        if (!speechSynthesis.speaking && i > currentPageNum) break;
+                        scrollToPage(i); 
+                        const page = await pdfDocument.getPage(i);
+                        const textContent = await page.getTextContent();
+                        const pageText = textContent.items.map(item => item.str).join(' ');
+                        const shouldContinue = await speakText(pageText);
+                        if (!shouldContinue) break;
+                    }
+                    btn.classList.remove('text-[var(--primary-color)]');
                 }
-                btn.classList.add('text-[var(--primary-color)]');
-                for (let i = currentPageNum; i <= pdfDocument.numPages; i++) {
-                    if (!speechSynthesis.speaking && i > currentPageNum) break;
-                    scrollToPage(i); 
-                    const page = await pdfDocument.getPage(i);
-                    const textContent = await page.getTextContent();
-                    const pageText = textContent.items.map(item => item.str).join(' ');
-                    const shouldContinue = await speakText(pageText);
-                    if (!shouldContinue) break;
-                }
-                btn.classList.remove('text-[var(--primary-color)]');
             }
             function speakText(text) {
                 return new Promise(resolve => {
