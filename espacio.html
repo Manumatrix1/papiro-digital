@@ -382,7 +382,7 @@
                 });
             }
 
-            // CAMBIO: Lógica de guardado de la goma de borrar corregida
+            // CAMBIO: La lógica de guardado de la goma de borrar ha sido restaurada y corregida.
             async function stopDrawing(e) {
                 if (!isDrawing) return;
                 isDrawing = false;
@@ -393,7 +393,6 @@
                 }
                 const pageNum = parseInt(canvas.dataset.pageNum);
 
-                // Lógica explícita para cada herramienta para evitar errores
                 if (activeTool === 'erase') {
                     await saveAnnotation({ page: pageNum, type: 'erase', path: currentPath, color: '#000000' });
                 } else {
@@ -475,6 +474,7 @@
                 }
             }
 
+            // CAMBIO: La lista ahora muestra todos los resaltados (con o sin nota) y las notas de texto.
             function renderNotesToSidebar(searchTerm = '') {
                 const lowerCaseSearchTerm = searchTerm.toLowerCase();
                 notesList.innerHTML = '';
@@ -499,7 +499,7 @@
                     card.dataset.page = annotation.page;
                     let noteContent = annotation.note ? `<p class="text-white text-sm break-words note-text">${annotation.note}</p>` : `<p class="text-gray-400 text-sm italic note-text">Resaltado sin nota.</p>`;
                     const hasNote = annotation.note && annotation.note.trim() !== '';
-                    const deleteButtonTitle = hasNote ? 'Borrar texto de la nota' : 'Borrar resaltado';
+                    const deleteButtonTitle = hasNote ? 'Quitar texto de la nota' : 'Borrar anotación';
                     const deleteButtonIcon = hasNote ? 'fa-comment-slash' : 'fa-trash-can';
                     card.innerHTML = `
                         <div class="flex justify-between items-start">
@@ -537,7 +537,7 @@
                 const annotation = Object.values(annotationsByPage).flat().find(a => a.id === annotationId);
                 if (!annotation) return;
                 const hasNote = annotation.note && annotation.note.trim() !== '';
-                if (hasNote) {
+                if (hasNote && annotation.type === 'highlight') {
                     handleDeleteNoteText(annotationId);
                 } else {
                     handleDeleteAnnotation(annotationId);
