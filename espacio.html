@@ -15,7 +15,7 @@
             --primary-color: #88c999; --background-color: #0f0f0f;
             --surface-color: #181818; --surface-border-color: #2a2a2a;
         }
-        html, body { height: 100%; width: 100%; overflow: auto; background-color: var(--background-color); color: white; font-family: 'Inter', sans-serif; }
+        html, body { height: 100%; width: 100%; overflow: hidden; background-color: var(--background-color); color: white; font-family: 'Inter', sans-serif; }
         .app-container { height: 100vh; display: flex; flex-direction: column; }
         main { flex-grow: 1; position: relative; overflow: hidden; }
         .scroll-wrapper {
@@ -24,12 +24,7 @@
             -webkit-overflow-scrolling: touch;
             overscroll-behavior: contain;
         }
-        #pdf-content-wrapper {
-            width: 100%;
-            margin: 1rem 0;
-            transform-origin: 50% 0; 
-            transition: transform 0.1s ease-out;
-        }
+        #pdf-content-wrapper { width: 100%; margin: 1rem 0; }
         .pdf-page-container { 
             position: relative; 
             margin: 0 auto 1rem auto;
@@ -80,6 +75,7 @@
         <input type="color" id="color-picker" class="w-8 h-8 rounded-full cursor-pointer bg-transparent border-none" value="#FFDD00" title="Color">
         <span id="page-indicator" class="text-sm text-gray-400 ml-2">1 / 1</span>
     </div>
+
     <aside id="sidebar" class="p-4">
         <div class="flex justify-between items-center mb-4 flex-shrink-0">
             <h3 class="text-xl font-bold">Cuaderno de Notas</h3>
@@ -88,6 +84,7 @@
         <div id="notes-list" class="space-y-4 flex-grow overflow-y-auto"></div>
     </aside>
     <div id="sidebar-overlay"></div>
+
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
     </script>
@@ -95,21 +92,22 @@
         import { auth, db } from './firebase-config.js';
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
         import { doc, getDoc, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+
         // --- VARIABLES GLOBALES ---
         let currentUser, projectId, pdfId, pdfDocument, annotationsUnsubscribe;
         let activeTool = 'select', activeColor = '#FFDD00', isDrawing = false;
         let annotationsByPage = {}, currentPath = [];
         let currentPageNum = 1;
-        let zoomScale = 1.0;
-        let isPanning = false, panStart = { x: 0, y: 0 }, scrollStart = { left: 0, top: 0 };
         
         const pdfWrapper = document.getElementById('pdf-content-wrapper');
         const scrollContainer = document.querySelector('.scroll-wrapper');
         let pageIntersectionObserver;
+
         // --- INICIO Y CACHÉ ---
         onAuthStateChanged(auth, (user) => {
             if (user) iniciarAplicacion(user); else window.location.href = 'index.html';
         });
+
         function iniciarAplicacion(user) {
             currentUser = user;
             const urlParams = new URLSearchParams(window.location.search);
@@ -119,6 +117,7 @@
             setupAllEventListeners();
             loadPdfDocument();
         }
+
         const DB_NAME = 'PapiroDigitalDB', STORE_NAME = 'pdfCache';
         function openDB() {
             return new Promise((resolve, reject) => {
@@ -148,11 +147,14 @@
             document.getElementById('tool-highlight').addEventListener('click', () => setActiveTool('highlight'));
             document.getElementById('tool-erase').addEventListener('click', () => setActiveTool('erase'));
             document.getElementById('color-picker').addEventListener('input', (e) => activeColor = e.target.value);
+            
             document.getElementById('open-notes-btn').addEventListener('click', () => document.getElementById('sidebar').classList.add('open'));
             document.getElementById('close-sidebar-btn').addEventListener('click', () => document.getElementById('sidebar').classList.remove('open'));
             document.getElementById('sidebar-overlay').addEventListener('click', () => document.getElementById('sidebar').classList.remove('open'));
             document.getElementById('read-aloud-btn').addEventListener('click', toggleReadAloud);
+
             scrollContainer.addEventListener('scroll', updatePageIndicator);
+
             const fullscreenBtn = document.getElementById('fullscreen-btn');
             fullscreenBtn.addEventListener('click', () => {
                 const icon = fullscreenBtn.querySelector('i');
@@ -164,57 +166,30 @@
                     icon.classList.replace('fa-compress', 'fa-expand');
                 }
             });
-            let initialDistance = null;
-            
-            pdfWrapper.addEventListener('touchstart', (e) => {
-                if (activeTool !== 'select') {
-                    startDrawing(e);
-                } else if (e.touches.length === 2) {
-                    isPanning = false;
-                    initialDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-                } else if (e.touches.length === 1 && zoomScale > 1.01) {
-                    isPanning = true;
-                    panStart.x = e.touches[0].pageX;
-                    panStart.y = e.touches[0].pageY;
-                    scrollStart.left = scrollContainer.scrollLeft;
-                    scrollStart.top = scrollContainer.scrollTop;
-                }
-            }, { passive: false });
-            pdfWrapper.addEventListener('touchmove', (e) => {
-                if (isDrawing || isPanning || (e.touches.length === 2 && activeTool === 'select')) {
-                    e.preventDefault();
-                }
-                if (isDrawing) {
-                    draw(e);
-                } else if (initialDistance && e.touches.length === 2) {
-                    const newDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-                    const scaleAmount = newDistance / initialDistance;
-                    zoomScale = Math.min(Math.max(1.0, zoomScale * scaleAmount), 5.0);
-                    pdfWrapper.style.transform = `scale(${zoomScale})`;
-                    pdfWrapper.style.width = `${100 * zoomScale}%`;
-                    initialDistance = newDistance;
-                } else if (isPanning) {
-                    const dx = e.touches[0].pageX - panStart.x;
-                    const dy = e.touches[0].pageY - panStart.y;
-                    scrollContainer.scrollLeft = scrollStart.left - dx;
-                    scrollContainer.scrollTop = scrollStart.top - dy;
-                }
-            }, { passive: false });
-            pdfWrapper.addEventListener('touchend', (e) => {
-                if (isDrawing) stopDrawing(e);
-                if (e.touches.length < 2) initialDistance = null;
-                isPanning = false;
-            });
+
+            pdfWrapper.addEventListener('touchstart', startDrawing, { passive: false });
+            pdfWrapper.addEventListener('touchmove', draw, { passive: false });
+            pdfWrapper.addEventListener('touchend', stopDrawing);
+            pdfWrapper.addEventListener('mousedown', startDrawing);
+            pdfWrapper.addEventListener('mousemove', draw);
+            pdfWrapper.addEventListener('mouseup', stopDrawing);
+            pdfWrapper.addEventListener('mouseleave', stopDrawing);
         }
+
+        // --- LÓGICA DE CONTROL ---
         function setActiveTool(tool) {
             activeTool = tool;
             document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById(`tool-${tool}`).classList.add('active');
+
             const canvases = document.querySelectorAll('.annotation-canvas');
-            canvases.forEach(canvas => {
-                canvas.style.touchAction = (tool === 'select') ? 'auto' : 'none';
-            });
+            if (tool === 'select') {
+                canvases.forEach(canvas => canvas.style.display = 'none');
+            } else {
+                canvases.forEach(canvas => canvas.style.display = 'block');
+            }
         }
+
         // --- CARGA Y RENDERIZADO ---
         async function loadPdfDocument() {
             const statusText = document.getElementById('status-text');
@@ -245,6 +220,7 @@
                 statusText.textContent = `Error: ${error.message}`;
             }
         }
+
         async function setupPagePlaceholders() {
             pdfWrapper.innerHTML = '';
             const page = await pdfDocument.getPage(1);
@@ -261,6 +237,7 @@
             startPageObserver();
             updatePageIndicator();
         }
+
         async function renderPage(pageContainer, pageNum) {
             const page = await pdfDocument.getPage(pageNum);
             const scale = 2.0;
@@ -273,10 +250,15 @@
             annotationCanvas.dataset.pageNum = pageNum;
             pageContainer.innerHTML = '';
             pageContainer.append(canvas, annotationCanvas);
-            annotationCanvas.style.touchAction = (activeTool === 'select') ? 'auto' : 'none';
+
+            if (activeTool === 'select') {
+                annotationCanvas.style.display = 'none';
+            }
+
             await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
             redrawAnnotations(pageNum);
         }
+
         function startPageObserver() {
             if (pageIntersectionObserver) pageIntersectionObserver.disconnect();
             const options = { root: scrollContainer, rootMargin: '500px 0px' };
@@ -330,6 +312,7 @@
             await saveAnnotation({ page: pageNum, type: activeTool, path: currentPath, color: activeColor, note });
             currentPath = [];
         }
+
         function getCoords(e, canvas) {
             const rect = canvas.getBoundingClientRect();
             const touch = e.touches ? e.touches[0] : (e.changedTouches ? e.changedTouches[0] : e);
@@ -405,7 +388,7 @@
             document.getElementById('page-indicator').textContent = `${currentPageNum} / ${pdfDocument.numPages}`;
         }
         
-        // --- FUNCIONES COMPLETAS DE NOTAS Y VOZ ---
+        // --- MEJORA 2 Y 3: FUNCIONES COMPLETAS DE NOTAS Y VOZ ---
         function renderNotesToSidebar() {
             const notesList = document.getElementById('notes-list');
             notesList.innerHTML = '';
@@ -420,14 +403,8 @@
                 card.innerHTML = `<div class="flex justify-between items-start"><div class="flex items-center gap-2 mb-2 cursor-pointer flex-grow" onclick="window.scrollToPage(${annotation.page})"><span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color:${annotation.color};"></span><span class="text-xs font-bold text-gray-400 hover:text-white">Página ${annotation.page}</span></div><div class="note-actions flex gap-2 flex-shrink-0"><button class="edit-note-btn text-gray-400 hover:text-white" data-id="${annotation.id}" data-note="${annotation.note || ''}"><i class="fas fa-edit"></i></button><button class="delete-note-btn text-gray-400 hover:text-red-500" data-id="${annotation.id}"><i class="fas fa-trash"></i></button></div></div>${noteContent}`;
                 notesList.appendChild(card);
             });
-            
-            // Asignar eventos después de renderizar
-            notesList.querySelectorAll('.edit-note-btn').forEach(btn => {
-                btn.addEventListener('click', handleEditNote);
-            });
-            notesList.querySelectorAll('.delete-note-btn').forEach(btn => {
-                btn.addEventListener('click', handleDeleteNote);
-            });
+            notesList.querySelectorAll('.edit-note-btn').forEach(btn => btn.addEventListener('click', handleEditNote));
+            notesList.querySelectorAll('.delete-note-btn').forEach(btn => btn.addEventListener('click', handleDeleteNote));
         }
         async function handleEditNote(e) {
             const button = e.currentTarget;
@@ -490,6 +467,7 @@
                 speechSynthesis.speak(utterance);
             });
         }
+
     </script>
 </body>
 </html>
