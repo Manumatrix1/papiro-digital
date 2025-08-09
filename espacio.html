@@ -167,6 +167,7 @@
 
         document.addEventListener('DOMContentLoaded', () => {
 
+            // --- Variables Globales ---
             let currentUser, projectId, pdfId, pdfDocument, annotationsUnsubscribe;
             let activeTool = 'select', activeColor = '#FFDD00', isDrawing = false;
             let annotationsByPage = {}, currentPath = [];
@@ -177,6 +178,7 @@
             let initialDistance = null;
             let drawingStartPoint = null;
 
+            // --- Selectores del DOM ---
             const appContainer = document.querySelector('.app-container');
             const zoomContainer = document.getElementById('zoom-container');
             const pdfWrapper = document.getElementById('pdf-content-wrapper');
@@ -184,6 +186,7 @@
             const notesList = document.getElementById('notes-list');
             let pageIntersectionObserver;
 
+            // --- Inicio de la Aplicación ---
             onAuthStateChanged(auth, (user) => { if (user) iniciarAplicacion(user); else window.location.href = 'index.html'; });
 
             function iniciarAplicacion(user) {
@@ -196,6 +199,7 @@
                 loadPdfDocument();
             }
 
+            // --- Funciones de Base de Datos (IndexedDB) ---
             const DB_NAME = 'PapiroDigitalDB', STORE_NAME = 'pdfCache';
             function openDB() {
                 return new Promise((resolve, reject) => {
@@ -218,6 +222,7 @@
                 });
             }
 
+            // --- Configuración de Eventos ---
             function setupAllEventListeners() {
                 document.getElementById('tool-select').addEventListener('click', () => setActiveTool('select'));
                 document.getElementById('tool-draw').addEventListener('click', () => setActiveTool('draw'));
@@ -312,6 +317,7 @@
                 });
             }
 
+            // --- Lógica de Carga y Renderizado del PDF ---
             async function loadPdfDocument() {
                 const statusText = document.getElementById('status-text');
                 try {
@@ -403,6 +409,7 @@
                 });
             }
 
+            // --- Lógica de Anotaciones ---
             async function stopDrawing(e) {
                 if (!isDrawing) return;
                 isDrawing = false;
@@ -429,7 +436,7 @@
                 };
                 try {
                     const docRef = await saveAnnotation(annotationData);
-                    showPromoteButton(docRef.id, annotationData, e, canvas);
+                    showPromoteButton(docRef.id, e, canvas);
                 } catch (error) {
                     console.error("Error al guardar la anotación inicial:", error);
                 }
@@ -437,38 +444,26 @@
                 drawingStartPoint = null;
             }
 
-            function showPromoteButton(annotationId, annotationData, endEvent, canvas) {
+            function showPromoteButton(annotationId, endEvent, canvas) {
                 clearPromoteButton();
                 const rect = canvas.getBoundingClientRect();
+                const touch = endEvent.changedTouches[0] || endEvent;
                 const btn = document.createElement('button');
                 btn.id = 'promote-note-btn';
                 btn.textContent = 'G';
                 btn.title = 'Guardar en el Cuaderno';
-
-                const startPoint = annotationData.path[0];
-                const endPoint = annotationData.path[annotationData.path.length - 1];
-                const midPointXCanvas = (startPoint.x + endPoint.x) / 2;
-                
-                const scaleX = rect.width / canvas.width;
-                const cssX = (midPointXCanvas * scaleX) + rect.left + scrollContainer.scrollLeft - (36 / 2); // 36 is button width
-                const cssY = (startPoint.y * scaleX) + rect.top + scrollContainer.scrollTop - 45; // 45px above
-
-                btn.style.left = `${cssX}px`;
-                btn.style.top = `${cssY}px`;
-
+                btn.style.left = `${touch.clientX - rect.left + scrollContainer.scrollLeft + 15}px`;
+                btn.style.top = `${touch.clientY - rect.top + scrollContainer.scrollTop - 18}px`;
                 const handleClick = (e) => {
                     e.stopPropagation();
                     e.preventDefault();
                     handleEditNote(annotationId);
                     clearPromoteButton();
                 };
-
                 btn.addEventListener('click', handleClick);
                 btn.addEventListener('touchend', handleClick);
-                
                 appContainer.appendChild(btn);
-
-                setTimeout(clearPromoteButton, 2000);
+                setTimeout(clearPromoteButton, 5000);
             }
 
             function clearPromoteButton() {
@@ -490,7 +485,7 @@
                     drawPath(ctx, { type: activeTool, path: currentPath, color: activeColor });
                 }
             }
-
+            
             async function handleAddNewNote() {
                 const { value: formValues } = await Swal.fire({
                     target: '.app-container',
@@ -577,23 +572,22 @@
                     card.className = 'note-card relative p-3 rounded-lg border border-transparent hover:border-gray-700 hover:bg-gray-800/50';
                     card.dataset.id = annotation.id;
                     card.dataset.page = annotation.page;
-                    const youtubeIcon = annotation.youtubeLink ?
-                        `<a href="${annotation.youtubeLink}" target="_blank" class="text-red-500 hover:text-red-400 ml-2" title="Ver video de YouTube"><i class="fab fa-youtube"></i></a>` : '';
+                    const youtubeHTML = annotation.youtubeLink 
+                        ? `<div class="mt-2"><a href="${annotation.youtubeLink}" target="_blank" class="flex items-center gap-2 text-xs text-red-400 hover:text-red-300"><i class="fab fa-youtube"></i><span class="truncate hover:underline">${annotation.youtubeLink.replace(/^(https?:\/\/)?(www\.)?/, '')}</span></a></div>`
+                        : '';
                     card.innerHTML = `
                         <div class="flex justify-between items-start">
                             <div class="flex items-center gap-2 mb-2 cursor-pointer flex-grow pr-16">
                                 <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color:${annotation.color};"></span>
                                 <span class="text-xs font-bold text-gray-400">Página ${annotation.page}</span>
-                                ${youtubeIcon}
                             </div>
                             <div class="note-actions absolute top-2 right-2 flex gap-1">
                                 <button class="edit-note-btn p-2 rounded-md bg-gray-700/80 hover:bg-gray-600" title="Editar Nota"><i class="fas fa-edit pointer-events-none"></i></button>
                                 <button class="delete-note-btn p-2 rounded-md bg-gray-700/80 hover:bg-red-500/80" title="Borrar Anotación"><i class="fas fa-trash pointer-events-none"></i></button>
                             </div>
                         </div>
-                        <p class="text-white text-sm break-words note-text mb-1">${annotation.note}</p>
-                        ${annotation.youtubeLink ? `<p class="text-gray-400 text-xs break-words"><a href="${annotation.youtubeLink}" target="_blank" class="hover:underline">${annotation.youtubeLink}</a></p>` : ''}
-                        `;
+                        <p class="text-white text-sm break-words note-text">${annotation.note}</p>
+                        ${youtubeHTML}`;
                     notesList.appendChild(card);
                 });
             }
