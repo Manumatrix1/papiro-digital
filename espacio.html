@@ -36,7 +36,7 @@
         .annotation-canvas { 
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;
         }
-        /* MEJORA 1: Asegura que la barra de herramientas permanezca fija durante el zoom */
+        /* La barra de herramientas se posiciona de forma fija en relación a la ventana */
         #annotation-toolbar { 
             position: fixed; 
             bottom: 1rem; 
@@ -81,6 +81,7 @@
             </div>
         </main>
     </div>
+
     <div id="annotation-toolbar">
         <button class="tool-btn active" id="tool-select" title="Mover"><i class="fas fa-hand-paper"></i></button>
         <button class="tool-btn" id="tool-draw" title="Dibujar"><i class="fas fa-pencil-alt"></i></button>
@@ -107,7 +108,6 @@
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
         import { doc, getDoc, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
 
-        // --- VARIABLES GLOBALES ---
         let currentUser, projectId, pdfId, pdfDocument, annotationsUnsubscribe;
         let activeTool = 'select', activeColor = '#FFDD00', isDrawing = false;
         let annotationsByPage = {}, currentPath = [];
@@ -117,10 +117,10 @@
         const scrollContainer = document.querySelector('.scroll-wrapper');
         let pageIntersectionObserver;
 
-        // --- INICIO Y CACHÉ ---
         onAuthStateChanged(auth, (user) => {
             if (user) iniciarAplicacion(user); else window.location.href = 'index.html';
         });
+
         function iniciarAplicacion(user) {
             currentUser = user;
             const urlParams = new URLSearchParams(window.location.search);
@@ -130,6 +130,7 @@
             setupAllEventListeners();
             loadPdfDocument();
         }
+
         const DB_NAME = 'PapiroDigitalDB', STORE_NAME = 'pdfCache';
         function openDB() {
             return new Promise((resolve, reject) => {
@@ -152,7 +153,6 @@
             });
         }
         
-        // --- GESTIÓN DE EVENTOS ---
         function setupAllEventListeners() {
             document.getElementById('tool-select').addEventListener('click', () => setActiveTool('select'));
             document.getElementById('tool-draw').addEventListener('click', () => setActiveTool('draw'));
@@ -177,7 +177,7 @@
                 }
             });
             
-            // MEJORA 2: Delegación de eventos para las notas
+            // MEJORA 2: Delegación de eventos para las notas (más robusto)
             document.getElementById('notes-list').addEventListener('click', (e) => {
                 const editBtn = e.target.closest('.edit-note-btn');
                 if (editBtn) {
@@ -200,7 +200,6 @@
             pdfWrapper.addEventListener('mouseleave', stopDrawing);
         }
 
-        // --- LÓGICA DE CONTROL ---
         function setActiveTool(tool) {
             activeTool = tool;
             document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
@@ -214,7 +213,6 @@
             }
         }
 
-        // --- CARGA Y RENDERIZADO ---
         async function loadPdfDocument() {
             const statusText = document.getElementById('status-text');
             try {
@@ -302,7 +300,6 @@
             });
         }
         
-        // --- DIBUJO Y ANOTACIONES ---
         function startDrawing(e) { 
             if (activeTool === 'select') return;
             e.preventDefault();
@@ -415,7 +412,7 @@
         function renderNotesToSidebar() {
             const notesList = document.getElementById('notes-list');
             notesList.innerHTML = '';
-            const allAnnotations = Object.values(annotationsByPage).flat().filter(a => a.note || (a.type === 'highlight' && !a.note)).sort((a,b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0));
+            const allAnnotations = Object.values(annotationsByPage).flat().filter(a => a.note || (a.type === 'highlight')).sort((a,b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0));
             if (allAnnotations.length === 0) {
                 notesList.innerHTML = `<p class="text-gray-500 text-center">Aún no hay notas.</p>`; return;
             }
@@ -427,6 +424,7 @@
                 notesList.appendChild(card);
             });
         }
+
         async function handleEditNote(button) {
             const annotationId = button.dataset.id;
             const currentNote = button.dataset.note;
@@ -439,6 +437,7 @@
                 await updateDoc(noteRef, { note: newNote });
             }
         }
+        // MEJORA 2: Función de borrado de notas completa y funcional
         function handleDeleteNote(button) {
             const annotationId = button.dataset.id;
             Swal.fire({
@@ -446,8 +445,14 @@
                 icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, borrar', cancelButtonText: 'Cancelar'
             }).then(async (result) => {
                 if (result.isConfirmed) {
-                    const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
-                    await deleteDoc(noteRef);
+                    try {
+                        const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
+                        await deleteDoc(noteRef);
+                        Swal.fire('¡Borrada!', 'La nota ha sido eliminada.', 'success');
+                    } catch (error) {
+                        console.error("Error al borrar la nota:", error);
+                        Swal.fire('Error', 'No se pudo eliminar la nota.', 'error');
+                    }
                 }
             });
         }
@@ -458,9 +463,35 @@
                 document.getElementById('sidebar').classList.remove('open');
             }
         };
-        async function toggleReadAloud() { /* ... */ }
-        function speakText(text) { /* ... */ }
-
+        async function toggleReadAloud() {
+            let isReading = speechSynthesis.speaking;
+            const btn = document.getElementById('read-aloud-btn');
+            if (isReading) {
+                speechSynthesis.cancel();
+                btn.classList.remove('text-[var(--primary-color)]');
+                return;
+            }
+            btn.classList.add('text-[var(--primary-color)]');
+            for (let i = currentPageNum; i <= pdfDocument.numPages; i++) {
+                if (speechSynthesis.speaking === false && i > currentPageNum) { break; }
+                window.scrollToPage(i); 
+                updatePageIndicator(); 
+                const page = await pdfDocument.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                await speakText(pageText);
+            }
+            btn.classList.remove('text-[var(--primary-color)]');
+        }
+        function speakText(text) {
+            return new Promise(resolve => {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'es-ES';
+                utterance.onend = resolve;
+                utterance.onerror = () => resolve();
+                speechSynthesis.speak(utterance);
+            });
+        }
     </script>
 </body>
 </html>
