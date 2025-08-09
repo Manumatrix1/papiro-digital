@@ -16,101 +16,35 @@
             --surface-color: #181818; --surface-border-color: #2a2a2a;
         }
         html, body { height: 100%; width: 100%; overflow: hidden; background-color: var(--background-color); color: white; font-family: 'Inter', sans-serif; }
-        .app-container { height: 100vh; display: flex; flex-direction: column; background-color: var(--background-color); position: relative; }
+        .app-container { height: 100vh; display: flex; flex-direction: column; background-color: var(--background-color); }
         main { flex-grow: 1; position: relative; overflow: hidden; }
         .scroll-wrapper {
             width: 100%; height: 100%;
-            overflow: auto;
+            overflow: auto; 
             -webkit-overflow-scrolling: touch;
             overscroll-behavior: contain;
         }
         #zoom-container { width: 100%; transition: width 0.1s, height 0.1s; }
         #pdf-content-wrapper { width: 100%; transform-origin: top left; }
-        .pdf-page-container {
-            position: relative;
+        .pdf-page-container { 
+            position: relative; 
             margin: 0 auto 1rem auto;
             width: 95%;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
             background-color: #2a2a2a;
         }
         .pdf-page-container canvas { display: block; width:100%; height:auto; }
-        .annotation-canvas {
+        .annotation-canvas { 
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;
         }
         .tool-btn { background: none; border: none; color: #9ca3af; cursor: pointer; padding: 0.5rem; }
         .tool-btn.active { color: var(--primary-color); }
-        #sidebar {
-            position: fixed; top: 0; right: 0;
-            width: 350px;
-            max-width: 90vw;
-            height: 100%;
-            background-color: var(--surface-color);
-            transition: transform 0.3s ease-in-out;
-            z-index: 110; display: flex; flex-direction: column;
-            border-left: 1px solid var(--surface-border-color);
-            transform: translateX(100%);
-        }
-        #sidebar.open {
-            transform: translateX(0);
-        }
+        #sidebar { position: fixed; top: 0; right: -100%; width: 100%; max-width: 350px; height: 100%; background-color: var(--surface-color); transition: transform 0.3s ease-in-out; z-index: 110; display: flex; flex-direction: column; border-left: 1px solid var(--surface-border-color); }
+        #sidebar.open { transform: translateX(-100%); }
         #sidebar-overlay { position: fixed; inset: 0; background-color: rgba(0,0,0,0.6); z-index: 105; display: none; }
         #sidebar.open + #sidebar-overlay { display: block; }
-        #page-indicator {
-            position: fixed;
-            bottom: 1.5rem;
-            right: 1.5rem;
-            width: 50px;
-            height: 50px;
-            background-color: var(--surface-color);
-            border: 1px solid var(--surface-border-color);
-            border-radius: 9999px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: #9ca3af;
-            z-index: 50;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            transition: opacity 0.3s;
-        }
-        #note-search-input {
-            width: 100%; background-color: #2a2a2a; border: 1px solid #4a4a4a;
-            border-radius: 0.5rem; padding: 0.5rem 0.75rem; color: white; font-size: 0.875rem;
-        }
-        #add-note-btn {
-            background-color: var(--primary-color); color: black; border-radius: 9999px;
-            width: 32px; height: 32px; font-size: 1.5rem; line-height: 1; font-weight: bold;
-        }
-        .clear-btn {
-            flex-grow: 1; padding: 0.5rem; font-size: 0.75rem; font-weight: 600;
-            background-color: #3a3a3a; color: #a0a0a0; border-radius: 0.5rem;
-            border: 1px solid #5a5a5a;
-        }
-        .clear-btn:hover { background-color: #4a4a4a; color: white; }
-        #promote-note-btn {
-            position: absolute;
-            z-index: 100;
-            background-color: var(--surface-color);
-            color: var(--primary-color);
-            border: 1px solid var(--primary-color);
-            border-radius: 9999px;
-            width: 36px;
-            height: 36px;
-            font-weight: 700;
-            font-size: 1rem;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .swal-note-container { display: flex; flex-direction: column; gap: 1rem; text-align: left; }
-        .swal-note-container label { margin-bottom: 0.25rem; font-size: 0.875rem; color: #d1d5db; }
-        .swal-note-container .swal2-textarea, .swal-note-container .swal2-input { width: 100% !important; margin: 0; }
-        .swal-color-container { display: flex; align-items: center; gap: 0.75rem; }
-        .swal-color-preview { width: 28px; height: 28px; border-radius: 9999px; border: 2px solid #4a4a4a; }
-        #swal-color { padding: 0 !important; width: 40px !important; height: 40px !important; border: none; cursor: pointer; }
+        
+        /* CAMBIO: Estilos para la tarjeta de nota */
         .note-card {
             border-bottom: 1px dashed var(--surface-border-color);
             padding-bottom: 1rem;
@@ -119,6 +53,7 @@
         .note-card:last-child {
             border-bottom: none;
             margin-bottom: 0;
+            padding-bottom: 0;
         }
     </style>
 </head>
@@ -127,13 +62,13 @@
         <header class="bg-surface-color border-b border-[#2a2a2a] py-2 px-3 flex justify-between items-center w-full flex-shrink-0 z-20">
             <a href="mi_tablero.html" class="p-2 rounded-md hover:bg-[#2a2a2a]"><i class="fas fa-arrow-left"></i></a>
             <h1 id="project-title" class="text-md font-bold text-white truncate mx-2 flex-1 min-w-0"></h1>
-            <div id="main-tools" class="flex items-center gap-1 flex-shrink-0">
+            <div id="main-tools" class="flex items-center gap-2">
                 <button class="tool-btn active" id="tool-select" title="Mover"><i class="fas fa-hand-paper"></i></button>
                 <button class="tool-btn" id="tool-draw" title="Dibujar"><i class="fas fa-pencil-alt"></i></button>
                 <button class="tool-btn" id="tool-highlight" title="Resaltar"><i class="fas fa-highlighter"></i></button>
-                <button class="tool-btn" id="tool-erase" title="Borrar"><i class="fas fa-eraser"></i></button>
                 <input type="color" id="color-picker" class="w-8 h-8 rounded-full cursor-pointer bg-transparent border-none p-1" value="#FFDD00" title="Color">
                 <div class="w-px h-6 bg-[#2a2a2a] mx-2"></div>
+                <span id="page-indicator" class="text-sm text-gray-400 mx-2 hidden md:inline">1 / 1</span>
                 <button id="fullscreen-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]" title="Pantalla Completa"><i class="fas fa-expand"></i></button>
                 <button id="read-aloud-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]" title="Leer en voz alta"><i class="fas fa-volume-up"></i></button>
                 <button id="open-notes-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]" title="Ver Cuaderno"><i class="fas fa-book"></i></button>
@@ -148,29 +83,17 @@
                     <div id="pdf-content-wrapper" style="display: none;"></div>
                 </div>
             </div>
-            <span id="page-indicator">1 / 1</span>
         </main>
-
-        <aside id="sidebar" class="p-4">
-            <div class="flex justify-between items-center mb-2 flex-shrink-0">
-                <h3 class="text-xl font-bold">Cuaderno de Notas</h3>
-                <div class="flex items-center gap-2">
-                    <button id="add-note-btn" title="Añadir Nota de Texto">+</button>
-                    <button id="close-sidebar-btn" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
-                </div>
-            </div>
-            <div class="mb-4 flex-shrink-0">
-                <input type="search" id="note-search-input" placeholder="Buscar notas...">
-            </div>
-            <div class="flex gap-2 mb-4 flex-shrink-0">
-                <button id="clear-notes-btn" class="clear-btn">Limpiar Notas</button>
-                <button id="clear-all-btn" class="clear-btn">Limpiar Todo</button>
-            </div>
-            <div id="notes-list" class="flex-grow overflow-y-auto"></div>
-        </aside>
-        <div id="sidebar-overlay"></div>
     </div>
 
+    <aside id="sidebar" class="p-4">
+        <div class="flex justify-between items-center mb-4 flex-shrink-0">
+            <h3 class="text-xl font-bold">Cuaderno de Notas</h3>
+            <button id="close-sidebar-btn" class="text-gray-400 hover:text-white p-2"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="notes-list" class="flex-grow overflow-y-auto"></div>
+    </aside>
+    <div id="sidebar-overlay"></div>
 
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
@@ -178,10 +101,10 @@
     <script type="module">
         import { auth, db } from './firebase-config.js';
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { doc, getDoc, collection, query, onSnapshot, addDoc, serverTimestamp, updateDoc, deleteDoc, writeBatch, orderBy } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { doc, getDoc, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
 
         document.addEventListener('DOMContentLoaded', () => {
-            
+
             let currentUser, projectId, pdfId, pdfDocument, annotationsUnsubscribe;
             let activeTool = 'select', activeColor = '#FFDD00', isDrawing = false;
             let annotationsByPage = {}, currentPath = [];
@@ -189,14 +112,11 @@
             let zoomScale = 1.0;
             let isPanning = false, panStart = { x: 0, y: 0 }, scrollStart = { left: 0, top: 0 };
             let originalContentSize = { width: 0, height: 0 };
-            let initialDistance = null;
-            let drawingStartPoint = null;
             
             const appContainer = document.querySelector('.app-container');
             const zoomContainer = document.getElementById('zoom-container');
             const pdfWrapper = document.getElementById('pdf-content-wrapper');
             const scrollContainer = document.querySelector('.scroll-wrapper');
-            const notesList = document.getElementById('notes-list');
             let pageIntersectionObserver;
 
             onAuthStateChanged(auth, (user) => { if (user) iniciarAplicacion(user); else window.location.href = 'index.html'; });
@@ -210,7 +130,7 @@
                 setupAllEventListeners();
                 loadPdfDocument();
             }
-            
+
             const DB_NAME = 'PapiroDigitalDB', STORE_NAME = 'pdfCache';
             function openDB() {
                 return new Promise((resolve, reject) => {
@@ -237,18 +157,10 @@
                 document.getElementById('tool-select').addEventListener('click', () => setActiveTool('select'));
                 document.getElementById('tool-draw').addEventListener('click', () => setActiveTool('draw'));
                 document.getElementById('tool-highlight').addEventListener('click', () => setActiveTool('highlight'));
-                document.getElementById('tool-erase').addEventListener('click', () => setActiveTool('erase'));
                 document.getElementById('color-picker').addEventListener('input', (e) => activeColor = e.target.value);
                 document.getElementById('open-notes-btn').addEventListener('click', () => document.getElementById('sidebar').classList.add('open'));
-                
-                const sidebar = document.getElementById('sidebar');
-                sidebar.querySelector('#add-note-btn')?.addEventListener('click', handleAddNewNote);
-                sidebar.querySelector('#note-search-input')?.addEventListener('input', (e) => renderNotesToSidebar(e.target.value));
-                sidebar.querySelector('#close-sidebar-btn')?.addEventListener('click', () => sidebar.classList.remove('open'));
-                sidebar.querySelector('#clear-notes-btn')?.addEventListener('click', handleClearNotes);
-                sidebar.querySelector('#clear-all-btn')?.addEventListener('click', handleClearAll);
-
-                document.getElementById('sidebar-overlay').addEventListener('click', () => sidebar.classList.remove('open'));
+                document.getElementById('close-sidebar-btn').addEventListener('click', () => document.getElementById('sidebar').classList.remove('open'));
+                document.getElementById('sidebar-overlay').addEventListener('click', () => document.getElementById('sidebar').classList.remove('open'));
                 document.getElementById('read-aloud-btn').addEventListener('click', toggleReadAloud);
                 scrollContainer.addEventListener('scroll', updatePageIndicator);
 
@@ -264,25 +176,17 @@
                     }
                 });
                 
-                notesList.addEventListener('click', (e) => {
-                    const noteCard = e.target.closest('.note-card');
-                    if (!noteCard) return;
-                    const annotationId = noteCard.dataset.id;
+                document.getElementById('notes-list').addEventListener('click', (e) => {
                     const editBtn = e.target.closest('.edit-note-btn');
-                    if (editBtn) { handleEditNote(annotationId); return; }
+                    if (editBtn) handleEditNote(editBtn);
                     const deleteBtn = e.target.closest('.delete-note-btn');
-                    if (deleteBtn) { handleDeleteNote(annotationId); return; }
-                    const pageToGo = noteCard.dataset.page;
-                    if (pageToGo) { scrollToPage(pageToGo); }
+                    if (deleteBtn) handleDeleteNote(deleteBtn);
                 });
 
+                let initialDistance = null;
                 pdfWrapper.addEventListener('touchstart', (e) => {
-                    if (e.target.id !== 'promote-note-btn') {
-                        clearPromoteButton();
-                    }
-                    if (activeTool !== 'select') { 
-                        startDrawing(e); 
-                    } else if (e.touches.length === 2) {
+                    if (activeTool !== 'select') { startDrawing(e); } 
+                    else if (e.touches.length === 2) {
                         isPanning = false;
                         initialDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
                     } else if (e.touches.length === 1 && zoomScale > 1.01) {
@@ -295,12 +199,9 @@
                 }, { passive: false });
 
                 pdfWrapper.addEventListener('touchmove', (e) => {
-                    if (isDrawing || isPanning || (e.touches.length === 2 && activeTool === 'select')) { 
-                        e.preventDefault(); 
-                    }
-                    if (isDrawing) { 
-                        draw(e); 
-                    } else if (initialDistance && e.touches.length === 2) {
+                    if (isDrawing || isPanning || (e.touches.length === 2 && activeTool === 'select')) { e.preventDefault(); }
+                    if (isDrawing) { draw(e); } 
+                    else if (initialDistance && e.touches.length === 2) {
                         const newDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
                         const scaleAmount = newDistance / initialDistance;
                         zoomScale = Math.min(Math.max(1.0, zoomScale * scaleAmount), 5.0);
@@ -317,16 +218,22 @@
                 }, { passive: false });
 
                 pdfWrapper.addEventListener('touchend', (e) => {
-                    if (isDrawing) {
-                        stopDrawing(e);
-                    }
-                    if (e.touches.length < 2) {
-                        initialDistance = null;
-                    }
+                    if (isDrawing) stopDrawing(e);
+                    if (e.touches.length < 2) initialDistance = null;
                     isPanning = false;
                 });
             }
             
+            function setActiveTool(tool) {
+                activeTool = tool;
+                document.querySelectorAll('#main-tools .tool-btn').forEach(btn => btn.classList.remove('active'));
+                document.getElementById(`tool-${tool}`).classList.add('active');
+                const canvases = document.querySelectorAll('.annotation-canvas');
+                canvases.forEach(canvas => {
+                    canvas.style.touchAction = (tool === 'select') ? 'auto' : 'none';
+                });
+            }
+
             async function loadPdfDocument() {
                 const statusText = document.getElementById('status-text');
                 try {
@@ -356,7 +263,7 @@
                     statusText.textContent = `Error: ${error.message}`;
                 }
             }
-            
+
             async function setupPagePlaceholders() {
                 pdfWrapper.innerHTML = '';
                 const page = await pdfDocument.getPage(1);
@@ -380,11 +287,9 @@
                 pdfWrapper.style.width = `${originalContentSize.width}px`;
                 startPageObserver();
                 updatePageIndicator();
-                setActiveTool('select'); 
             }
 
             async function renderPage(pageContainer, pageNum) {
-                if (!pdfDocument) return;
                 const page = await pdfDocument.getPage(pageNum);
                 const scale = 2.0;
                 const viewport = page.getViewport({ scale: scale });
@@ -396,6 +301,7 @@
                 annotationCanvas.dataset.pageNum = pageNum;
                 pageContainer.innerHTML = '';
                 pageContainer.append(canvas, annotationCanvas);
+                annotationCanvas.style.touchAction = (activeTool === 'select') ? 'auto' : 'none';
                 await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
                 redrawAnnotations(pageNum);
             }
@@ -410,6 +316,7 @@
                             if (pageContainer.querySelector('canvas')) return;
                             const pageNum = parseInt(pageContainer.dataset.pageNumber);
                             renderPage(pageContainer, pageNum);
+                            pageIntersectionObserver.unobserve(pageContainer);
                         }
                     });
                 }, options);
@@ -417,320 +324,84 @@
                     pageIntersectionObserver.observe(page);
                 });
             }
-
+            
+            function startDrawing(e) { 
+                if (activeTool === 'select') return;
+                e.preventDefault();
+                isDrawing = true;
+                const canvas = findCanvasUnderPointer(e);
+                if (canvas) currentPath = [getCoords(e, canvas)];
+            }
+            function draw(e) {
+                if (!isDrawing) return;
+                e.preventDefault();
+                const canvas = findCanvasUnderPointer(e);
+                if (canvas) {
+                    currentPath.push(getCoords(e, canvas));
+                    redrawAnnotations(canvas.dataset.pageNum);
+                }
+            }
             async function stopDrawing(e) {
                 if (!isDrawing) return;
                 isDrawing = false;
                 const canvas = findCanvasUnderPointer(e, true);
-                if (!canvas || currentPath.length < 2) {
-                    currentPath = [];
-                    drawingStartPoint = null;
-                    return;
-                }
+                if (!canvas || currentPath.length < 3) { currentPath = []; return; }
                 const pageNum = parseInt(canvas.dataset.pageNum);
-                if (activeTool === 'erase') {
-                    await saveAnnotation({ page: pageNum, type: 'erase', path: currentPath, color: '#000000' });
-                    currentPath = [];
-                    drawingStartPoint = null;
-                    return;
+                let note = "";
+                if (activeTool === 'highlight') {
+                    const { value } = await Swal.fire({
+                        title: 'Añadir nota', input: 'textarea',
+                        inputPlaceholder: 'Escribe tu comentario...', showCancelButton: true
+                    });
+                    if (value) note = value;
                 }
-                const annotationData = {
-                    page: pageNum, type: activeTool, path: [...currentPath],
-                    color: activeColor, note: "", youtubeLink: ""
-                };
-                try {
-                    const docRef = await saveAnnotation(annotationData);
-                    showPromoteButton(docRef.id, e, canvas);
-                } catch (error) {
-                    console.error("Error al guardar la anotación inicial:", error);
-                }
+                await saveAnnotation({ page: pageNum, type: activeTool, path: currentPath, color: activeColor, note });
                 currentPath = [];
-                drawingStartPoint = null;
             }
-            
-            function showPromoteButton(annotationId, endEvent, canvas) {
-                clearPromoteButton();
+
+            function getCoords(e, canvas) {
                 const rect = canvas.getBoundingClientRect();
-                const touch = endEvent.changedTouches[0] || endEvent;
-                const btn = document.createElement('button');
-                btn.id = 'promote-note-btn';
-                btn.textContent = 'G';
-                btn.title = 'Guardar en el Cuaderno';
-                btn.style.left = `${touch.clientX - rect.left + scrollContainer.scrollLeft + 15}px`;
-                btn.style.top = `${touch.clientY - rect.top + scrollContainer.scrollTop - 18}px`;
-                const handleClick = (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    handleEditNote(annotationId);
-                    clearPromoteButton();
-                };
-                btn.addEventListener('click', handleClick);
-                btn.addEventListener('touchend', handleClick);
-                appContainer.appendChild(btn);
-                setTimeout(clearPromoteButton, 5000);
+                const touch = e.touches ? e.touches[0] : (e.changedTouches ? e.changedTouches[0] : e);
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                return { x: (touch.clientX - rect.left) * scaleX, y: (touch.clientY - rect.top) * scaleY };
             }
-
-            function clearPromoteButton() {
-                const existingBtn = document.getElementById('promote-note-btn');
-                if (existingBtn) {
-                    existingBtn.remove();
-                }
+            function findCanvasUnderPointer(e, isEndEvent = false) {
+                const eventPoint = isEndEvent ? (e.changedTouches ? e.changedTouches[0] : e) : (e.touches ? e.touches[0] : e);
+                if (!eventPoint) return null;
+                return document.elementFromPoint(eventPoint.clientX, eventPoint.clientY)?.closest('.pdf-page-container')?.querySelector('.annotation-canvas');
             }
-
+            async function saveAnnotation(annotationData) {
+                const annotationsRef = collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations");
+                await addDoc(annotationsRef, { ...annotationData, createdAt: serverTimestamp() });
+            }
+            function loadAllAnnotations() {
+                const annotationsQuery = query(collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations"), orderBy("createdAt"));
+                annotationsUnsubscribe = onSnapshot(annotationsQuery, (snapshot) => {
+                    annotationsByPage = {};
+                    snapshot.forEach(doc => {
+                        const annotation = { id: doc.id, ...doc.data() };
+                        if (!annotationsByPage[annotation.page]) annotationsByPage[annotation.page] = [];
+                        annotationsByPage[annotation.page].push(annotation);
+                    });
+                    document.querySelectorAll('.pdf-page-container').forEach(pageContainer => {
+                        if (pageContainer.querySelector('canvas')) {
+                             redrawAnnotations(pageContainer.dataset.pageNumber);
+                        }
+                    });
+                    renderNotesToSidebar();
+                });
+            }
             function redrawAnnotations(pageNum) {
                 const canvas = document.querySelector(`.annotation-canvas[data-page-num='${pageNum}']`);
                 if (!canvas) return;
                 const ctx = canvas.getContext('2d');
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                (annotationsByPage[pageNum] || []).forEach(annotation => {
-                    if (annotation.path?.length > 0) drawPath(ctx, annotation);
-                });
-                if (isDrawing && currentPageNum == pageNum) {
+                (annotationsByPage[pageNum] || []).forEach(annotation => drawPath(ctx, annotation));
+                if (isDrawing && parseInt(canvas.dataset.pageNum) == currentPageNum) {
                     drawPath(ctx, { type: activeTool, path: currentPath, color: activeColor });
                 }
             }
-
-            async function handleAddNewNote() {
-                const { value: formValues } = await Swal.fire({
-                    target: '.app-container',
-                    title: 'Nueva Nota',
-                    html: `
-                        <div class="swal-note-container">
-                            <div><label for="swal-note">Nota</label><textarea id="swal-note" class="swal2-textarea" placeholder="Escribe tu nota..."></textarea></div>
-                            <div><label for="swal-page">Número de página</label><input type="number" id="swal-page" class="swal2-input" placeholder="Ej: 5" min="1" max="${pdfDocument.numPages}"></div>
-                            <div><label for="swal-youtube">Enlace de YouTube (opcional)</label><input type="url" id="swal-youtube" class="swal2-input" placeholder="https://www.youtube.com/watch?v=..."></div>
-                            <div class="swal-color-container"><label for="swal-color">Color de la etiqueta</label><input type="color" id="swal-color" value="#88c999"><div id="swal-color-preview" style="background-color: #88c999;"></div></div>
-                        </div>`,
-                    focusConfirm: false,
-                    showCancelButton: true,
-                    confirmButtonText: 'Guardar',
-                    didOpen: () => {
-                        const colorInput = document.getElementById('swal-color');
-                        const colorPreview = document.getElementById('swal-color-preview');
-                        colorInput.oninput = (e) => { colorPreview.style.backgroundColor = e.target.value; };
-                    },
-                    preConfirm: () => {
-                        return {
-                            note: document.getElementById('swal-note').value,
-                            page: parseInt(document.getElementById('swal-page').value),
-                            color: document.getElementById('swal-color').value,
-                            youtubeLink: document.getElementById('swal-youtube').value
-                        }
-                    }
-                });
-                if (formValues && formValues.note && formValues.page) {
-                    await saveAnnotation({
-                        type: 'text', note: formValues.note, page: formValues.page,
-                        color: formValues.color, youtubeLink: formValues.youtubeLink || "", path: []
-                    });
-                }
-            }
-
-            async function handleClearNotes() {
-                const result = await Swal.fire({
-                    target: '.app-container',
-                    title: '¿Limpiar todas las notas?',
-                    text: "Se borrará el texto de todas las notas, pero los resaltados y dibujos permanecerán.",
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#d33',
-                    confirmButtonText: 'Sí, limpiar',
-                    cancelButtonText: 'Cancelar'
-                });
-                if (result.isConfirmed) {
-                    const batch = writeBatch(db);
-                    Object.values(annotationsByPage).flat().filter(a => a.note).forEach(a => {
-                        const docRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", a.id);
-                        batch.update(docRef, { note: "", youtubeLink: "" });
-                    });
-                    await batch.commit();
-                }
-            }
-
-            async function handleClearAll() {
-                 const result = await Swal.fire({
-                    target: '.app-container',
-                    title: '¿Limpiar todo el documento?',
-                    text: "Se borrarán TODAS las anotaciones. Esta acción no se puede deshacer.",
-                    icon: 'error',
-                    showCancelButton: true,
-                    confirmButtonColor: '#d33',
-                    confirmButtonText: 'Sí, borrar todo',
-                    cancelButtonText: 'Cancelar'
-                });
-                if (result.isConfirmed) {
-                    const batch = writeBatch(db);
-                    Object.values(annotationsByPage).flat().forEach(a => {
-                        const docRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", a.id);
-                        batch.delete(docRef);
-                    });
-                    await batch.commit();
-                }
-            }
-
-            function renderNotesToSidebar(searchTerm = '') {
-                const lowerCaseSearchTerm = searchTerm.toLowerCase();
-                notesList.innerHTML = '';
-                const annotationsWithNotes = Object.values(annotationsByPage)
-                    .flat()
-                    .filter(a => a.id && a.note)
-                    .sort((a, b) => (a.page - b.page));
-                const filteredAnnotations = lowerCaseSearchTerm ?
-                    annotationsWithNotes.filter(a => a.note.toLowerCase().includes(lowerCaseSearchTerm)) :
-                    annotationsWithNotes;
-                if (filteredAnnotations.length === 0) {
-                    notesList.innerHTML = `<p class="text-gray-500 text-center p-4">No hay notas guardadas.</p>`;
-                    return;
-                }
-                filteredAnnotations.forEach(annotation => {
-                    const card = document.createElement('div');
-                    card.className = 'note-card';
-                    card.dataset.id = annotation.id;
-                    card.dataset.page = annotation.page;
-                    const youtubeIcon = annotation.youtubeLink ?
-                        `<a href="${annotation.youtubeLink}" target="_blank" class="text-red-500 hover:text-red-400 ml-2" title="Ver video de YouTube"><i class="fab fa-youtube"></i></a>` : '';
-                    card.innerHTML = `
-                        <div class="flex justify-between items-start gap-3">
-                            <div class="flex-grow cursor-pointer" onclick="window.scrollToPage(${annotation.page})">
-                                <div class="flex items-center gap-2">
-                                    <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color:${annotation.color};"></span>
-                                    <span class="text-xs font-bold text-gray-400">Página ${annotation.page}</span>
-                                    ${youtubeIcon}
-                                </div>
-                                <p class="text-white text-sm break-words note-text mt-2">${annotation.note}</p>
-                            </div>
-                            <div class="note-actions flex flex-col gap-2 flex-shrink-0">
-                                <button class="edit-note-btn p-1 rounded-md hover:bg-gray-700" title="Editar Nota"><i class="fas fa-edit pointer-events-none"></i></button>
-                                <button class="delete-note-btn p-1 rounded-md hover:bg-gray-700" title="Borrar Anotación"><i class="fas fa-trash pointer-events-none"></i></button>
-                            </div>
-                        </div>
-                        `;
-                    notesList.appendChild(card);
-                });
-            }
-
-            async function handleEditNote(annotationId) {
-                if (!annotationId) return;
-                const originalAnnotation = Object.values(annotationsByPage).flat().find(a => a.id === annotationId);
-                if (!originalAnnotation) return;
-                const { value: formValues } = await Swal.fire({
-                    target: '.app-container',
-                    title: 'Editar Nota',
-                    html: `
-                        <div class="swal-note-container">
-                            <div><label for="swal-note-edit">Nota</label><textarea id="swal-note-edit" class="swal2-textarea" placeholder="Escribe tu nota...">${originalAnnotation.note || ''}</textarea></div>
-                            <div><label for="swal-youtube-edit">Enlace de YouTube (opcional)</label><input type="url" id="swal-youtube-edit" class="swal2-input" placeholder="https://www.youtube.com/watch?v=..." value="${originalAnnotation.youtubeLink || ''}"></div>
-                        </div>`,
-                    showCancelButton: true,
-                    confirmButtonText: 'Guardar',
-                    cancelButtonText: 'Cancelar',
-                    preConfirm: () => {
-                        return {
-                            note: document.getElementById('swal-note-edit').value,
-                            youtubeLink: document.getElementById('swal-youtube-edit').value
-                        }
-                    }
-                });
-                if (formValues) {
-                    const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
-                    await updateDoc(noteRef, { note: formValues.note, youtubeLink: formValues.youtubeLink });
-                }
-            }
-
-            function handleDeleteNote(annotationId) {
-                if (!annotationId) return;
-                Swal.fire({
-                    target: '.app-container',
-                    title: '¿Borrar anotación?',
-                    text: "Se borrará la anotación por completo. Esta acción no se puede deshacer.",
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#d33',
-                    confirmButtonText: 'Sí, borrar',
-                    cancelButtonText: 'Cancelar'
-                }).then(async (result) => {
-                    if (result.isConfirmed) {
-                        const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
-                        await deleteDoc(noteRef);
-                    }
-                });
-            }
-
-            function saveAnnotation(annotationData) {
-                return addDoc(collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations"), {
-                    ...annotationData,
-                    createdAt: serverTimestamp()
-                });
-            }
-
-            function loadAllAnnotations() {
-                if (annotationsUnsubscribe) annotationsUnsubscribe();
-                const annotationsQuery = query(collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations"), orderBy("createdAt"));
-                annotationsUnsubscribe = onSnapshot(annotationsQuery, (snapshot) => {
-                    annotationsByPage = {};
-                    snapshot.docs.forEach(doc => {
-                        const annotation = { id: doc.id, ...doc.data() };
-                        if (!annotationsByPage[annotation.page]) annotationsByPage[annotation.page] = [];
-                        annotationsByPage[annotation.page].push(annotation);
-                    });
-                    const currentSearch = document.getElementById('note-search-input')?.value || '';
-                    renderNotesToSidebar(currentSearch);
-                    document.querySelectorAll('.pdf-page-container').forEach(pageContainer => {
-                        if (pageContainer.querySelector('canvas')) redrawAnnotations(pageContainer.dataset.pageNumber);
-                    });
-                });
-            }
-
-            function setActiveTool(tool) {
-                clearPromoteButton();
-                activeTool = tool;
-                document.querySelectorAll('#main-tools .tool-btn').forEach(btn => btn.classList.remove('active'));
-                document.getElementById(`tool-${tool}`).classList.add('active');
-            }
-
-            function startDrawing(e) {
-                clearPromoteButton();
-                if (activeTool === 'select' || !e.touches) return;
-                e.preventDefault();
-                isDrawing = true;
-                const canvas = findCanvasUnderPointer(e);
-                if (canvas) {
-                    currentPageNum = parseInt(canvas.dataset.pageNum);
-                    const coords = getCoords(e, canvas);
-                    drawingStartPoint = coords;
-                    currentPath = [coords];
-                }
-            }
-
-            function draw(e) {
-                if (!isDrawing) return;
-                const canvas = findCanvasUnderPointer(e);
-                if (canvas) {
-                    const currentCoords = getCoords(e, canvas);
-                    if (activeTool === 'highlight') {
-                        currentPath = [drawingStartPoint, { x: currentCoords.x, y: drawingStartPoint.y }];
-                    } else {
-                        currentPath.push(currentCoords);
-                    }
-                    redrawAnnotations(canvas.dataset.pageNum);
-                }
-            }
-
-            function getCoords(e, canvas) {
-                const rect = canvas.getBoundingClientRect();
-                const touch = e.touches?.[0] || e.changedTouches?.[0];
-                const scaleX = canvas.width / rect.width;
-                const scaleY = canvas.height / rect.height;
-                return { x: (touch.clientX - rect.left) * scaleX, y: (touch.clientY - rect.top) * scaleY };
-            }
-
-            function findCanvasUnderPointer(e, isEndEvent = false) {
-                const touch = isEndEvent ? (e.changedTouches?.[0]) : (e.touches?.[0]);
-                if (!touch) return null;
-                const element = document.elementFromPoint(touch.clientX, touch.clientY);
-                return element?.closest('.pdf-page-container')?.querySelector('.annotation-canvas');
-            }
-
             function drawPath(ctx, annotation) {
                 if (!annotation.path || annotation.path.length < 2) return;
                 ctx.save();
@@ -751,21 +422,81 @@
                 ctx.stroke();
                 ctx.restore();
             }
-
             function updatePageIndicator() {
                 if(!pdfDocument) return;
-                const indicator = document.getElementById('page-indicator');
                 const scrollCenterY = scrollContainer.scrollTop + scrollContainer.clientHeight / 2;
                 let mostVisiblePage = 1;
                 document.querySelectorAll('.pdf-page-container').forEach((pageEl, index) => {
                     const pageTop = pageEl.offsetTop * zoomScale;
                     const pageBottom = pageTop + (pageEl.offsetHeight * zoomScale);
-                    if (scrollCenterY >= pageTop && scrollCenterY < pageBottom) mostVisiblePage = index + 1;
+                    if (scrollCenterY >= pageTop && scrollCenterY < pageBottom) {
+                        mostVisiblePage = index + 1;
+                    }
                 });
                 currentPageNum = mostVisiblePage;
-                indicator.textContent = `${currentPageNum} / ${pdfDocument.numPages}`;
+                document.getElementById('page-indicator').textContent = `${currentPageNum} / ${pdfDocument.numPages}`;
             }
-
+            
+            // CAMBIO: Estructura de la tarjeta de nota modificada para una mejor alineación.
+            function renderNotesToSidebar() {
+                const notesList = document.getElementById('notes-list');
+                notesList.innerHTML = '';
+                const allAnnotations = Object.values(annotationsByPage).flat().filter(a => a.note || (a.type === 'highlight')).sort((a,b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0));
+                if (allAnnotations.length === 0) {
+                    notesList.innerHTML = `<p class="text-gray-500 text-center">Aún no hay notas.</p>`; return;
+                }
+                allAnnotations.forEach(annotation => {
+                    const card = document.createElement('div');
+                    card.className = 'note-card';
+                    let noteContent = annotation.note ? `<p class="text-white text-sm break-words">${annotation.note}</p>` : `<p class="text-gray-400 text-sm italic">Resaltado sin nota.</p>`;
+                    card.innerHTML = `
+                        <div class="relative">
+                            <div class="flex justify-between items-center">
+                                <div class="flex items-center gap-2 cursor-pointer" onclick="window.scrollToPage(${annotation.page})">
+                                    <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color:${annotation.color};"></span>
+                                    <span class="text-xs font-bold text-gray-400 hover:text-white">Página ${annotation.page}</span>
+                                </div>
+                                <div class="note-actions flex gap-2">
+                                    <button class="edit-note-btn text-gray-400 hover:text-white" data-id="${annotation.id}" data-note="${annotation.note || ''}"><i class="fas fa-edit"></i></button>
+                                    <button class="delete-note-btn text-gray-400 hover:text-red-500" data-id="${annotation.id}"><i class="fas fa-trash"></i></button>
+                                </div>
+                            </div>
+                            <div class="mt-2 pl-5 cursor-pointer" onclick="window.scrollToPage(${annotation.page})">
+                                ${noteContent}
+                            </div>
+                        </div>`;
+                    notesList.appendChild(card);
+                });
+            }
+            async function handleEditNote(button) {
+                const annotationId = button.dataset.id;
+                const currentNote = button.dataset.note;
+                const { value: newNote } = await Swal.fire({
+                    title: 'Editar nota', input: 'textarea', inputValue: currentNote,
+                    showCancelButton: true, confirmButtonText: 'Guardar'
+                });
+                if (typeof newNote === 'string') {
+                    const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
+                    await updateDoc(noteRef, { note: newNote });
+                }
+            }
+            function handleDeleteNote(button) {
+                const annotationId = button.dataset.id;
+                Swal.fire({
+                    title: '¿Estás seguro?', text: "Esta acción no se puede deshacer.",
+                    icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, borrar', cancelButtonText: 'Cancelar'
+                }).then(async (result) => {
+                    if (result.isConfirmed) {
+                        try {
+                            const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
+                            await deleteDoc(noteRef);
+                        } catch (error) {
+                            console.error("Error al borrar la nota:", error);
+                            Swal.fire('Error', 'No se pudo eliminar la nota.', 'error');
+                        }
+                    }
+                });
+            }
             window.scrollToPage = (pageNum) => {
                 const pageEl = document.querySelector(`.pdf-page-container[data-page-number='${pageNum}']`);
                 if(pageEl) {
@@ -773,43 +504,32 @@
                     document.getElementById('sidebar').classList.remove('open');
                 }
             };
-
             async function toggleReadAloud() {
                 let isReading = speechSynthesis.speaking;
                 const btn = document.getElementById('read-aloud-btn');
                 if (isReading) {
                     speechSynthesis.cancel();
                     btn.classList.remove('text-[var(--primary-color)]');
-                } else {
-                    btn.classList.add('text-[var(--primary-color)]');
-                    for (let i = currentPageNum; i <= pdfDocument.numPages; i++) {
-                        if (!speechSynthesis.speaking && i > currentPageNum) break;
-                        scrollToPage(i);
-                        const page = await pdfDocument.getPage(i);
-                        const textContent = await page.getTextContent();
-                        const pageText = textContent.items.map(item => item.str).join(' ');
-                        const shouldContinue = await speakText(pageText);
-                        if (!shouldContinue) break;
-                    }
-                    btn.classList.remove('text-[var(--primary-color)]');
+                    return;
                 }
+                btn.classList.add('text-[var(--primary-color)]');
+                for (let i = currentPageNum; i <= pdfDocument.numPages; i++) {
+                    if (speechSynthesis.speaking === false && i > currentPageNum) { break; }
+                    window.scrollToPage(i); 
+                    updatePageIndicator(); 
+                    const page = await pdfDocument.getPage(i);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    await speakText(pageText);
+                }
+                btn.classList.remove('text-[var(--primary-color)]');
             }
-
             function speakText(text) {
                 return new Promise(resolve => {
-                    if (!speechSynthesis) return resolve(false);
                     const utterance = new SpeechSynthesisUtterance(text);
                     utterance.lang = 'es-ES';
-                    let cancelled = false;
-                    utterance.onend = () => resolve(!cancelled);
-                    utterance.onerror = () => resolve(false);
-                    const checkCancelInterval = setInterval(() => {
-                        if (!speechSynthesis.speaking) {
-                            cancelled = true;
-                            clearInterval(checkCancelInterval);
-                            resolve(false);
-                        }
-                    }, 250);
+                    utterance.onend = resolve;
+                    utterance.onerror = () => resolve();
                     speechSynthesis.speak(utterance);
                 });
             }
