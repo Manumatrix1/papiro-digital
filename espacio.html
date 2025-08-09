@@ -16,6 +16,7 @@
             --surface-color: #181818; --surface-border-color: #2a2a2a;
         }
         html, body { height: 100%; width: 100%; overflow: hidden; background-color: var(--background-color); color: white; font-family: 'Inter', sans-serif; }
+        /* CAMBIO: Contenedor principal ahora es un contexto de posicionamiento */
         .app-container { height: 100vh; display: flex; flex-direction: column; background-color: var(--background-color); position: relative; }
         main { flex-grow: 1; position: relative; overflow: hidden; }
         .scroll-wrapper {
@@ -202,10 +203,16 @@
                 notesList.addEventListener('click', (e) => {
                     const noteCard = e.target.closest('.note-card');
                     if (!noteCard) return;
+
+                    // CAMBIO: Se obtiene el ID directamente desde el dataset del noteCard.
+                    const annotationId = noteCard.dataset.id;
+
                     const editBtn = e.target.closest('.edit-note-btn');
-                    if (editBtn) { handleEditNote(editBtn.dataset.id, noteCard); return; }
+                    if (editBtn) { handleEditNote(annotationId, noteCard); return; }
+                    
                     const deleteBtn = e.target.closest('.delete-note-btn');
-                    if (deleteBtn) { handleDeleteNote(deleteBtn.dataset.id, noteCard); return; }
+                    if (deleteBtn) { handleDeleteNote(annotationId, noteCard); return; }
+                    
                     const pageToGo = noteCard.dataset.page;
                     if (pageToGo) { scrollToPage(pageToGo); }
                 });
@@ -496,29 +503,35 @@
                 indicator.textContent = `${currentPageNum} / ${pdfDocument.numPages}`;
             }
             
+            // CAMBIO: HTML de la tarjeta de nota corregido y botones siempre visibles
             function renderNotesToSidebar() {
                 notesList.innerHTML = '';
                 const allAnnotations = Object.values(annotationsByPage)
                     .flat()
-                    .filter(a => a.type === 'highlight')
+                    .filter(a => a.type === 'highlight' && a.id) // Asegurarse de que solo se rendericen las que tienen ID
                     .sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0));
+                
                 if (allAnnotations.length === 0) {
                     notesList.innerHTML = `<p class="text-gray-500 text-center p-4">Aún no hay notas.</p>`;
                     return;
                 }
+                
                 allAnnotations.forEach(annotation => {
                     const card = document.createElement('div');
-                    card.className = 'note-card group relative p-3 rounded-lg border border-transparent hover:border-gray-700 hover:bg-gray-800/50 transition-colors duration-200';
-                    card.dataset.id = annotation.id;
+                    card.className = 'note-card relative p-3 rounded-lg border border-transparent hover:border-gray-700 hover:bg-gray-800/50';
+                    // Se asigna el ID a la tarjeta principal para que los botones lo hereden
+                    card.dataset.id = annotation.id; 
                     card.dataset.page = annotation.page;
+                    
                     let noteContent = annotation.note ? `<p class="text-white text-sm break-words note-text">${annotation.note}</p>` : `<p class="text-gray-400 text-sm italic note-text">Resaltado sin nota.</p>`;
+                    
                     card.innerHTML = `
                         <div class="flex justify-between items-start">
-                            <div class="flex items-center gap-2 mb-2 cursor-pointer flex-grow">
+                            <div class="flex items-center gap-2 mb-2 cursor-pointer flex-grow pr-16">
                                 <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color:${annotation.color};"></span>
                                 <span class="text-xs font-bold text-gray-400">Página ${annotation.page}</span>
                             </div>
-                            <div class="note-actions absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <div class="note-actions absolute top-2 right-2 flex gap-1">
                                 <button class="edit-note-btn p-2 rounded-md bg-gray-700/80 hover:bg-gray-600 text-gray-300 hover:text-white" title="Editar Nota"><i class="fas fa-edit pointer-events-none"></i></button>
                                 <button class="delete-note-btn p-2 rounded-md bg-gray-700/80 hover:bg-red-500/80 text-gray-300 hover:text-white" title="Borrar Nota"><i class="fas fa-trash pointer-events-none"></i></button>
                             </div>
@@ -528,13 +541,21 @@
                 });
             }
 
+            // CAMBIO: Funciones de editar y borrar con verificación de ID
             async function handleEditNote(annotationId, noteCardElement) {
+                if (!annotationId) {
+                    console.error("ID de anotación inválido para editar:", annotationId);
+                    Swal.fire('Error', 'No se pudo identificar la nota para editar.', 'error');
+                    return;
+                }
                 const originalAnnotation = Object.values(annotationsByPage).flat().find(a => a.id === annotationId);
                 if (!originalAnnotation) return;
+                
                 const { value: newNote } = await Swal.fire({
                     title: 'Editar nota', input: 'textarea', inputValue: originalAnnotation.note || '',
                     showCancelButton: true, confirmButtonText: 'Guardar', cancelButtonText: 'Cancelar'
                 });
+
                 if (typeof newNote === 'string') {
                     const noteTextElement = noteCardElement.querySelector('.note-text');
                     if (newNote) {
@@ -547,17 +568,21 @@
                     const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
                     await updateDoc(noteRef, { note: newNote }).catch(error => {
                         console.error("Error al actualizar la nota:", error);
-                        Swal.fire('Error', 'No se pudo guardar la nota. Inténtalo de nuevo.', 'error');
+                        Swal.fire('Error', 'No se pudo guardar la nota.', 'error');
                         noteTextElement.textContent = originalAnnotation.note || 'Resaltado sin nota.';
                     });
                 }
             }
 
-            // CAMBIO: Lógica de borrado modificada para eliminar solo el texto de la nota.
             function handleDeleteNote(annotationId, noteCardElement) {
+                if (!annotationId) {
+                    console.error("ID de anotación inválido para borrar:", annotationId);
+                    Swal.fire('Error', 'No se pudo identificar la nota para borrar.', 'error');
+                    return;
+                }
                 Swal.fire({
                     title: '¿Borrar texto de la nota?',
-                    text: "El resaltado en el PDF permanecerá. Podrás añadir otra nota después.",
+                    text: "El resaltado en el PDF permanecerá. Esta acción es reversible editando la nota de nuevo.",
                     icon: 'warning',
                     showCancelButton: true,
                     confirmButtonColor: '#d33',
@@ -567,10 +592,8 @@
                     if (result.isConfirmed) {
                         try {
                             const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
-                            // Se actualiza el campo 'note' a un string vacío en vez de borrar el documento
                             await updateDoc(noteRef, { note: "" });
 
-                            // Actualizar la UI sin recargar todo
                             const noteTextElement = noteCardElement.querySelector('.note-text');
                             if (noteTextElement) {
                                 noteTextElement.textContent = 'Resaltado sin nota.';
