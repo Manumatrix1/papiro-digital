@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title id="page-title">Papiro Digital</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -15,7 +15,7 @@
             --primary-color: #88c999; --background-color: #0f0f0f;
             --surface-color: #181818; --surface-border-color: #2a2a2a;
         }
-        html, body { height: 100%; width: 100%; overflow: hidden; background-color: var(--background-color); color: white; font-family: 'Inter', sans-serif; }
+        html, body { height: 100%; width: 100%; overflow: auto; background-color: var(--background-color); color: white; font-family: 'Inter', sans-serif; }
         .app-container { height: 100vh; display: flex; flex-direction: column; }
         main { flex-grow: 1; position: relative; overflow: hidden; }
         .scroll-wrapper {
@@ -27,8 +27,8 @@
         #pdf-content-wrapper {
             width: 100%;
             margin: 1rem 0;
-            /* AJUSTE FINAL: Asegura que el zoom se ancle en el centro exacto */
             transform-origin: 50% 0; 
+            transition: transform 0.1s ease-out;
         }
         .pdf-page-container { 
             position: relative; 
@@ -80,7 +80,6 @@
         <input type="color" id="color-picker" class="w-8 h-8 rounded-full cursor-pointer bg-transparent border-none" value="#FFDD00" title="Color">
         <span id="page-indicator" class="text-sm text-gray-400 ml-2">1 / 1</span>
     </div>
-
     <aside id="sidebar" class="p-4">
         <div class="flex justify-between items-center mb-4 flex-shrink-0">
             <h3 class="text-xl font-bold">Cuaderno de Notas</h3>
@@ -89,7 +88,6 @@
         <div id="notes-list" class="space-y-4 flex-grow overflow-y-auto"></div>
     </aside>
     <div id="sidebar-overlay"></div>
-
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
     </script>
@@ -97,7 +95,6 @@
         import { auth, db } from './firebase-config.js';
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
         import { doc, getDoc, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
-
         // --- VARIABLES GLOBALES ---
         let currentUser, projectId, pdfId, pdfDocument, annotationsUnsubscribe;
         let activeTool = 'select', activeColor = '#FFDD00', isDrawing = false;
@@ -109,7 +106,6 @@
         const pdfWrapper = document.getElementById('pdf-content-wrapper');
         const scrollContainer = document.querySelector('.scroll-wrapper');
         let pageIntersectionObserver;
-
         // --- INICIO Y CACHÉ ---
         onAuthStateChanged(auth, (user) => {
             if (user) iniciarAplicacion(user); else window.location.href = 'index.html';
@@ -157,7 +153,6 @@
             document.getElementById('sidebar-overlay').addEventListener('click', () => document.getElementById('sidebar').classList.remove('open'));
             document.getElementById('read-aloud-btn').addEventListener('click', toggleReadAloud);
             scrollContainer.addEventListener('scroll', updatePageIndicator);
-
             const fullscreenBtn = document.getElementById('fullscreen-btn');
             fullscreenBtn.addEventListener('click', () => {
                 const icon = fullscreenBtn.querySelector('i');
@@ -169,7 +164,6 @@
                     icon.classList.replace('fa-compress', 'fa-expand');
                 }
             });
-
             let initialDistance = null;
             
             pdfWrapper.addEventListener('touchstart', (e) => {
@@ -186,7 +180,6 @@
                     scrollStart.top = scrollContainer.scrollTop;
                 }
             }, { passive: false });
-
             pdfWrapper.addEventListener('touchmove', (e) => {
                 if (isDrawing || isPanning || (e.touches.length === 2 && activeTool === 'select')) {
                     e.preventDefault();
@@ -198,6 +191,7 @@
                     const scaleAmount = newDistance / initialDistance;
                     zoomScale = Math.min(Math.max(1.0, zoomScale * scaleAmount), 5.0);
                     pdfWrapper.style.transform = `scale(${zoomScale})`;
+                    pdfWrapper.style.width = `${100 * zoomScale}%`;
                     initialDistance = newDistance;
                 } else if (isPanning) {
                     const dx = e.touches[0].pageX - panStart.x;
@@ -206,14 +200,12 @@
                     scrollContainer.scrollTop = scrollStart.top - dy;
                 }
             }, { passive: false });
-
             pdfWrapper.addEventListener('touchend', (e) => {
                 if (isDrawing) stopDrawing(e);
                 if (e.touches.length < 2) initialDistance = null;
                 isPanning = false;
             });
         }
-
         function setActiveTool(tool) {
             activeTool = tool;
             document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
@@ -223,7 +215,6 @@
                 canvas.style.touchAction = (tool === 'select') ? 'auto' : 'none';
             });
         }
-
         // --- CARGA Y RENDERIZADO ---
         async function loadPdfDocument() {
             const statusText = document.getElementById('status-text');
@@ -254,7 +245,6 @@
                 statusText.textContent = `Error: ${error.message}`;
             }
         }
-
         async function setupPagePlaceholders() {
             pdfWrapper.innerHTML = '';
             const page = await pdfDocument.getPage(1);
@@ -271,7 +261,6 @@
             startPageObserver();
             updatePageIndicator();
         }
-
         async function renderPage(pageContainer, pageNum) {
             const page = await pdfDocument.getPage(pageNum);
             const scale = 2.0;
@@ -288,7 +277,6 @@
             await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
             redrawAnnotations(pageNum);
         }
-
         function startPageObserver() {
             if (pageIntersectionObserver) pageIntersectionObserver.disconnect();
             const options = { root: scrollContainer, rootMargin: '500px 0px' };
@@ -342,7 +330,6 @@
             await saveAnnotation({ page: pageNum, type: activeTool, path: currentPath, color: activeColor, note });
             currentPath = [];
         }
-
         function getCoords(e, canvas) {
             const rect = canvas.getBoundingClientRect();
             const touch = e.touches ? e.touches[0] : (e.changedTouches ? e.changedTouches[0] : e);
@@ -433,8 +420,14 @@
                 card.innerHTML = `<div class="flex justify-between items-start"><div class="flex items-center gap-2 mb-2 cursor-pointer flex-grow" onclick="window.scrollToPage(${annotation.page})"><span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color:${annotation.color};"></span><span class="text-xs font-bold text-gray-400 hover:text-white">Página ${annotation.page}</span></div><div class="note-actions flex gap-2 flex-shrink-0"><button class="edit-note-btn text-gray-400 hover:text-white" data-id="${annotation.id}" data-note="${annotation.note || ''}"><i class="fas fa-edit"></i></button><button class="delete-note-btn text-gray-400 hover:text-red-500" data-id="${annotation.id}"><i class="fas fa-trash"></i></button></div></div>${noteContent}`;
                 notesList.appendChild(card);
             });
-            notesList.querySelectorAll('.edit-note-btn').forEach(btn => btn.addEventListener('click', handleEditNote));
-            notesList.querySelectorAll('.delete-note-btn').forEach(btn => btn.addEventListener('click', handleDeleteNote));
+            
+            // Asignar eventos después de renderizar
+            notesList.querySelectorAll('.edit-note-btn').forEach(btn => {
+                btn.addEventListener('click', handleEditNote);
+            });
+            notesList.querySelectorAll('.delete-note-btn').forEach(btn => {
+                btn.addEventListener('click', handleDeleteNote);
+            });
         }
         async function handleEditNote(e) {
             const button = e.currentTarget;
