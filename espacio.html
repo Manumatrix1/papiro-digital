@@ -72,7 +72,6 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
             transition: opacity 0.3s;
         }
-        /* Estilos para el buscador y botón de añadir en el panel */
         #note-search-input {
             width: 100%;
             background-color: #2a2a2a;
@@ -126,7 +125,10 @@
         <aside id="sidebar" class="p-4">
             <div class="flex justify-between items-center mb-2 flex-shrink-0">
                 <h3 class="text-xl font-bold">Cuaderno de Notas</h3>
-                <button id="add-note-btn" title="Añadir Nota de Texto">+</button>
+                <div class="flex items-center gap-2">
+                    <button id="add-note-btn" title="Añadir Nota de Texto">+</button>
+                    <button id="close-sidebar-btn" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+                </div>
             </div>
             <div class="mb-4 flex-shrink-0">
                 <input type="search" id="note-search-input" placeholder="Buscar notas...">
@@ -183,11 +185,10 @@
                 document.getElementById('color-picker').addEventListener('input', (e) => activeColor = e.target.value);
                 document.getElementById('open-notes-btn').addEventListener('click', () => document.getElementById('sidebar').classList.add('open'));
                 
-                // CAMBIO: Se mueven los listeners del panel a su propio contenedor para evitar conflictos
                 const sidebar = document.getElementById('sidebar');
-                sidebar.querySelector('#close-sidebar-btn')?.addEventListener('click', () => sidebar.classList.remove('open'));
                 sidebar.querySelector('#add-note-btn')?.addEventListener('click', handleAddNewNote);
                 sidebar.querySelector('#note-search-input')?.addEventListener('input', (e) => renderNotesToSidebar(e.target.value));
+                sidebar.querySelector('#close-sidebar-btn')?.addEventListener('click', () => sidebar.classList.remove('open'));
 
                 document.getElementById('sidebar-overlay').addEventListener('click', () => sidebar.classList.remove('open'));
                 document.getElementById('read-aloud-btn').addEventListener('click', toggleReadAloud);
@@ -264,10 +265,7 @@
                     isPanning = false;
                 });
             }
-
-            // --- El resto del JS (lógica de PDF, dibujo, etc. sin cambios) ---
             
-            // --- CAMBIO: Nueva función para añadir notas de texto ---
             async function handleAddNewNote() {
                 const { value: formValues } = await Swal.fire({
                     target: '.app-container',
@@ -302,24 +300,24 @@
                         note: formValues.note,
                         page: formValues.page,
                         color: formValues.color,
-                        path: [] // Las notas de texto no tienen un trazado
+                        path: []
                     };
                     await saveAnnotation(annotationData);
                 }
             }
 
-            // CAMBIO: La función de renderizar ahora acepta un filtro de búsqueda
+            // CAMBIO CLAVE 1: El panel solo muestra anotaciones que tienen texto.
             function renderNotesToSidebar(searchTerm = '') {
                 const lowerCaseSearchTerm = searchTerm.toLowerCase();
                 notesList.innerHTML = '';
                 const allAnnotations = Object.values(annotationsByPage)
                     .flat()
-                    .filter(a => a.id && (a.type === 'highlight' || a.type === 'text')) // Ahora muestra ambos tipos
+                    .filter(a => a.id && a.note) // <-- La magia está aquí: solo mostrar si a.note tiene contenido.
                     .sort((a, b) => (a.page - b.page) || ((a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)));
 
-                const filteredAnnotations = allAnnotations.filter(a => 
-                    a.note && a.note.toLowerCase().includes(lowerCaseSearchTerm)
-                );
+                const filteredAnnotations = lowerCaseSearchTerm ? 
+                    allAnnotations.filter(a => a.note.toLowerCase().includes(lowerCaseSearchTerm)) : 
+                    allAnnotations;
 
                 if (filteredAnnotations.length === 0) {
                     notesList.innerHTML = `<p class="text-gray-500 text-center p-4">No se encontraron notas.</p>`;
@@ -332,7 +330,9 @@
                     card.dataset.id = annotation.id; 
                     card.dataset.page = annotation.page;
                     
-                    let noteContent = annotation.note ? `<p class="text-white text-sm break-words note-text">${annotation.note}</p>` : `<p class="text-gray-400 text-sm italic note-text">Resaltado sin nota.</p>`;
+                    let noteContent = `<p class="text-white text-sm break-words note-text">${annotation.note}</p>`;
+                    let deleteButtonTitle = annotation.type === 'text' ? 'Borrar Nota' : 'Borrar texto de la nota';
+                    let deleteButtonIcon = annotation.type === 'text' ? 'fa-trash-can' : 'fa-comment-slash';
                     
                     card.innerHTML = `
                         <div class="flex justify-between items-start">
@@ -342,7 +342,7 @@
                             </div>
                             <div class="note-actions absolute top-2 right-2 flex gap-1">
                                 <button class="edit-note-btn p-2 rounded-md bg-gray-700/80 hover:bg-gray-600 text-gray-300 hover:text-white" title="Editar Nota"><i class="fas fa-edit pointer-events-none"></i></button>
-                                <button class="delete-note-btn p-2 rounded-md bg-gray-700/80 hover:bg-red-500/80 text-gray-300 hover:text-white" title="Borrar Anotación"><i class="fas fa-trash pointer-events-none"></i></button>
+                                <button class="delete-note-btn p-2 rounded-md bg-gray-700/80 hover:bg-red-500/80 text-gray-300 hover:text-white" title="${deleteButtonTitle}"><i class="fas ${deleteButtonIcon} pointer-events-none"></i></button>
                             </div>
                         </div>
                         ${noteContent}`;
@@ -350,39 +350,6 @@
                 });
             }
 
-            // CAMBIO: Borrar ahora elimina el documento completo
-            function handleDeleteNote(annotationId, noteCardElement) {
-                if (!annotationId) {
-                    Swal.fire({ target: '.app-container', title: 'Error', text: 'No se pudo identificar la nota para borrar.', icon: 'error' });
-                    return;
-                }
-                Swal.fire({
-                    target: '.app-container',
-                    title: '¿Estás seguro?',
-                    text: "Se borrará la anotación completa (resaltado y nota). ¡Esta acción no se puede deshacer!",
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#d33',
-                    confirmButtonText: 'Sí, borrar todo',
-                    cancelButtonText: 'Cancelar'
-                }).then(async (result) => {
-                    if (result.isConfirmed) {
-                        try {
-                            noteCardElement.style.transition = 'opacity 0.3s ease';
-                            noteCardElement.style.opacity = '0';
-                            setTimeout(() => noteCardElement.remove(), 300);
-
-                            const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
-                            await deleteDoc(noteRef);
-                        } catch (error) {
-                            console.error("Error al borrar la anotación:", error);
-                            Swal.fire({ target: '.app-container', title: 'Error', text: 'No se pudo eliminar la anotación.', icon: 'error' });
-                        }
-                    }
-                });
-            }
-
-            // El resto del JS (funciones que no cambian)
             async function handleEditNote(annotationId, noteCardElement) {
                 if (!annotationId) {
                     Swal.fire({ target: '.app-container', title: 'Error', text: 'No se pudo identificar la nota para editar.', icon: 'error' });
@@ -406,6 +373,68 @@
                 }
             }
             
+            // CAMBIO CLAVE 2: La lógica de borrar vuelve a ser la que solo elimina el texto.
+            function handleDeleteNote(annotationId, noteCardElement) {
+                if (!annotationId) {
+                    Swal.fire({ target: '.app-container', title: 'Error', text: 'No se pudo identificar la nota.', icon: 'error' });
+                    return;
+                }
+
+                const annotation = Object.values(annotationsByPage).flat().find(a => a.id === annotationId);
+                // Si la nota es de tipo 'text' (sin resaltado), se borra por completo.
+                if (annotation && annotation.type === 'text') {
+                    handleDeleteAnnotation(annotationId, noteCardElement);
+                    return;
+                }
+
+                // Si es un resaltado, solo se borra el texto de la nota.
+                Swal.fire({
+                    target: '.app-container',
+                    title: '¿Quitar nota del resaltado?',
+                    text: "El resaltado en el PDF permanecerá. La nota desaparecerá de esta lista.",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    confirmButtonText: 'Sí, quitar nota',
+                    cancelButtonText: 'Cancelar'
+                }).then(async (result) => {
+                    if (result.isConfirmed) {
+                        try {
+                            const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
+                            // Se actualiza el campo 'note' a un string vacío.
+                            await updateDoc(noteRef, { note: "" });
+                        } catch (error) {
+                            console.error("Error al quitar la nota:", error);
+                            Swal.fire({ target: '.app-container', title: 'Error', text: 'No se pudo quitar la nota.', icon: 'error' });
+                        }
+                    }
+                });
+            }
+
+            // Esta función ahora solo se usa para borrar notas de tipo 'texto'
+            function handleDeleteAnnotation(annotationId, noteCardElement) {
+                 Swal.fire({
+                    target: '.app-container',
+                    title: '¿Borrar esta nota?',
+                    text: "Esta acción no se puede deshacer.",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    confirmButtonText: 'Sí, borrar',
+                    cancelButtonText: 'Cancelar'
+                }).then(async (result) => {
+                    if (result.isConfirmed) {
+                        try {
+                            const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
+                            await deleteDoc(noteRef);
+                        } catch (error) {
+                            console.error("Error al borrar la anotación:", error);
+                            Swal.fire({ target: '.app-container', title: 'Error', text: 'No se pudo eliminar la anotación.', icon: 'error' });
+                        }
+                    }
+                });
+            }
+
             async function saveAnnotation(annotationData) {
                 const annotationsRef = collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations");
                 await addDoc(annotationsRef, { ...annotationData, createdAt: serverTimestamp() });
@@ -433,9 +462,7 @@
                 });
             }
             
-            // ... (El resto de las funciones como setActiveTool, loadPdfDocument, setupPagePlaceholders, etc. se mantienen igual que en la versión anterior y funcional)
-            
-            // --- Copiando el resto de funciones que no sufrieron cambios ---
+            // --- El resto del código sin cambios ---
             const DB_NAME = 'PapiroDigitalDB', STORE_NAME = 'pdfCache';
             function openDB() {
                 return new Promise((resolve, reject) => {
@@ -586,7 +613,7 @@
                 const ctx = canvas.getContext('2d');
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 (annotationsByPage[pageNum] || []).forEach(annotation => {
-                    if(annotation.path && annotation.path.length > 0) { // Solo dibujar si tiene trazado
+                    if(annotation.path && annotation.path.length > 0) {
                         drawPath(ctx, annotation)
                     }
                 });
@@ -678,7 +705,6 @@
                     speechSynthesis.speak(utterance);
                 });
             }
-
         });
     </script>
 </body>
