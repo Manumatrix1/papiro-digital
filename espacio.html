@@ -39,11 +39,10 @@
         }
         .tool-btn { background: none; border: none; color: #9ca3af; cursor: pointer; padding: 0.5rem; }
         .tool-btn.active { color: var(--primary-color); }
-        /* CAMBIO: CSS del panel ajustado para ser más robusto */
         #sidebar { 
             position: fixed; top: 0; right: 0;
-            width: 350px; /* Ancho fijo para consistencia */
-            max-width: 90vw; /* Asegura que no ocupe toda la pantalla en móviles */
+            width: 350px;
+            max-width: 90vw;
             height: 100%; 
             background-color: var(--surface-color); 
             transition: transform 0.3s ease-in-out; 
@@ -140,6 +139,7 @@
         <div id="sidebar-overlay"></div>
     </div>
 
+
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
     </script>
@@ -178,6 +178,29 @@
                 loadPdfDocument();
             }
             
+            // --- FUNCIONES DE CACHÉ (INDEXEDDB) RESTAURADAS ---
+            const DB_NAME = 'PapiroDigitalDB', STORE_NAME = 'pdfCache';
+            function openDB() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(DB_NAME, 1);
+                    request.onerror = () => reject("Error al abrir IndexedDB.");
+                    request.onsuccess = () => resolve(request.result);
+                    request.onupgradeneeded = (event) => { event.target.result.createObjectStore(STORE_NAME, { keyPath: 'id' }); };
+                });
+            }
+            async function savePdfToDB(id, pdfData) {
+                const db = await openDB();
+                db.transaction([STORE_NAME], 'readwrite').objectStore(STORE_NAME).put({ id, data: pdfData });
+            }
+            async function getPdfFromDB(id) {
+                const db = await openDB();
+                return new Promise((resolve) => {
+                    const request = db.transaction([STORE_NAME], 'readonly').objectStore(STORE_NAME).get(id);
+                    request.onsuccess = () => resolve(request.result ? request.result.data : null);
+                    request.onerror = () => resolve(null);
+                });
+            }
+
             function setupAllEventListeners() {
                 document.getElementById('tool-select').addEventListener('click', () => setActiveTool('select'));
                 document.getElementById('tool-draw').addEventListener('click', () => setActiveTool('draw'));
@@ -190,7 +213,6 @@
                 sidebar.querySelector('#add-note-btn')?.addEventListener('click', handleAddNewNote);
                 sidebar.querySelector('#note-search-input')?.addEventListener('input', (e) => renderNotesToSidebar(e.target.value));
                 sidebar.querySelector('#close-sidebar-btn')?.addEventListener('click', () => sidebar.classList.remove('open'));
-                // CAMBIO: Listeners para los nuevos botones de limpieza
                 sidebar.querySelector('#clear-notes-btn')?.addEventListener('click', handleClearNotes);
                 sidebar.querySelector('#clear-all-btn')?.addEventListener('click', handleClearAll);
 
@@ -269,9 +291,100 @@
                     isPanning = false;
                 });
             }
-
-            // --- Funciones de Notas (con nuevas características) ---
             
+            // --- Todas las demás funciones ---
+            
+            async function loadPdfDocument() {
+                const statusText = document.getElementById('status-text');
+                try {
+                    statusText.textContent = 'Buscando en caché...';
+                    const cachedPdf = await getPdfFromDB(pdfId);
+                    let pdfData;
+                    if (cachedPdf) {
+                        statusText.textContent = 'Cargando desde caché...';
+                        pdfData = cachedPdf;
+                    } else {
+                        statusText.textContent = 'Descargando documento...';
+                        const pdfDocRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId);
+                        const docSnap = await getDoc(pdfDocRef);
+                        if (!docSnap.exists()) throw new Error("PDF no encontrado en Firebase");
+                        const response = await fetch(docSnap.data().url);
+                        pdfData = await response.arrayBuffer();
+                        await savePdfToDB(pdfId, pdfData);
+                    }
+                    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(pdfData) });
+                    pdfDocument = await loadingTask.promise;
+                    document.getElementById('status-indicator').style.display = 'none';
+                    pdfWrapper.style.display = 'block';
+                    await setupPagePlaceholders();
+                    loadAllAnnotations();
+                } catch (error) {
+                    console.error("Error al cargar PDF:", error);
+                    statusText.textContent = `Error: ${error.message}`;
+                }
+            }
+            
+            async function setupPagePlaceholders() {
+                pdfWrapper.innerHTML = '';
+                const page = await pdfDocument.getPage(1);
+                const viewport = page.getViewport({ scale: 1.0 });
+                const aspectRatio = viewport.height / viewport.width;
+                let totalHeight = 0;
+                const containerWidth = scrollContainer.clientWidth;
+                const pageRenderWidth = containerWidth * 0.95;
+                for (let i = 1; i <= pdfDocument.numPages; i++) {
+                    const pageContainer = document.createElement('div');
+                    pageContainer.className = 'pdf-page-container';
+                    pageContainer.dataset.pageNumber = i;
+                    const pageHeight = pageRenderWidth * aspectRatio;
+                    pageContainer.style.height = `${pageHeight}px`;
+                    pdfWrapper.appendChild(pageContainer);
+                    totalHeight += pageHeight + 16;
+                }
+                originalContentSize = { width: containerWidth, height: totalHeight - 16 };
+                zoomContainer.style.width = `${originalContentSize.width}px`;
+                zoomContainer.style.height = `${originalContentSize.height}px`;
+                pdfWrapper.style.width = `${originalContentSize.width}px`;
+                startPageObserver();
+                updatePageIndicator();
+                setActiveTool('select'); 
+            }
+            
+            async function renderPage(pageContainer, pageNum) {
+                if (!pdfDocument) return;
+                const page = await pdfDocument.getPage(pageNum);
+                const scale = 2.0;
+                const viewport = page.getViewport({ scale: scale });
+                const canvas = document.createElement('canvas');
+                const annotationCanvas = document.createElement('canvas');
+                canvas.width = annotationCanvas.width = viewport.width;
+                canvas.height = annotationCanvas.height = viewport.height;
+                annotationCanvas.className = 'annotation-canvas';
+                annotationCanvas.dataset.pageNum = pageNum;
+                pageContainer.innerHTML = '';
+                pageContainer.append(canvas, annotationCanvas);
+                await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+                redrawAnnotations(pageNum);
+            }
+            
+            function startPageObserver() {
+                if (pageIntersectionObserver) pageIntersectionObserver.disconnect();
+                const options = { root: scrollContainer, rootMargin: '500px 0px' };
+                pageIntersectionObserver = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const pageContainer = entry.target;
+                            if (pageContainer.querySelector('canvas')) return;
+                            const pageNum = parseInt(pageContainer.dataset.pageNumber);
+                            renderPage(pageContainer, pageNum);
+                        }
+                    });
+                }, options);
+                document.querySelectorAll('.pdf-page-container').forEach(page => {
+                    pageIntersectionObserver.observe(page);
+                });
+            }
+
             async function handleAddNewNote() {
                 const { value: formValues } = await Swal.fire({
                     target: '.app-container', title: 'Nueva Nota de Texto',
@@ -296,7 +409,6 @@
                         return { note, page, color };
                     }
                 });
-
                 if (formValues) {
                     await saveAnnotation({
                         type: 'text', note: formValues.note, page: formValues.page,
@@ -304,8 +416,7 @@
                     });
                 }
             }
-
-            // CAMBIO: Nueva función para limpiar solo las notas
+            
             async function handleClearNotes() {
                 const result = await Swal.fire({
                     target: '.app-container', title: '¿Limpiar todas las notas?',
@@ -313,7 +424,6 @@
                     icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33',
                     confirmButtonText: 'Sí, limpiar notas', cancelButtonText: 'Cancelar'
                 });
-
                 if (result.isConfirmed) {
                     const batch = writeBatch(db);
                     const notesToClear = Object.values(annotationsByPage).flat().filter(a => a.note);
@@ -326,7 +436,6 @@
                 }
             }
 
-            // CAMBIO: Nueva función para limpiar todo el documento
             async function handleClearAll() {
                  const result = await Swal.fire({
                     target: '.app-container', title: '¿Limpiar todo el documento?',
@@ -334,7 +443,6 @@
                     icon: 'error', showCancelButton: true, confirmButtonColor: '#d33',
                     confirmButtonText: 'Sí, borrar todo', cancelButtonText: 'Cancelar'
                 });
-
                 if (result.isConfirmed) {
                     const batch = writeBatch(db);
                     const allAnnotations = Object.values(annotationsByPage).flat();
@@ -354,16 +462,13 @@
                     .flat()
                     .filter(a => a.id && (a.note || a.type === 'highlight'))
                     .sort((a, b) => (a.page - b.page) || ((a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)));
-
                 const filteredAnnotations = lowerCaseSearchTerm ? 
                     allAnnotations.filter(a => a.note && a.note.toLowerCase().includes(lowerCaseSearchTerm)) : 
                     allAnnotations;
-
                 if (filteredAnnotations.length === 0) {
                     notesList.innerHTML = `<p class="text-gray-500 text-center p-4">No se encontraron notas.</p>`;
                     return;
                 }
-                
                 filteredAnnotations.forEach(annotation => {
                     const card = document.createElement('div');
                     card.className = 'note-card relative p-3 rounded-lg border border-transparent hover:border-gray-700 hover:bg-gray-800/50';
@@ -387,19 +492,14 @@
             }
 
             async function handleEditNote(annotationId) {
-                if (!annotationId) {
-                    Swal.fire({ target: '.app-container', title: 'Error', text: 'No se pudo identificar la nota para editar.', icon: 'error' });
-                    return;
-                }
+                if (!annotationId) return;
                 const originalAnnotation = Object.values(annotationsByPage).flat().find(a => a.id === annotationId);
                 if (!originalAnnotation) return;
-                
                 const { value: newNote } = await Swal.fire({
                     target: '.app-container', title: 'Editar nota', input: 'textarea', 
                     inputValue: originalAnnotation.note || '', showCancelButton: true, 
                     confirmButtonText: 'Guardar', cancelButtonText: 'Cancelar'
                 });
-
                 if (typeof newNote === 'string') {
                     const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
                     await updateDoc(noteRef, { note: newNote });
@@ -421,8 +521,6 @@
                 });
             }
 
-            // --- El resto del código sin cambios ---
-            
             async function saveAnnotation(annotationData) {
                 const annotationsRef = collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations");
                 await addDoc(annotationsRef, { ...annotationData, createdAt: serverTimestamp() });
@@ -459,98 +557,7 @@
                     canvas.style.pointerEvents = (tool === 'select') ? 'none' : 'auto';
                 });
             }
-
-            async function loadPdfDocument() {
-                const statusText = document.getElementById('status-text');
-                try {
-                    statusText.textContent = 'Buscando en caché...';
-                    const cachedPdf = await getPdfFromDB(pdfId);
-                    let pdfData;
-                    if (cachedPdf) {
-                        statusText.textContent = 'Cargando desde caché...';
-                        pdfData = cachedPdf;
-                    } else {
-                        statusText.textContent = 'Descargando documento...';
-                        const pdfDocRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId);
-                        const docSnap = await getDoc(pdfDocRef);
-                        if (!docSnap.exists()) throw new Error("PDF no encontrado en Firebase");
-                        const response = await fetch(docSnap.data().url);
-                        pdfData = await response.arrayBuffer();
-                        await savePdfToDB(pdfId, pdfData);
-                    }
-                    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(pdfData) });
-                    pdfDocument = await loadingTask.promise;
-                    document.getElementById('status-indicator').style.display = 'none';
-                    pdfWrapper.style.display = 'block';
-                    await setupPagePlaceholders();
-                    loadAllAnnotations();
-                } catch (error) {
-                    console.error("Error al cargar PDF:", error);
-                    statusText.textContent = `Error: ${error.message}`;
-                }
-            }
-
-            async function setupPagePlaceholders() {
-                pdfWrapper.innerHTML = '';
-                const page = await pdfDocument.getPage(1);
-                const viewport = page.getViewport({ scale: 1.0 });
-                const aspectRatio = viewport.height / viewport.width;
-                let totalHeight = 0;
-                const containerWidth = scrollContainer.clientWidth;
-                const pageRenderWidth = containerWidth * 0.95;
-                for (let i = 1; i <= pdfDocument.numPages; i++) {
-                    const pageContainer = document.createElement('div');
-                    pageContainer.className = 'pdf-page-container';
-                    pageContainer.dataset.pageNumber = i;
-                    const pageHeight = pageRenderWidth * aspectRatio;
-                    pageContainer.style.height = `${pageHeight}px`;
-                    pdfWrapper.appendChild(pageContainer);
-                    totalHeight += pageHeight + 16;
-                }
-                originalContentSize = { width: containerWidth, height: totalHeight - 16 };
-                zoomContainer.style.width = `${originalContentSize.width}px`;
-                zoomContainer.style.height = `${originalContentSize.height}px`;
-                pdfWrapper.style.width = `${originalContentSize.width}px`;
-                startPageObserver();
-                updatePageIndicator();
-                setActiveTool('select'); 
-            }
-
-            async function renderPage(pageContainer, pageNum) {
-                if (!pdfDocument) return;
-                const page = await pdfDocument.getPage(pageNum);
-                const scale = 2.0;
-                const viewport = page.getViewport({ scale: scale });
-                const canvas = document.createElement('canvas');
-                const annotationCanvas = document.createElement('canvas');
-                canvas.width = annotationCanvas.width = viewport.width;
-                canvas.height = annotationCanvas.height = viewport.height;
-                annotationCanvas.className = 'annotation-canvas';
-                annotationCanvas.dataset.pageNum = pageNum;
-                pageContainer.innerHTML = '';
-                pageContainer.append(canvas, annotationCanvas);
-                await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-                redrawAnnotations(pageNum);
-            }
-
-            function startPageObserver() {
-                if (pageIntersectionObserver) pageIntersectionObserver.disconnect();
-                const options = { root: scrollContainer, rootMargin: '500px 0px' };
-                pageIntersectionObserver = new IntersectionObserver((entries) => {
-                    entries.forEach(entry => {
-                        if (entry.isIntersecting) {
-                            const pageContainer = entry.target;
-                            if (pageContainer.querySelector('canvas')) return;
-                            const pageNum = parseInt(pageContainer.dataset.pageNumber);
-                            renderPage(pageContainer, pageNum);
-                        }
-                    });
-                }, options);
-                document.querySelectorAll('.pdf-page-container').forEach(page => {
-                    pageIntersectionObserver.observe(page);
-                });
-            }
-
+            
             function startDrawing(e) { 
                 if (activeTool === 'select' || !e.touches) return;
                 e.preventDefault();
@@ -560,7 +567,6 @@
                     currentPath = [getCoords(e, canvas)];
                 }
             }
-
             function draw(e) {
                 if (!isDrawing) return;
                 const canvas = findCanvasUnderPointer(e);
@@ -569,8 +575,6 @@
                     redrawAnnotations(canvas.dataset.pageNum);
                 }
             }
-
-            // CAMBIO: Lógica de guardado de la goma reforzada
             async function stopDrawing(e) {
                 if (!isDrawing) return;
                 isDrawing = false;
@@ -594,7 +598,6 @@
                 }
                 currentPath = [];
             }
-
             function getCoords(e, canvas) {
                 const rect = canvas.getBoundingClientRect();
                 const touch = e.touches ? e.touches[0] : (e.changedTouches ? e.changedTouches[0] : e);
@@ -602,7 +605,6 @@
                 const scaleY = canvas.height / rect.height;
                 return { x: (touch.clientX - rect.left) * scaleX, y: (touch.clientY - rect.top) * scaleY };
             }
-
             function findCanvasUnderPointer(e, isEndEvent = false) {
                 const touch = isEndEvent ? (e.changedTouches ? e.changedTouches[0] : e) : (e.touches ? e.touches[0] : e);
                 if (!touch) return null;
@@ -612,7 +614,6 @@
                 canvases.forEach(c => c.style.pointerEvents = (activeTool === 'select') ? 'none' : 'auto');
                 return element ? element.closest('.pdf-page-container')?.querySelector('.annotation-canvas') : null;
             }
-
             function redrawAnnotations(pageNum) {
                 const canvas = document.querySelector(`.annotation-canvas[data-page-num='${pageNum}']`);
                 if (!canvas) return;
@@ -627,7 +628,6 @@
                     drawPath(ctx, { type: activeTool, path: currentPath, color: activeColor });
                 }
             }
-
             function drawPath(ctx, annotation) {
                 if (!annotation.path || annotation.path.length < 2) return;
                 ctx.save();
@@ -648,7 +648,6 @@
                 ctx.stroke();
                 ctx.restore();
             }
-
             function updatePageIndicator() {
                 if(!pdfDocument) return;
                 const indicator = document.getElementById('page-indicator');
@@ -667,7 +666,6 @@
                 currentPageNum = mostVisiblePage;
                 indicator.textContent = `${currentPageNum} / ${pdfDocument.numPages}`;
             }
-
             window.scrollToPage = (pageNum) => {
                 const pageNumInt = parseInt(pageNum);
                 const pageEl = document.querySelector(`.pdf-page-container[data-page-number='${pageNumInt}']`);
@@ -676,7 +674,6 @@
                     document.getElementById('sidebar').classList.remove('open');
                 }
             };
-
             async function toggleReadAloud() {
                 let isReading = speechSynthesis.speaking;
                 const btn = document.getElementById('read-aloud-btn');
@@ -697,7 +694,6 @@
                 }
                 btn.classList.remove('text-[var(--primary-color)]');
             }
-
             function speakText(text) {
                 return new Promise(resolve => {
                     if (!speechSynthesis) return resolve(false);
