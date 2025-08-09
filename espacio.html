@@ -382,7 +382,239 @@
                 });
             }
 
-            // CAMBIO: La función de guardado ya no muestra una ventana emergente al resaltar.
+            async function handleAddNewNote() {
+                const { value: formValues } = await Swal.fire({
+                    target: '.app-container', title: 'Nueva Nota de Texto',
+                    html: `
+                        <textarea id="swal-note" class="swal2-textarea" placeholder="Escribe tu nota..."></textarea>
+                        <input type="number" id="swal-page" class="swal2-input" placeholder="Número de página" min="1" max="${pdfDocument.numPages}">
+                        <input type="color" id="swal-color" class="swal2-input" value="#88c999" title="Color de la nota">
+                    `,
+                    focusConfirm: false, showCancelButton: true, confirmButtonText: 'Guardar',
+                    preConfirm: () => {
+                        const note = document.getElementById('swal-note').value;
+                        const page = parseInt(document.getElementById('swal-page').value);
+                        const color = document.getElementById('swal-color').value;
+                        if (!note || !page) {
+                            Swal.showValidationMessage('Por favor, completa la nota y el número de página');
+                            return false;
+                        }
+                        if (page < 1 || page > pdfDocument.numPages) {
+                            Swal.showValidationMessage(`El número de página debe estar entre 1 y ${pdfDocument.numPages}`);
+                            return false;
+                        }
+                        return { note, page, color };
+                    }
+                });
+                if (formValues) {
+                    await saveAnnotation({
+                        type: 'text', note: formValues.note, page: formValues.page,
+                        color: formValues.color, path: []
+                    });
+                }
+            }
+            
+            async function handleClearNotes() {
+                const result = await Swal.fire({
+                    target: '.app-container', title: '¿Limpiar todas las notas?',
+                    text: "Se borrará el texto de todas las notas, pero los resaltados y dibujos permanecerán. Esta acción no se puede deshacer.",
+                    icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33',
+                    confirmButtonText: 'Sí, limpiar notas', cancelButtonText: 'Cancelar'
+                });
+                if (result.isConfirmed) {
+                    const batch = writeBatch(db);
+                    const notesToClear = Object.values(annotationsByPage).flat().filter(a => a.note);
+                    notesToClear.forEach(annotation => {
+                        const docRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotation.id);
+                        batch.update(docRef, { note: "" });
+                    });
+                    await batch.commit();
+                    Swal.fire({ target: '.app-container', title: '¡Listo!', text: 'Se han limpiado todas las notas.', icon: 'success' });
+                }
+            }
+
+            async function handleClearAll() {
+                 const result = await Swal.fire({
+                    target: '.app-container', title: '¿Limpiar todo el documento?',
+                    text: "Se borrarán TODOS los resaltados, dibujos y notas de este PDF. Esta acción no se puede deshacer.",
+                    icon: 'error', showCancelButton: true, confirmButtonColor: '#d33',
+                    confirmButtonText: 'Sí, borrar todo', cancelButtonText: 'Cancelar'
+                });
+                if (result.isConfirmed) {
+                    const batch = writeBatch(db);
+                    const allAnnotations = Object.values(annotationsByPage).flat();
+                    allAnnotations.forEach(annotation => {
+                        const docRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotation.id);
+                        batch.delete(docRef);
+                    });
+                    await batch.commit();
+                    Swal.fire({ target: '.app-container', title: '¡Listo!', text: 'Se ha limpiado el documento.', icon: 'success' });
+                }
+            }
+
+            function renderNotesToSidebar(searchTerm = '') {
+                const lowerCaseSearchTerm = searchTerm.toLowerCase();
+                notesList.innerHTML = '';
+                const allAnnotations = Object.values(annotationsByPage)
+                    .flat()
+                    .filter(a => a.id && (a.note || a.type === 'highlight'))
+                    .sort((a, b) => (a.page - b.page) || ((a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)));
+                const filteredAnnotations = lowerCaseSearchTerm ? 
+                    allAnnotations.filter(a => a.note && a.note.toLowerCase().includes(lowerCaseSearchTerm)) : 
+                    allAnnotations;
+                if (filteredAnnotations.length === 0) {
+                    notesList.innerHTML = `<p class="text-gray-500 text-center p-4">No se encontraron notas.</p>`;
+                    return;
+                }
+                filteredAnnotations.forEach(annotation => {
+                    const card = document.createElement('div');
+                    card.className = 'note-card relative p-3 rounded-lg border border-transparent hover:border-gray-700 hover:bg-gray-800/50';
+                    card.dataset.id = annotation.id; 
+                    card.dataset.page = annotation.page;
+                    let noteContent = annotation.note ? `<p class="text-white text-sm break-words note-text">${annotation.note}</p>` : `<p class="text-gray-400 text-sm italic note-text">Resaltado sin nota.</p>`;
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <div class="flex items-center gap-2 mb-2 cursor-pointer flex-grow pr-16">
+                                <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color:${annotation.color};"></span>
+                                <span class="text-xs font-bold text-gray-400">Página ${annotation.page}</span>
+                            </div>
+                            <div class="note-actions absolute top-2 right-2 flex gap-1">
+                                <button class="edit-note-btn p-2 rounded-md bg-gray-700/80 hover:bg-gray-600 text-gray-300 hover:text-white" title="Editar Nota"><i class="fas fa-edit pointer-events-none"></i></button>
+                                <button class="delete-note-btn p-2 rounded-md bg-gray-700/80 hover:bg-red-500/80 text-gray-300 hover:text-white" title="Borrar Anotación"><i class="fas fa-trash pointer-events-none"></i></button>
+                            </div>
+                        </div>
+                        ${noteContent}`;
+                    notesList.appendChild(card);
+                });
+            }
+
+            async function handleEditNote(annotationId) {
+                if (!annotationId) return;
+                const originalAnnotation = Object.values(annotationsByPage).flat().find(a => a.id === annotationId);
+                if (!originalAnnotation) return;
+                const { value: newNote } = await Swal.fire({
+                    target: '.app-container', title: 'Editar nota', input: 'textarea', 
+                    inputValue: originalAnnotation.note || '', showCancelButton: true, 
+                    confirmButtonText: 'Guardar', cancelButtonText: 'Cancelar'
+                });
+                if (typeof newNote === 'string') {
+                    const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
+                    await updateDoc(noteRef, { note: newNote });
+                }
+            }
+            
+            // FUNCIÓN DE BORRADO RESTAURADA
+            function handleDeleteNote(annotationId) {
+                const annotation = Object.values(annotationsByPage).flat().find(a => a.id === annotationId);
+                if (!annotation) return;
+
+                if (annotation.type === 'text') {
+                    handleDeleteAnnotation(annotationId);
+                } else {
+                    handleDeleteNoteText(annotationId);
+                }
+            }
+
+            function handleDeleteNoteText(annotationId) {
+                Swal.fire({
+                    target: '.app-container',
+                    title: '¿Quitar nota del resaltado?',
+                    text: "El resaltado en el PDF permanecerá.",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    confirmButtonText: 'Sí, quitar nota',
+                    cancelButtonText: 'Cancelar'
+                }).then(async (result) => {
+                    if (result.isConfirmed) {
+                        try {
+                            const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
+                            await updateDoc(noteRef, { note: "" });
+                        } catch (error) {
+                            console.error("Error al quitar la nota:", error);
+                        }
+                    }
+                });
+            }
+
+            function handleDeleteAnnotation(annotationId) {
+                 Swal.fire({
+                    target: '.app-container',
+                    title: '¿Borrar esta nota?',
+                    text: "Esta acción no se puede deshacer.",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    confirmButtonText: 'Sí, borrar',
+                    cancelButtonText: 'Cancelar'
+                }).then(async (result) => {
+                    if (result.isConfirmed) {
+                        try {
+                            const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
+                            await deleteDoc(noteRef);
+                        } catch (error) {
+                            console.error("Error al borrar la anotación:", error);
+                        }
+                    }
+                });
+            }
+
+            async function saveAnnotation(annotationData) {
+                await addDoc(collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations"), {
+                    ...annotationData,
+                    createdAt: serverTimestamp()
+                });
+            }
+
+            function loadAllAnnotations() {
+                if (annotationsUnsubscribe) annotationsUnsubscribe();
+                const annotationsQuery = query(collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations"));
+                annotationsUnsubscribe = onSnapshot(annotationsQuery, (snapshot) => {
+                    annotationsByPage = {};
+                    snapshot.docs.forEach(doc => {
+                        const annotation = { id: doc.id, ...doc.data() };
+                        if (!annotationsByPage[annotation.page]) {
+                            annotationsByPage[annotation.page] = [];
+                        }
+                        annotationsByPage[annotation.page].push(annotation);
+                    });
+                    const currentSearch = document.getElementById('note-search-input')?.value || '';
+                    renderNotesToSidebar(currentSearch);
+                    document.querySelectorAll('.pdf-page-container').forEach(pageContainer => {
+                        if (pageContainer.querySelector('canvas')) {
+                             redrawAnnotations(pageContainer.dataset.pageNumber);
+                        }
+                    });
+                });
+            }
+            
+            function setActiveTool(tool) {
+                activeTool = tool;
+                document.querySelectorAll('#main-tools .tool-btn').forEach(btn => btn.classList.remove('active'));
+                document.getElementById(`tool-${tool}`).classList.add('active');
+                const canvases = document.querySelectorAll('.annotation-canvas');
+                canvases.forEach(canvas => {
+                    canvas.style.pointerEvents = (tool === 'select') ? 'none' : 'auto';
+                });
+            }
+            
+            function startDrawing(e) { 
+                if (activeTool === 'select' || !e.touches) return;
+                e.preventDefault();
+                isDrawing = true;
+                const canvas = findCanvasUnderPointer(e);
+                if (canvas) {
+                    currentPath = [getCoords(e, canvas)];
+                }
+            }
+            function draw(e) {
+                if (!isDrawing) return;
+                const canvas = findCanvasUnderPointer(e);
+                if (canvas) {
+                    currentPath.push(getCoords(e, canvas));
+                    redrawAnnotations(canvas.dataset.pageNum);
+                }
+            }
             async function stopDrawing(e) {
                 if (!isDrawing) return;
                 isDrawing = false;
@@ -392,168 +624,14 @@
                     return;
                 }
                 const pageNum = parseInt(canvas.dataset.pageNum);
-                let annotationData = {
-                    page: pageNum,
-                    type: activeTool,
-                    path: currentPath,
-                    color: activeColor,
-                    note: "" // Por defecto, la nota está vacía
-                };
-
-                // Guardar directamente sin preguntar
-                await saveAnnotation(annotationData);
-                currentPath = [];
-            }
-
-            // CAMBIO: El panel ahora muestra todos los resaltados, tengan o no nota.
-            function renderNotesToSidebar(searchTerm = '') {
-                const lowerCaseSearchTerm = searchTerm.toLowerCase();
-                notesList.innerHTML = '';
-                const allAnnotations = Object.values(annotationsByPage)
-                    .flat()
-                    .filter(a => a.id && (a.type === 'highlight' || a.type === 'text')) // Muestra resaltados y notas de texto
-                    .sort((a, b) => (a.page - b.page) || ((a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)));
-
-                const filteredAnnotations = lowerCaseSearchTerm ? 
-                    allAnnotations.filter(a => a.note && a.note.toLowerCase().includes(lowerCaseSearchTerm)) : 
-                    allAnnotations;
-
-                if (filteredAnnotations.length === 0) {
-                    notesList.innerHTML = `<p class="text-gray-500 text-center p-4">No se encontraron notas.</p>`;
-                    return;
-                }
-                
-                filteredAnnotations.forEach(annotation => {
-                    const card = document.createElement('div');
-                    card.className = 'note-card relative p-3 rounded-lg border border-transparent hover:border-gray-700 hover:bg-gray-800/50';
-                    card.dataset.id = annotation.id; 
-                    card.dataset.page = annotation.page;
-                    
-                    let noteContent = annotation.note ? `<p class="text-white text-sm break-words note-text">${annotation.note}</p>` : `<p class="text-gray-400 text-sm italic note-text">Resaltado sin nota.</p>`;
-                    
-                    // Lógica para el botón de borrar
-                    const hasNote = annotation.note && annotation.note.trim() !== '';
-                    const deleteButtonTitle = hasNote ? 'Borrar texto de la nota' : 'Borrar resaltado';
-                    const deleteButtonIcon = hasNote ? 'fa-comment-slash' : 'fa-trash-can';
-                    
-                    card.innerHTML = `
-                        <div class="flex justify-between items-start">
-                            <div class="flex items-center gap-2 mb-2 cursor-pointer flex-grow pr-16">
-                                <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color:${annotation.color};"></span>
-                                <span class="text-xs font-bold text-gray-400">Página ${annotation.page}</span>
-                            </div>
-                            <div class="note-actions absolute top-2 right-2 flex gap-1">
-                                <button class="edit-note-btn p-2 rounded-md bg-gray-700/80 hover:bg-gray-600 text-gray-300 hover:text-white" title="Añadir/Editar Nota"><i class="fas fa-edit pointer-events-none"></i></button>
-                                <button class="delete-note-btn p-2 rounded-md bg-gray-700/80 hover:bg-red-500/80 text-gray-300 hover:text-white" title="${deleteButtonTitle}"><i class="fas ${deleteButtonIcon} pointer-events-none"></i></button>
-                            </div>
-                        </div>
-                        ${noteContent}`;
-                    notesList.appendChild(card);
-                });
-            }
-
-            // CAMBIO: La lógica de borrado es ahora más inteligente.
-            function handleDeleteNote(annotationId) {
-                if (!annotationId) return;
-                const annotation = Object.values(annotationsByPage).flat().find(a => a.id === annotationId);
-                if (!annotation) return;
-
-                const hasNote = annotation.note && annotation.note.trim() !== '';
-
-                if (hasNote) {
-                    // Si tiene nota, solo borra el texto de la nota
-                    Swal.fire({
-                        target: '.app-container',
-                        title: '¿Quitar nota del resaltado?',
-                        text: "El resaltado en el PDF permanecerá. La nota desaparecerá de esta lista.",
-                        icon: 'warning',
-                        showCancelButton: true,
-                        confirmButtonText: 'Sí, quitar nota',
-                    }).then(async (result) => {
-                        if (result.isConfirmed) {
-                            const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
-                            await updateDoc(noteRef, { note: "" });
-                        }
-                    });
+                if (activeTool === 'erase') {
+                    await saveAnnotation({ page: pageNum, type: 'erase', path: currentPath, color: '#000000' });
+                } else if (activeTool === 'highlight') {
+                    await saveAnnotation({ page: pageNum, type: activeTool, path: currentPath, color: activeColor, note: "" });
                 } else {
-                    // Si no tiene nota (o es de tipo texto), borra toda la anotación
-                    Swal.fire({
-                        target: '.app-container',
-                        title: '¿Borrar esta anotación?',
-                        text: "Esta acción no se puede deshacer.",
-                        icon: 'warning',
-                        showCancelButton: true,
-                        confirmButtonColor: '#d33',
-                        confirmButtonText: 'Sí, borrar',
-                    }).then(async (result) => {
-                        if (result.isConfirmed) {
-                            const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
-                            await deleteDoc(noteRef);
-                        }
-                    });
+                    await saveAnnotation({ page: pageNum, type: activeTool, path: currentPath, color: activeColor, note: "" });
                 }
-            }
-            
-            // --- El resto de funciones se mantienen igual que en la versión anterior ---
-            async function handleEditNote(annotationId) {
-                if (!annotationId) return;
-                const originalAnnotation = Object.values(annotationsByPage).flat().find(a => a.id === annotationId);
-                if (!originalAnnotation) return;
-                const { value: newNote } = await Swal.fire({
-                    target: '.app-container', title: 'Añadir/Editar nota', input: 'textarea', 
-                    inputValue: originalAnnotation.note || '', showCancelButton: true, 
-                    confirmButtonText: 'Guardar', cancelButtonText: 'Cancelar'
-                });
-                if (typeof newNote === 'string') {
-                    const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
-                    await updateDoc(noteRef, { note: newNote });
-                }
-            }
-            async function saveAnnotation(annotationData) {
-                await addDoc(collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations"), {
-                    ...annotationData,
-                    createdAt: serverTimestamp()
-                });
-            }
-            function loadAllAnnotations() {
-                if (annotationsUnsubscribe) annotationsUnsubscribe();
-                const annotationsQuery = query(collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations"));
-                annotationsUnsubscribe = onSnapshot(annotationsQuery, (snapshot) => {
-                    annotationsByPage = {};
-                    snapshot.docs.forEach(doc => {
-                        const annotation = { id: doc.id, ...doc.data() };
-                        if (!annotationsByPage[annotation.page]) annotationsByPage[annotation.page] = [];
-                        annotationsByPage[annotation.page].push(annotation);
-                    });
-                    const currentSearch = document.getElementById('note-search-input')?.value || '';
-                    renderNotesToSidebar(currentSearch);
-                    document.querySelectorAll('.pdf-page-container').forEach(pageContainer => {
-                        if (pageContainer.querySelector('canvas')) redrawAnnotations(pageContainer.dataset.pageNumber);
-                    });
-                });
-            }
-            function setActiveTool(tool) {
-                activeTool = tool;
-                document.querySelectorAll('#main-tools .tool-btn').forEach(btn => btn.classList.remove('active'));
-                document.getElementById(`tool-${tool}`).classList.add('active');
-                document.querySelectorAll('.annotation-canvas').forEach(canvas => {
-                    canvas.style.pointerEvents = (tool === 'select') ? 'none' : 'auto';
-                });
-            }
-            function startDrawing(e) { 
-                if (activeTool === 'select' || !e.touches) return;
-                e.preventDefault();
-                isDrawing = true;
-                const canvas = findCanvasUnderPointer(e);
-                if (canvas) currentPath = [getCoords(e, canvas)];
-            }
-            function draw(e) {
-                if (!isDrawing) return;
-                const canvas = findCanvasUnderPointer(e);
-                if (canvas) {
-                    currentPath.push(getCoords(e, canvas));
-                    redrawAnnotations(canvas.dataset.pageNum);
-                }
+                currentPath = [];
             }
             function getCoords(e, canvas) {
                 const rect = canvas.getBoundingClientRect();
@@ -619,10 +697,42 @@
                 }
             };
             async function toggleReadAloud() {
-                // ... (código existente sin cambios)
+                let isReading = speechSynthesis.speaking;
+                const btn = document.getElementById('read-aloud-btn');
+                if (isReading) {
+                    speechSynthesis.cancel();
+                    btn.classList.remove('text-[var(--primary-color)]');
+                    return;
+                }
+                btn.classList.add('text-[var(--primary-color)]');
+                for (let i = currentPageNum; i <= pdfDocument.numPages; i++) {
+                    if (!speechSynthesis.speaking && i > currentPageNum) break;
+                    scrollToPage(i); 
+                    const page = await pdfDocument.getPage(i);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    const shouldContinue = await speakText(pageText);
+                    if (!shouldContinue) break;
+                }
+                btn.classList.remove('text-[var(--primary-color)]');
             }
             function speakText(text) {
-                // ... (código existente sin cambios)
+                return new Promise(resolve => {
+                    if (!speechSynthesis) return resolve(false);
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'es-ES';
+                    let cancelled = false;
+                    utterance.onend = () => resolve(!cancelled);
+                    utterance.onerror = () => resolve(false);
+                    const checkCancelInterval = setInterval(() => {
+                        if (!speechSynthesis.speaking) {
+                            cancelled = true;
+                            clearInterval(checkCancelInterval);
+                            resolve(false);
+                        }
+                    }, 250);
+                    speechSynthesis.speak(utterance);
+                });
             }
         });
     </script>
