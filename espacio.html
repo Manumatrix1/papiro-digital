@@ -424,11 +424,12 @@
                     type: activeTool,
                     path: [...currentPath],
                     color: activeColor,
-                    note: ""
+                    note: "",
+                    youtubeLink: ""
                 };
                 try {
                     const docRef = await saveAnnotation(annotationData);
-                    showPromoteButton(docRef.id, e, canvas);
+                    showPromoteButton(docRef.id, annotationData, e, canvas);
                 } catch (error) {
                     console.error("Error al guardar la anotación inicial:", error);
                 }
@@ -436,17 +437,24 @@
                 drawingStartPoint = null;
             }
 
-            function showPromoteButton(annotationId, endEvent, canvas) {
+            function showPromoteButton(annotationId, annotationData, endEvent, canvas) {
                 clearPromoteButton();
                 const rect = canvas.getBoundingClientRect();
-                const touch = endEvent.changedTouches[0] || endEvent;
                 const btn = document.createElement('button');
                 btn.id = 'promote-note-btn';
                 btn.textContent = 'G';
                 btn.title = 'Guardar en el Cuaderno';
 
-                btn.style.left = `${touch.clientX - rect.left + scrollContainer.scrollLeft + 15}px`;
-                btn.style.top = `${touch.clientY - rect.top + scrollContainer.scrollTop - 18}px`;
+                const startPoint = annotationData.path[0];
+                const endPoint = annotationData.path[annotationData.path.length - 1];
+                const midPointXCanvas = (startPoint.x + endPoint.x) / 2;
+                
+                const scaleX = rect.width / canvas.width;
+                const cssX = (midPointXCanvas * scaleX) + rect.left + scrollContainer.scrollLeft - (36 / 2); // 36 is button width
+                const cssY = (startPoint.y * scaleX) + rect.top + scrollContainer.scrollTop - 45; // 45px above
+
+                btn.style.left = `${cssX}px`;
+                btn.style.top = `${cssY}px`;
 
                 const handleClick = (e) => {
                     e.stopPropagation();
@@ -457,10 +465,10 @@
 
                 btn.addEventListener('click', handleClick);
                 btn.addEventListener('touchend', handleClick);
+                
+                appContainer.appendChild(btn);
 
-                pdfWrapper.appendChild(btn);
-
-                setTimeout(clearPromoteButton, 5000);
+                setTimeout(clearPromoteButton, 2000);
             }
 
             function clearPromoteButton() {
@@ -523,7 +531,7 @@
                     const batch = writeBatch(db);
                     Object.values(annotationsByPage).flat().filter(a => a.note).forEach(a => {
                         const docRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", a.id);
-                        batch.update(docRef, { note: "" });
+                        batch.update(docRef, { note: "", youtubeLink: "" });
                     });
                     await batch.commit();
                 }
@@ -583,7 +591,9 @@
                                 <button class="delete-note-btn p-2 rounded-md bg-gray-700/80 hover:bg-red-500/80" title="Borrar Anotación"><i class="fas fa-trash pointer-events-none"></i></button>
                             </div>
                         </div>
-                        <p class="text-white text-sm break-words note-text">${annotation.note}</p>`;
+                        <p class="text-white text-sm break-words note-text mb-1">${annotation.note}</p>
+                        ${annotation.youtubeLink ? `<p class="text-gray-400 text-xs break-words"><a href="${annotation.youtubeLink}" target="_blank" class="hover:underline">${annotation.youtubeLink}</a></p>` : ''}
+                        `;
                     notesList.appendChild(card);
                 });
             }
