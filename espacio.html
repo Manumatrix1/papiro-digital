@@ -95,12 +95,17 @@
         document.addEventListener('DOMContentLoaded', () => {
             
             let currentUser, projectId, pdfId, pdfDocument, annotationsUnsubscribe;
-            let activeTool = 'select', activeColor = '#FFDD00', isDrawing = false;
-            let annotationsByPage = {}, currentPath = [];
+            let activeTool = 'select', activeColor = '#FFDD00';
+            let annotationsByPage = {};
             let currentPageNum = 1;
             let zoomScale = 1.0;
-            let isPanning = false, panStart = { x: 0, y: 0 }, scrollStart = { left: 0, top: 0 };
-            let originalContentSize = { width: 0, height: 0 };
+            
+            // --- NUEVAS VARIABLES PARA CONTROL TÁCTIL MEJORADO ---
+            let isDrawing = false, isPanning = false, isZooming = false;
+            let currentPath = [];
+            let panStart = { x: 0, y: 0 }, scrollStart = { left: 0, top: 0 };
+            let initialDistance = null;
+            let touchStartPoint = null; // Para detectar si es un toque o un deslizamiento
             
             const appContainer = document.querySelector('.app-container');
             const zoomContainer = document.getElementById('zoom-container');
@@ -143,11 +148,11 @@
                 });
             }
             
+            // --- GESTIÓN DE EVENTOS (LÓGICA TÁCTIL REESCRITA) ---
             function setupAllEventListeners() {
                 document.getElementById('tool-select').addEventListener('click', () => setActiveTool('select'));
                 document.getElementById('tool-draw').addEventListener('click', () => setActiveTool('draw'));
                 document.getElementById('tool-highlight').addEventListener('click', () => setActiveTool('highlight'));
-                // CAMBIO: Event listener para la goma añadido
                 document.getElementById('tool-erase').addEventListener('click', () => setActiveTool('erase'));
 
                 document.getElementById('color-picker').addEventListener('input', (e) => activeColor = e.target.value);
@@ -174,74 +179,109 @@
                     if (!noteCard) return;
 
                     const editBtn = e.target.closest('.edit-note-btn');
-                    if (editBtn) {
-                        handleEditNote(editBtn.dataset.id, noteCard);
-                        return;
-                    }
+                    if (editBtn) { handleEditNote(editBtn.dataset.id, noteCard); return; }
 
                     const deleteBtn = e.target.closest('.delete-note-btn');
-                    if (deleteBtn) {
-                        handleDeleteNote(deleteBtn.dataset.id, noteCard);
-                        return;
-                    }
+                    if (deleteBtn) { handleDeleteNote(deleteBtn.dataset.id, noteCard); return; }
                     
                     const pageToGo = noteCard.dataset.page;
-                    if (pageToGo) {
-                        scrollToPage(pageToGo);
-                    }
+                    if (pageToGo) { scrollToPage(pageToGo); }
                 });
+                
+                // EVENTOS TÁCTILES CORREGIDOS
+                pdfWrapper.addEventListener('touchstart', handleTouchStart, { passive: false });
+                pdfWrapper.addEventListener('touchmove', handleTouchMove, { passive: false });
+                pdfWrapper.addEventListener('touchend', handleTouchEnd, { passive: false });
+            }
 
-                let initialDistance = null;
-                pdfWrapper.addEventListener('touchstart', (e) => {
-                    if (activeTool !== 'select') { startDrawing(e); } 
-                    else if (e.touches.length === 2) {
-                        isPanning = false;
-                        initialDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-                    } else if (e.touches.length === 1 && zoomScale > 1.01) {
+            function handleTouchStart(e) {
+                // Manejar zoom con dos dedos
+                if (e.touches.length === 2) {
+                    isZooming = true;
+                    isPanning = false;
+                    initialDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+                    e.preventDefault();
+                    return;
+                }
+
+                // Manejar un solo dedo
+                if (e.touches.length === 1) {
+                    const touch = e.touches[0];
+                    touchStartPoint = { x: touch.pageX, y: touch.pageY }; // Guardar punto de inicio
+
+                    if (activeTool === 'select' && zoomScale > 1.01) {
                         isPanning = true;
-                        panStart.x = e.touches[0].pageX;
-                        panStart.y = e.touches[0].pageY;
+                        panStart.x = touch.pageX;
+                        panStart.y = touch.pageY;
                         scrollStart.left = scrollContainer.scrollLeft;
                         scrollStart.top = scrollContainer.scrollTop;
                     }
-                }, { passive: false });
+                }
+            }
 
-                pdfWrapper.addEventListener('touchmove', (e) => {
-                    if (isDrawing || isPanning || (e.touches.length === 2 && activeTool === 'select')) { e.preventDefault(); }
-                    if (isDrawing) { draw(e); } 
-                    else if (initialDistance && e.touches.length === 2) {
-                        const newDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-                        const scaleAmount = newDistance / initialDistance;
-                        zoomScale = Math.min(Math.max(1.0, zoomScale * scaleAmount), 5.0);
-                        pdfWrapper.style.transform = `scale(${zoomScale})`;
-                        zoomContainer.style.width = `${originalContentSize.width * zoomScale}px`;
-                        zoomContainer.style.height = `${originalContentSize.height * zoomScale}px`;
-                        initialDistance = newDistance;
-                    } else if (isPanning) {
-                        const dx = e.touches[0].pageX - panStart.x;
-                        const dy = e.touches[0].pageY - panStart.y;
-                        scrollContainer.scrollLeft = scrollStart.left - dx;
-                        scrollContainer.scrollTop = scrollStart.top - dy;
+            function handleTouchMove(e) {
+                if (isZooming && e.touches.length === 2) {
+                    e.preventDefault();
+                    const newDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+                    const scaleAmount = newDistance / initialDistance;
+                    zoomScale = Math.min(Math.max(1.0, zoomScale * scaleAmount), 5.0);
+                    pdfWrapper.style.transform = `scale(${zoomScale})`;
+                    zoomContainer.style.width = `${originalContentSize.width * zoomScale}px`;
+                    zoomContainer.style.height = `${originalContentSize.height * zoomScale}px`;
+                    initialDistance = newDistance;
+                    return;
+                }
+
+                if (isPanning && e.touches.length === 1) {
+                    e.preventDefault();
+                    const dx = e.touches[0].pageX - panStart.x;
+                    const dy = e.touches[0].pageY - panStart.y;
+                    scrollContainer.scrollLeft = scrollStart.left - dx;
+                    scrollContainer.scrollTop = scrollStart.top - dy;
+                    return;
+                }
+
+                // Si no es la herramienta de seleccionar, vemos si debemos empezar a dibujar
+                if (activeTool !== 'select' && e.touches.length === 1 && touchStartPoint) {
+                    const touch = e.touches[0];
+                    const movedX = Math.abs(touch.pageX - touchStartPoint.x);
+                    const movedY = Math.abs(touch.pageY - touchStartPoint.y);
+
+                    // Solo empezar a dibujar si el dedo se movió más de 5px para evitar empezar en un scroll
+                    if (!isDrawing && (movedX > 5 || movedY > 5)) {
+                        startDrawing(e);
                     }
-                }, { passive: false });
 
-                pdfWrapper.addEventListener('touchend', (e) => {
-                    if (isDrawing) stopDrawing(e);
-                    if (e.touches.length < 2) initialDistance = null;
-                    isPanning = false;
-                });
+                    if (isDrawing) {
+                        e.preventDefault();
+                        draw(e);
+                    }
+                }
+            }
+
+            function handleTouchEnd(e) {
+                // Si el toque terminó y no estábamos dibujando, no hacer nada
+                if (isDrawing) {
+                    stopDrawing(e);
+                }
+                
+                // Reiniciar todos los estados
+                isDrawing = false;
+                isPanning = false;
+                isZooming = false;
+                initialDistance = null;
+                touchStartPoint = null;
+                currentPath = [];
             }
             
+            // --- LÓGICA DE CONTROL ---
             function setActiveTool(tool) {
                 activeTool = tool;
                 document.querySelectorAll('#main-tools .tool-btn').forEach(btn => btn.classList.remove('active'));
                 document.getElementById(`tool-${tool}`).classList.add('active');
-                const canvases = document.querySelectorAll('.annotation-canvas');
-                canvases.forEach(canvas => {
-                    canvas.style.touchAction = (tool === 'select') ? 'auto' : 'none';
-                });
             }
 
+            // --- CARGA Y RENDERIZADO (sin cambios) ---
             async function loadPdfDocument() {
                 const statusText = document.getElementById('status-text');
                 try {
@@ -289,8 +329,7 @@
                     pdfWrapper.appendChild(pageContainer);
                     totalHeight += pageHeight + 16;
                 }
-                originalContentSize.width = containerWidth;
-                originalContentSize.height = totalHeight - 16;
+                originalContentSize = { width: containerWidth, height: totalHeight - 16 };
                 zoomContainer.style.width = `${originalContentSize.width}px`;
                 zoomContainer.style.height = `${originalContentSize.height}px`;
                 pdfWrapper.style.width = `${originalContentSize.width}px`;
@@ -311,7 +350,6 @@
                 annotationCanvas.dataset.pageNum = pageNum;
                 pageContainer.innerHTML = '';
                 pageContainer.append(canvas, annotationCanvas);
-                annotationCanvas.style.touchAction = (activeTool === 'select') ? 'auto' : 'none';
                 await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
                 redrawAnnotations(pageNum);
             }
@@ -334,49 +372,46 @@
                 });
             }
             
-            function startDrawing(e) { 
-                if (activeTool === 'select' || !e.touches) return;
-                e.preventDefault();
+            // --- DIBUJO Y ANOTACIONES (Lógica mejorada) ---
+            function startDrawing(e) {
                 isDrawing = true;
+                e.preventDefault(); // Prevenir scroll solo cuando se confirma el dibujo
                 const canvas = findCanvasUnderPointer(e);
                 if (canvas) {
-                  currentPageNum = parseInt(canvas.dataset.pageNum);
-                  currentPath = [getCoords(e, canvas)];
+                    currentPath = [getCoords(e, canvas)];
                 }
             }
+
             function draw(e) {
-                if (!isDrawing || !e.touches) return;
-                e.preventDefault();
+                if (!isDrawing) return;
                 const canvas = findCanvasUnderPointer(e);
                 if (canvas) {
                     currentPath.push(getCoords(e, canvas));
                     redrawAnnotations(canvas.dataset.pageNum);
                 }
             }
+            
             async function stopDrawing(e) {
-                if (!isDrawing) return;
-                isDrawing = false;
-                const canvas = findCanvasUnderPointer(e, true);
-                if (!canvas || currentPath.length < 3) { currentPath = []; return; }
-                const pageNum = parseInt(canvas.dataset.pageNum);
-                
-                // No preguntar por notas si se está borrando
-                if (activeTool === 'erase') {
-                    await saveAnnotation({ page: pageNum, type: 'erase', path: currentPath, color: '#000000' });
+                if (!isDrawing || currentPath.length < 3) {
                     currentPath = [];
                     return;
                 }
+                const canvas = findCanvasUnderPointer(e, true);
+                if (!canvas) return;
 
-                let note = "";
-                if (activeTool === 'highlight') {
-                    const { value } = await Swal.fire({
+                const pageNum = parseInt(canvas.dataset.pageNum);
+                
+                if (activeTool === 'erase') {
+                    await saveAnnotation({ page: pageNum, type: 'erase', path: currentPath, color: '#000000' });
+                } else if (activeTool === 'highlight') {
+                    const { value: note } = await Swal.fire({
                         title: 'Añadir nota', input: 'textarea',
                         inputPlaceholder: 'Escribe tu comentario...', showCancelButton: true
                     });
-                    if (value) note = value;
+                    await saveAnnotation({ page: pageNum, type: activeTool, path: currentPath, color: activeColor, note: note || "" });
+                } else {
+                    await saveAnnotation({ page: pageNum, type: activeTool, path: currentPath, color: activeColor, note: "" });
                 }
-                await saveAnnotation({ page: pageNum, type: activeTool, path: currentPath, color: activeColor, note });
-                currentPath = [];
             }
 
             function getCoords(e, canvas) {
@@ -386,16 +421,19 @@
                 const scaleY = canvas.height / rect.height;
                 return { x: (touch.clientX - rect.left) * scaleX, y: (touch.clientY - rect.top) * scaleY };
             }
+
             function findCanvasUnderPointer(e, isEndEvent = false) {
                 const touch = isEndEvent ? (e.changedTouches ? e.changedTouches[0] : e) : (e.touches ? e.touches[0] : e);
                 if (!touch) return null;
                 const element = document.elementFromPoint(touch.clientX, touch.clientY);
                 return element ? element.closest('.pdf-page-container')?.querySelector('.annotation-canvas') : null;
             }
+
             async function saveAnnotation(annotationData) {
                 const annotationsRef = collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations");
                 await addDoc(annotationsRef, { ...annotationData, createdAt: serverTimestamp() });
             }
+
             function loadAllAnnotations() {
                 if (annotationsUnsubscribe) annotationsUnsubscribe();
                 const annotationsQuery = query(collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations"), orderBy("createdAt"));
@@ -416,16 +454,21 @@
                     renderNotesToSidebar();
                 });
             }
+
             function redrawAnnotations(pageNum) {
                 const canvas = document.querySelector(`.annotation-canvas[data-page-num='${pageNum}']`);
                 if (!canvas) return;
                 const ctx = canvas.getContext('2d');
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 (annotationsByPage[pageNum] || []).forEach(annotation => drawPath(ctx, annotation));
-                if (isDrawing && parseInt(canvas.dataset.pageNum) == currentPageNum) {
-                    drawPath(ctx, { type: activeTool, path: currentPath, color: activeColor });
+                if (isDrawing) {
+                    const currentPageCanvas = document.querySelector(`.annotation-canvas[data-page-num='${currentPageNum}']`);
+                    if (canvas === currentPageCanvas) {
+                        drawPath(ctx, { type: activeTool, path: currentPath, color: activeColor });
+                    }
                 }
             }
+
             function drawPath(ctx, annotation) {
                 if (!annotation.path || annotation.path.length < 2) return;
                 ctx.save();
@@ -436,10 +479,9 @@
                 ctx.moveTo(annotation.path[0].x, annotation.path[0].y);
                 annotation.path.forEach(point => ctx.lineTo(point.x, point.y));
                 
-                // Lógica de borrado existente
                 if (annotation.type === 'erase') {
                     ctx.globalCompositeOperation = 'destination-out';
-                    ctx.lineWidth = 40; // Grosor de la goma
+                    ctx.lineWidth = 40;
                 } else {
                     ctx.globalCompositeOperation = 'source-over';
                     ctx.lineWidth = annotation.type === 'highlight' ? 20 : 3;
@@ -448,6 +490,7 @@
                 ctx.stroke();
                 ctx.restore();
             }
+
             function updatePageIndicator() {
                 if(!pdfDocument) return;
                 const scrollCenterY = scrollContainer.scrollTop + scrollContainer.clientHeight / 2;
@@ -466,12 +509,12 @@
                 document.getElementById('page-indicator').textContent = `${currentPageNum} / ${pdfDocument.numPages}`;
             }
             
-            // CAMBIO: Lógica para mostrar/ocultar botones en la tarjeta de nota
+            // --- FUNCIONES DE NOTAS Y VOZ (sin cambios) ---
             function renderNotesToSidebar() {
                 notesList.innerHTML = '';
                 const allAnnotations = Object.values(annotationsByPage)
                     .flat()
-                    .filter(a => a.type === 'highlight') // Solo mostrar resaltados en la lista de notas
+                    .filter(a => a.type === 'highlight')
                     .sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0));
                 
                 if (allAnnotations.length === 0) {
@@ -481,7 +524,6 @@
                 
                 allAnnotations.forEach(annotation => {
                     const card = document.createElement('div');
-                    // `group` permite que los elementos hijos reaccionen al hover de la tarjeta
                     card.className = 'note-card group relative p-3 rounded-lg border border-transparent hover:border-gray-700 hover:bg-gray-800/50 transition-colors duration-200';
                     card.dataset.id = annotation.id;
                     card.dataset.page = annotation.page;
