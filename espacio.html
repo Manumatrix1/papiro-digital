@@ -100,12 +100,14 @@
             let currentPageNum = 1;
             let zoomScale = 1.0;
             
-            // --- NUEVAS VARIABLES PARA CONTROL TÁCTIL MEJORADO ---
+            // --- VARIABLES PARA CONTROL TÁCTIL Y DE ESTADO ---
             let isDrawing = false, isPanning = false, isZooming = false;
             let currentPath = [];
             let panStart = { x: 0, y: 0 }, scrollStart = { left: 0, top: 0 };
             let initialDistance = null;
-            let touchStartPoint = null; // Para detectar si es un toque o un deslizamiento
+            let touchStartPoint = null;
+            // **LA LÍNEA QUE FALTABA - CORRECCIÓN**
+            let originalContentSize = { width: 0, height: 0 }; 
             
             const appContainer = document.querySelector('.app-container');
             const zoomContainer = document.getElementById('zoom-container');
@@ -148,7 +150,6 @@
                 });
             }
             
-            // --- GESTIÓN DE EVENTOS (LÓGICA TÁCTIL REESCRITA) ---
             function setupAllEventListeners() {
                 document.getElementById('tool-select').addEventListener('click', () => setActiveTool('select'));
                 document.getElementById('tool-draw').addEventListener('click', () => setActiveTool('draw'));
@@ -177,25 +178,20 @@
                 notesList.addEventListener('click', (e) => {
                     const noteCard = e.target.closest('.note-card');
                     if (!noteCard) return;
-
                     const editBtn = e.target.closest('.edit-note-btn');
                     if (editBtn) { handleEditNote(editBtn.dataset.id, noteCard); return; }
-
                     const deleteBtn = e.target.closest('.delete-note-btn');
                     if (deleteBtn) { handleDeleteNote(deleteBtn.dataset.id, noteCard); return; }
-                    
                     const pageToGo = noteCard.dataset.page;
                     if (pageToGo) { scrollToPage(pageToGo); }
                 });
                 
-                // EVENTOS TÁCTILES CORREGIDOS
                 pdfWrapper.addEventListener('touchstart', handleTouchStart, { passive: false });
                 pdfWrapper.addEventListener('touchmove', handleTouchMove, { passive: false });
                 pdfWrapper.addEventListener('touchend', handleTouchEnd, { passive: false });
             }
 
             function handleTouchStart(e) {
-                // Manejar zoom con dos dedos
                 if (e.touches.length === 2) {
                     isZooming = true;
                     isPanning = false;
@@ -203,12 +199,9 @@
                     e.preventDefault();
                     return;
                 }
-
-                // Manejar un solo dedo
                 if (e.touches.length === 1) {
                     const touch = e.touches[0];
-                    touchStartPoint = { x: touch.pageX, y: touch.pageY }; // Guardar punto de inicio
-
+                    touchStartPoint = { x: touch.pageX, y: touch.pageY };
                     if (activeTool === 'select' && zoomScale > 1.01) {
                         isPanning = true;
                         panStart.x = touch.pageX;
@@ -231,7 +224,6 @@
                     initialDistance = newDistance;
                     return;
                 }
-
                 if (isPanning && e.touches.length === 1) {
                     e.preventDefault();
                     const dx = e.touches[0].pageX - panStart.x;
@@ -240,18 +232,13 @@
                     scrollContainer.scrollTop = scrollStart.top - dy;
                     return;
                 }
-
-                // Si no es la herramienta de seleccionar, vemos si debemos empezar a dibujar
                 if (activeTool !== 'select' && e.touches.length === 1 && touchStartPoint) {
                     const touch = e.touches[0];
                     const movedX = Math.abs(touch.pageX - touchStartPoint.x);
                     const movedY = Math.abs(touch.pageY - touchStartPoint.y);
-
-                    // Solo empezar a dibujar si el dedo se movió más de 5px para evitar empezar en un scroll
                     if (!isDrawing && (movedX > 5 || movedY > 5)) {
                         startDrawing(e);
                     }
-
                     if (isDrawing) {
                         e.preventDefault();
                         draw(e);
@@ -260,12 +247,9 @@
             }
 
             function handleTouchEnd(e) {
-                // Si el toque terminó y no estábamos dibujando, no hacer nada
                 if (isDrawing) {
                     stopDrawing(e);
                 }
-                
-                // Reiniciar todos los estados
                 isDrawing = false;
                 isPanning = false;
                 isZooming = false;
@@ -274,14 +258,12 @@
                 currentPath = [];
             }
             
-            // --- LÓGICA DE CONTROL ---
             function setActiveTool(tool) {
                 activeTool = tool;
                 document.querySelectorAll('#main-tools .tool-btn').forEach(btn => btn.classList.remove('active'));
                 document.getElementById(`tool-${tool}`).classList.add('active');
             }
 
-            // --- CARGA Y RENDERIZADO (sin cambios) ---
             async function loadPdfDocument() {
                 const statusText = document.getElementById('status-text');
                 try {
@@ -372,10 +354,9 @@
                 });
             }
             
-            // --- DIBUJO Y ANOTACIONES (Lógica mejorada) ---
             function startDrawing(e) {
                 isDrawing = true;
-                e.preventDefault(); // Prevenir scroll solo cuando se confirma el dibujo
+                e.preventDefault();
                 const canvas = findCanvasUnderPointer(e);
                 if (canvas) {
                     currentPath = [getCoords(e, canvas)];
@@ -398,9 +379,7 @@
                 }
                 const canvas = findCanvasUnderPointer(e, true);
                 if (!canvas) return;
-
                 const pageNum = parseInt(canvas.dataset.pageNum);
-                
                 if (activeTool === 'erase') {
                     await saveAnnotation({ page: pageNum, type: 'erase', path: currentPath, color: '#000000' });
                 } else if (activeTool === 'highlight') {
@@ -478,7 +457,6 @@
                 ctx.beginPath();
                 ctx.moveTo(annotation.path[0].x, annotation.path[0].y);
                 annotation.path.forEach(point => ctx.lineTo(point.x, point.y));
-                
                 if (annotation.type === 'erase') {
                     ctx.globalCompositeOperation = 'destination-out';
                     ctx.lineWidth = 40;
@@ -509,7 +487,6 @@
                 document.getElementById('page-indicator').textContent = `${currentPageNum} / ${pdfDocument.numPages}`;
             }
             
-            // --- FUNCIONES DE NOTAS Y VOZ (sin cambios) ---
             function renderNotesToSidebar() {
                 notesList.innerHTML = '';
                 const allAnnotations = Object.values(annotationsByPage)
@@ -549,12 +526,10 @@
             async function handleEditNote(annotationId, noteCardElement) {
                 const originalAnnotation = Object.values(annotationsByPage).flat().find(a => a.id === annotationId);
                 if (!originalAnnotation) return;
-
                 const { value: newNote } = await Swal.fire({
                     title: 'Editar nota', input: 'textarea', inputValue: originalAnnotation.note || '',
                     showCancelButton: true, confirmButtonText: 'Guardar', cancelButtonText: 'Cancelar'
                 });
-
                 if (typeof newNote === 'string') {
                     const noteTextElement = noteCardElement.querySelector('.note-text');
                     if (newNote) {
@@ -584,7 +559,6 @@
                         noteCardElement.style.transition = 'opacity 0.3s ease';
                         noteCardElement.style.opacity = '0';
                         setTimeout(() => noteCardElement.remove(), 300);
-
                         try {
                             const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
                             await deleteDoc(noteRef);
@@ -634,7 +608,6 @@
                     let cancelled = false;
                     utterance.onend = () => resolve(!cancelled);
                     utterance.onerror = () => resolve(false);
-                    
                     const checkCancelInterval = setInterval(() => {
                         if (!speechSynthesis.speaking) {
                             cancelled = true;
@@ -642,7 +615,6 @@
                             resolve(false);
                         }
                     }, 250);
-
                     speechSynthesis.speak(utterance);
                 });
             }
