@@ -16,7 +16,7 @@
             --surface-color: #181818; --surface-border-color: #2a2a2a;
         }
         html, body { height: 100%; width: 100%; overflow: hidden; background-color: var(--background-color); color: white; font-family: 'Inter', sans-serif; }
-        .app-container { height: 100vh; display: flex; flex-direction: column; background-color: var(--background-color); }
+        .app-container { height: 100vh; display: flex; flex-direction: column; background-color: var(--background-color); position: relative; }
         main { flex-grow: 1; position: relative; overflow: hidden; }
         .scroll-wrapper {
             width: 100%; height: 100%;
@@ -102,16 +102,17 @@
             </div>
             <span id="page-indicator">1 / 1</span>
         </main>
+
+        <aside id="sidebar" class="p-4">
+            <div class="flex justify-between items-center mb-4 flex-shrink-0">
+                <h3 class="text-xl font-bold">Cuaderno de Notas</h3>
+                <button id="close-sidebar-btn" class="text-gray-400 hover:text-white p-2"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="notes-list" class="space-y-4 flex-grow overflow-y-auto"></div>
+        </aside>
+        <div id="sidebar-overlay"></div>
     </div>
 
-    <aside id="sidebar" class="p-4">
-        <div class="flex justify-between items-center mb-4 flex-shrink-0">
-            <h3 class="text-xl font-bold">Cuaderno de Notas</h3>
-            <button id="close-sidebar-btn" class="text-gray-400 hover:text-white p-2"><i class="fas fa-times"></i></button>
-        </div>
-        <div id="notes-list" class="space-y-4 flex-grow overflow-y-auto"></div>
-    </aside>
-    <div id="sidebar-overlay"></div>
 
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
@@ -518,8 +519,8 @@
                                 <span class="text-xs font-bold text-gray-400">Página ${annotation.page}</span>
                             </div>
                             <div class="note-actions absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                <button class="edit-note-btn p-2 rounded-md bg-gray-700/80 hover:bg-gray-600 text-gray-300 hover:text-white" data-id="${annotation.id}"><i class="fas fa-edit pointer-events-none"></i></button>
-                                <button class="delete-note-btn p-2 rounded-md bg-gray-700/80 hover:bg-red-500/80 text-gray-300 hover:text-white" data-id="${annotation.id}"><i class="fas fa-trash pointer-events-none"></i></button>
+                                <button class="edit-note-btn p-2 rounded-md bg-gray-700/80 hover:bg-gray-600 text-gray-300 hover:text-white" title="Editar Nota"><i class="fas fa-edit pointer-events-none"></i></button>
+                                <button class="delete-note-btn p-2 rounded-md bg-gray-700/80 hover:bg-red-500/80 text-gray-300 hover:text-white" title="Borrar Nota"><i class="fas fa-trash pointer-events-none"></i></button>
                             </div>
                         </div>
                         ${noteContent}`;
@@ -552,22 +553,32 @@
                 }
             }
 
+            // CAMBIO: Lógica de borrado modificada para eliminar solo el texto de la nota.
             function handleDeleteNote(annotationId, noteCardElement) {
                 Swal.fire({
-                    title: '¿Estás seguro?', text: "Esta acción no se puede deshacer.",
-                    icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33',
-                    confirmButtonText: 'Sí, borrar', cancelButtonText: 'Cancelar'
+                    title: '¿Borrar texto de la nota?',
+                    text: "El resaltado en el PDF permanecerá. Podrás añadir otra nota después.",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    confirmButtonText: 'Sí, borrar texto',
+                    cancelButtonText: 'Cancelar'
                 }).then(async (result) => {
                     if (result.isConfirmed) {
-                        noteCardElement.style.transition = 'opacity 0.3s ease';
-                        noteCardElement.style.opacity = '0';
-                        setTimeout(() => noteCardElement.remove(), 300);
                         try {
                             const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
-                            await deleteDoc(noteRef);
+                            // Se actualiza el campo 'note' a un string vacío en vez de borrar el documento
+                            await updateDoc(noteRef, { note: "" });
+
+                            // Actualizar la UI sin recargar todo
+                            const noteTextElement = noteCardElement.querySelector('.note-text');
+                            if (noteTextElement) {
+                                noteTextElement.textContent = 'Resaltado sin nota.';
+                                noteTextElement.className = 'text-gray-400 text-sm italic note-text';
+                            }
                         } catch (error) {
-                            console.error("Error al borrar la nota:", error);
-                            Swal.fire('Error', 'No se pudo eliminar la nota. Se recargará la lista.', 'error');
+                            console.error("Error al borrar el texto de la nota:", error);
+                            Swal.fire('Error', 'No se pudo eliminar el texto de la nota.', 'error');
                         }
                     }
                 });
