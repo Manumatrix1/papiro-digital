@@ -54,6 +54,7 @@
                 <button class="tool-btn active" id="tool-select" title="Mover"><i class="fas fa-hand-paper"></i></button>
                 <button class="tool-btn" id="tool-draw" title="Dibujar"><i class="fas fa-pencil-alt"></i></button>
                 <button class="tool-btn" id="tool-highlight" title="Resaltar"><i class="fas fa-highlighter"></i></button>
+                <button class="tool-btn" id="tool-erase" title="Borrar"><i class="fas fa-eraser"></i></button>
                 <input type="color" id="color-picker" class="w-8 h-8 rounded-full cursor-pointer bg-transparent border-none p-1" value="#FFDD00" title="Color">
                 <div class="w-px h-6 bg-[#2a2a2a] mx-2"></div>
                 <span id="page-indicator" class="text-sm text-gray-400 mx-2 hidden md:inline">1 / 1</span>
@@ -91,10 +92,8 @@
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
         import { doc, getDoc, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
 
-        // ENVOLTORIO: Este listener espera a que el HTML esté completamente cargado.
         document.addEventListener('DOMContentLoaded', () => {
             
-            // --- VARIABLES GLOBALES ---
             let currentUser, projectId, pdfId, pdfDocument, annotationsUnsubscribe;
             let activeTool = 'select', activeColor = '#FFDD00', isDrawing = false;
             let annotationsByPage = {}, currentPath = [];
@@ -103,7 +102,6 @@
             let isPanning = false, panStart = { x: 0, y: 0 }, scrollStart = { left: 0, top: 0 };
             let originalContentSize = { width: 0, height: 0 };
             
-            // --- SELECCIÓN DE ELEMENTOS DEL DOM ---
             const appContainer = document.querySelector('.app-container');
             const zoomContainer = document.getElementById('zoom-container');
             const pdfWrapper = document.getElementById('pdf-content-wrapper');
@@ -111,7 +109,6 @@
             const notesList = document.getElementById('notes-list');
             let pageIntersectionObserver;
 
-            // --- INICIO Y CACHÉ ---
             onAuthStateChanged(auth, (user) => { if (user) iniciarAplicacion(user); else window.location.href = 'index.html'; });
 
             function iniciarAplicacion(user) {
@@ -146,11 +143,13 @@
                 });
             }
             
-            // --- GESTIÓN DE EVENTOS ---
             function setupAllEventListeners() {
                 document.getElementById('tool-select').addEventListener('click', () => setActiveTool('select'));
                 document.getElementById('tool-draw').addEventListener('click', () => setActiveTool('draw'));
                 document.getElementById('tool-highlight').addEventListener('click', () => setActiveTool('highlight'));
+                // CAMBIO: Event listener para la goma añadido
+                document.getElementById('tool-erase').addEventListener('click', () => setActiveTool('erase'));
+
                 document.getElementById('color-picker').addEventListener('input', (e) => activeColor = e.target.value);
                 document.getElementById('open-notes-btn').addEventListener('click', () => document.getElementById('sidebar').classList.add('open'));
                 document.getElementById('close-sidebar-btn').addEventListener('click', () => document.getElementById('sidebar').classList.remove('open'));
@@ -233,7 +232,6 @@
                 });
             }
             
-            // --- LÓGICA DE CONTROL ---
             function setActiveTool(tool) {
                 activeTool = tool;
                 document.querySelectorAll('#main-tools .tool-btn').forEach(btn => btn.classList.remove('active'));
@@ -244,7 +242,6 @@
                 });
             }
 
-            // --- CARGA Y RENDERIZADO ---
             async function loadPdfDocument() {
                 const statusText = document.getElementById('status-text');
                 try {
@@ -337,7 +334,6 @@
                 });
             }
             
-            // --- DIBUJO Y ANOTACIONES ---
             function startDrawing(e) { 
                 if (activeTool === 'select' || !e.touches) return;
                 e.preventDefault();
@@ -363,6 +359,14 @@
                 const canvas = findCanvasUnderPointer(e, true);
                 if (!canvas || currentPath.length < 3) { currentPath = []; return; }
                 const pageNum = parseInt(canvas.dataset.pageNum);
+                
+                // No preguntar por notas si se está borrando
+                if (activeTool === 'erase') {
+                    await saveAnnotation({ page: pageNum, type: 'erase', path: currentPath, color: '#000000' });
+                    currentPath = [];
+                    return;
+                }
+
                 let note = "";
                 if (activeTool === 'highlight') {
                     const { value } = await Swal.fire({
@@ -431,9 +435,11 @@
                 ctx.beginPath();
                 ctx.moveTo(annotation.path[0].x, annotation.path[0].y);
                 annotation.path.forEach(point => ctx.lineTo(point.x, point.y));
+                
+                // Lógica de borrado existente
                 if (annotation.type === 'erase') {
                     ctx.globalCompositeOperation = 'destination-out';
-                    ctx.lineWidth = 40;
+                    ctx.lineWidth = 40; // Grosor de la goma
                 } else {
                     ctx.globalCompositeOperation = 'source-over';
                     ctx.lineWidth = annotation.type === 'highlight' ? 20 : 3;
@@ -460,10 +466,13 @@
                 document.getElementById('page-indicator').textContent = `${currentPageNum} / ${pdfDocument.numPages}`;
             }
             
-            // --- FUNCIONES DE NOTAS Y VOZ ---
+            // CAMBIO: Lógica para mostrar/ocultar botones en la tarjeta de nota
             function renderNotesToSidebar() {
                 notesList.innerHTML = '';
-                const allAnnotations = Object.values(annotationsByPage).flat().filter(a => a.note || a.type === 'highlight').sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0));
+                const allAnnotations = Object.values(annotationsByPage)
+                    .flat()
+                    .filter(a => a.type === 'highlight') // Solo mostrar resaltados en la lista de notas
+                    .sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0));
                 
                 if (allAnnotations.length === 0) {
                     notesList.innerHTML = `<p class="text-gray-500 text-center p-4">Aún no hay notas.</p>`;
@@ -472,7 +481,8 @@
                 
                 allAnnotations.forEach(annotation => {
                     const card = document.createElement('div');
-                    card.className = 'note-card p-3 rounded-lg border border-transparent hover:border-gray-600 transition-colors duration-200';
+                    // `group` permite que los elementos hijos reaccionen al hover de la tarjeta
+                    card.className = 'note-card group relative p-3 rounded-lg border border-transparent hover:border-gray-700 hover:bg-gray-800/50 transition-colors duration-200';
                     card.dataset.id = annotation.id;
                     card.dataset.page = annotation.page;
                     
@@ -482,11 +492,11 @@
                         <div class="flex justify-between items-start">
                             <div class="flex items-center gap-2 mb-2 cursor-pointer flex-grow">
                                 <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color:${annotation.color};"></span>
-                                <span class="text-xs font-bold text-gray-400 hover:text-white">Página ${annotation.page}</span>
+                                <span class="text-xs font-bold text-gray-400">Página ${annotation.page}</span>
                             </div>
-                            <div class="note-actions flex gap-2 flex-shrink-0">
-                                <button class="edit-note-btn p-1 text-gray-400 hover:text-white" data-id="${annotation.id}"><i class="fas fa-edit pointer-events-none"></i></button>
-                                <button class="delete-note-btn p-1 text-gray-400 hover:text-red-500" data-id="${annotation.id}"><i class="fas fa-trash pointer-events-none"></i></button>
+                            <div class="note-actions absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                <button class="edit-note-btn p-2 rounded-md bg-gray-700/80 hover:bg-gray-600 text-gray-300 hover:text-white" data-id="${annotation.id}"><i class="fas fa-edit pointer-events-none"></i></button>
+                                <button class="delete-note-btn p-2 rounded-md bg-gray-700/80 hover:bg-red-500/80 text-gray-300 hover:text-white" data-id="${annotation.id}"><i class="fas fa-trash pointer-events-none"></i></button>
                             </div>
                         </div>
                         ${noteContent}`;
@@ -594,7 +604,7 @@
                     speechSynthesis.speak(utterance);
                 });
             }
-        }); // <-- Cierre del document.addEventListener
+        });
     </script>
 </body>
 </html>
