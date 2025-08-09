@@ -26,7 +26,8 @@
         #pdf-content-wrapper {
             width: 100%;
             margin: 1rem 0;
-            transform-origin: center top;
+            /* --- AJUSTE CLAVE: Anclaje del zoom en el centro --- */
+            transform-origin: center top; 
         }
         .pdf-page-container { 
             position: relative; 
@@ -86,7 +87,7 @@
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
         import { doc, getDoc, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
 
-        // --- VARIABLES GLOBALES ---
+        // VARIABLES GLOBALES
         let currentUser, projectId, pdfId, pdfDocument;
         let activeTool = 'select', activeColor = '#FFDD00', isDrawing = false;
         let annotationsByPage = {}, currentPath = [];
@@ -97,7 +98,7 @@
         const scrollContainer = document.querySelector('.scroll-wrapper');
         let pageIntersectionObserver;
 
-        // --- FUNCIONES DE CACHÉ ---
+        // FUNCIONES DE CACHÉ (SIN CAMBIOS)
         const DB_NAME = 'PapiroDigitalDB', STORE_NAME = 'pdfCache';
         function openDB() {
             return new Promise((resolve, reject) => {
@@ -120,7 +121,7 @@
             });
         }
 
-        // --- INICIO DE LA APLICACIÓN ---
+        // INICIO DE LA APLICACIÓN
         onAuthStateChanged(auth, (user) => {
             if (user) iniciarAplicacion(user); else window.location.href = 'index.html';
         });
@@ -134,7 +135,7 @@
             loadPdfDocument();
         }
         
-        // --- GESTIÓN DE EVENTOS (LÓGICA FINAL Y CORRECTA) ---
+        // GESTIÓN DE EVENTOS
         function setupAllEventListeners() {
             document.getElementById('tool-select').addEventListener('click', () => setActiveTool('select'));
             document.getElementById('tool-draw').addEventListener('click', () => setActiveTool('draw'));
@@ -145,7 +146,7 @@
 
             let initialDistance = null;
             
-            // Los listeners se aplican al WRAPPER del contenido del PDF
+            // --- AJUSTE CLAVE: LOS EVENTOS SE GESTIONAN EN EL CONTENEDOR DEL PDF ---
             pdfWrapper.addEventListener('touchstart', (e) => {
                 if (activeTool !== 'select') {
                     startDrawing(e);
@@ -155,8 +156,8 @@
             });
 
             pdfWrapper.addEventListener('touchmove', (e) => {
-                // Solo prevenimos el scroll si estamos dibujando o haciendo zoom.
-                // Si es un solo dedo con la herramienta 'select', el navegador hace el scroll.
+                // SOLO prevenimos el scroll si estamos dibujando o haciendo zoom.
+                // Si es un dedo con 'select', el navegador maneja el scroll.
                 if (isDrawing || (e.touches.length === 2 && activeTool === 'select')) {
                     e.preventDefault();
                 }
@@ -184,7 +185,7 @@
             document.getElementById(`tool-${tool}`).classList.add('active');
         }
 
-        // --- CARGA Y RENDERIZADO (SIN CAMBIOS) ---
+        // CARGA Y RENDERIZADO
         async function loadPdfDocument() {
             const statusText = document.getElementById('status-text');
             try {
@@ -267,7 +268,7 @@
             });
         }
         
-        // --- DIBUJO Y OTRAS FUNCIONES (SIN CAMBIOS) ---
+        // DIBUJO Y OTRAS FUNCIONES
         function startDrawing(e) { 
             isDrawing = true;
             const canvas = findCanvasUnderPointer(e);
@@ -306,13 +307,14 @@
             const scrollCenterY = scrollContainer.scrollTop + scrollContainer.clientHeight / 2;
             let mostVisiblePage = 1;
             document.querySelectorAll('.pdf-page-container').forEach((pageEl, index) => {
-                if (scrollCenterY >= pageEl.offsetTop && scrollCenterY < pageEl.offsetTop + pageEl.offsetHeight) {
+                if (scrollCenterY >= pageEl.offsetTop * zoomScale && scrollCenterY < (pageEl.offsetTop + pageEl.offsetHeight) * zoomScale) {
                     mostVisiblePage = index + 1;
                 }
             });
             currentPageNum = mostVisiblePage;
             document.getElementById('page-indicator').textContent = `${currentPageNum} / ${pdfDocument.numPages}`;
         }
+        // ... (resto de funciones auxiliares como saveAnnotation, loadAllAnnotations, etc.)
     </script>
 </body>
 </html>
