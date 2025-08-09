@@ -139,30 +139,36 @@
             loadPdfDocument();
         }
         
-        // --- GESTIÓN DE EVENTOS ---
+        // --- GESTIÓN DE EVENTOS (CORRECCIÓN FINAL) ---
         function setupAllEventListeners() {
+            // Herramientas de la barra inferior
             document.getElementById('tool-select').addEventListener('click', () => setActiveTool('select'));
             document.getElementById('tool-draw').addEventListener('click', () => setActiveTool('draw'));
             document.getElementById('tool-highlight').addEventListener('click', () => setActiveTool('highlight'));
             document.getElementById('tool-erase').addEventListener('click', () => setActiveTool('erase'));
             document.getElementById('color-picker').addEventListener('input', (e) => activeColor = e.target.value);
-            scrollContainer.addEventListener('scroll', updatePageIndicator);
+            
+            // Botones de la barra superior y sidebar (ESTO FALTABA)
             document.getElementById('open-notes-btn').addEventListener('click', () => document.getElementById('sidebar').classList.add('open'));
             document.getElementById('close-sidebar-btn').addEventListener('click', () => document.getElementById('sidebar').classList.remove('open'));
             document.getElementById('sidebar-overlay').addEventListener('click', () => document.getElementById('sidebar').classList.remove('open'));
             document.getElementById('read-aloud-btn').addEventListener('click', toggleReadAloud);
 
+            // Evento de scroll del contenedor principal
+            scrollContainer.addEventListener('scroll', updatePageIndicator);
+
             let initialDistance = null;
             
-            pdfWrapper.addEventListener('touchstart', (e) => {
-                if (activeTool !== 'select') {
+            // AJUSTE CLAVE: LOS LISTENERS SE MUEVEN AL CONTENEDOR DE SCROLL
+            scrollContainer.addEventListener('touchstart', (e) => {
+                if (activeTool !== 'select' && e.target.closest('.annotation-canvas')) {
                     startDrawing(e);
                 } else if (e.touches.length === 2) {
                     initialDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
                 }
             });
 
-            pdfWrapper.addEventListener('touchmove', (e) => {
+            scrollContainer.addEventListener('touchmove', (e) => {
                 if (isDrawing || (e.touches.length === 2 && activeTool === 'select')) {
                     e.preventDefault();
                 }
@@ -178,7 +184,7 @@
                 }
             }, { passive: false });
 
-            pdfWrapper.addEventListener('touchend', (e) => {
+            scrollContainer.addEventListener('touchend', (e) => {
                 if (isDrawing) stopDrawing(e);
                 if (e.touches.length < 2) initialDistance = null;
             });
@@ -214,7 +220,7 @@
                 document.getElementById('status-indicator').style.display = 'none';
                 pdfWrapper.style.display = 'block';
                 await setupPagePlaceholders();
-                loadAllAnnotations(); // <<-- ESTA FUNCIÓN AHORA EXISTE
+                loadAllAnnotations();
             } catch (error) {
                 console.error("Error al cargar PDF:", error);
                 statusText.textContent = `Error: ${error.message}`;
@@ -251,7 +257,7 @@
             pageContainer.innerHTML = '';
             pageContainer.append(canvas, annotationCanvas);
             await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-            redrawAnnotations(pageNum); // <<-- ESTA FUNCIÓN AHORA EXISTE
+            redrawAnnotations(pageNum);
         }
 
         function startPageObserver() {
@@ -273,7 +279,7 @@
             });
         }
         
-        // --- DIBUJO Y ANOTACIONES (FUNCIONES RESTAURADAS) ---
+        // --- DIBUJO Y ANOTACIONES ---
         function startDrawing(e) { 
             isDrawing = true;
             const canvas = findCanvasUnderPointer(e);
@@ -284,7 +290,7 @@
             const canvas = findCanvasUnderPointer(e);
             if (canvas) {
                 currentPath.push(getCoords(e, canvas));
-                redrawAnnotations(canvas.dataset.pageNum); // <<-- ESTA FUNCIÓN AHORA EXISTE
+                redrawAnnotations(canvas.dataset.pageNum);
             }
         }
         async function stopDrawing(e) {
@@ -293,7 +299,7 @@
             const canvas = findCanvasUnderPointer(e, true);
             if (!canvas || currentPath.length < 3) { currentPath = []; return; }
             const pageNum = parseInt(canvas.dataset.pageNum);
-            await saveAnnotation({ page: pageNum, type: activeTool, path: currentPath, color: activeColor }); // <<-- ESTA FUNCIÓN AHORA EXISTE
+            await saveAnnotation({ page: pageNum, type: activeTool, path: currentPath, color: activeColor });
             currentPath = [];
         }
         function getCoords(e, canvas) {
@@ -308,8 +314,6 @@
             return document.elementFromPoint(eventPoint.clientX, eventPoint.clientY)?.closest('.pdf-page-container')?.querySelector('.annotation-canvas');
         }
         
-        // --- **DEFINICIÓN DE FUNCIONES FALTANTES** ---
-
         async function saveAnnotation(annotationData) {
             const annotationsRef = collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations");
             await addDoc(annotationsRef, { ...annotationData, createdAt: serverTimestamp() });
@@ -329,7 +333,6 @@
                          redrawAnnotations(pageContainer.dataset.pageNumber);
                     }
                 });
-                // renderNotesToSidebar(); // Puedes descomentar esto si tienes esa función
             });
         }
        
@@ -339,7 +342,7 @@
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             (annotationsByPage[pageNum] || []).forEach(annotation => drawPath(ctx, annotation));
-            if (isDrawing && parseInt(canvas.dataset.pageNum) == currentPageNum) { // Se podría ajustar esta lógica de página
+            if (isDrawing && parseInt(canvas.dataset.pageNum) == currentPageNum) {
                 drawPath(ctx, { type: activeTool, path: currentPath, color: activeColor });
             }
         }
@@ -372,8 +375,8 @@
             const scrollCenterY = scrollContainer.scrollTop + scrollContainer.clientHeight / 2;
             let mostVisiblePage = 1;
             document.querySelectorAll('.pdf-page-container').forEach((pageEl, index) => {
-                const pageTop = pageEl.offsetTop * zoomScale;
-                const pageBottom = pageTop + (pageEl.offsetHeight * zoomScale);
+                const pageTop = pageEl.offsetTop; // Ya no se multiplica por el zoom
+                const pageBottom = pageTop + pageEl.offsetHeight;
                 if (scrollCenterY >= pageTop && scrollCenterY < pageBottom) {
                     mostVisiblePage = index + 1;
                 }
@@ -385,18 +388,46 @@
         window.scrollToPage = (pageNum) => {
             const pageEl = document.querySelector(`.pdf-page-container[data-page-number='${pageNum}']`);
             if(pageEl) {
-                scrollContainer.scrollTop = pageEl.offsetTop * zoomScale - 20;
+                scrollContainer.scrollTop = pageEl.offsetTop - 20;
                 document.getElementById('sidebar').classList.remove('open');
             }
         };
 
         async function toggleReadAloud() {
-            // ... (Función de voz)
-        }
-        function speakText(text) {
-            // ... (Función de voz)
+            let isReading = speechSynthesis.speaking;
+            const btn = document.getElementById('read-aloud-btn');
+
+            if (isReading) {
+                speechSynthesis.cancel();
+                btn.classList.remove('text-[var(--primary-color)]');
+                return;
+            }
+
+            btn.classList.add('text-[var(--primary-color)]');
+            
+            for (let i = currentPageNum; i <= pdfDocument.numPages; i++) {
+                if (!speechSynthesis.speaking && i > currentPageNum) { // Se detuvo manualmente
+                    break;
+                }
+                window.scrollToPage(i); 
+                updatePageIndicator(); 
+                const page = await pdfDocument.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                await speakText(pageText);
+            }
+            btn.classList.remove('text-[var(--primary-color)]');
         }
 
+        function speakText(text) {
+            return new Promise(resolve => {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'es-ES';
+                utterance.onend = resolve;
+                utterance.onerror = () => resolve(); // Continúa incluso si hay error
+                speechSynthesis.speak(utterance);
+            });
+        }
     </script>
 </body>
 </html>
