@@ -39,10 +39,47 @@
         }
         .tool-btn { background: none; border: none; color: #9ca3af; cursor: pointer; padding: 0.5rem; }
         .tool-btn.active { color: var(--primary-color); }
-        #sidebar { position: fixed; top: 0; right: -100%; width: 100%; max-width: 350px; height: 100%; background-color: var(--surface-color); transition: transform 0.3s ease-in-out; z-index: 110; display: flex; flex-direction: column; border-left: 1px solid var(--surface-border-color); }
-        #sidebar.open { transform: translateX(-100%); }
+
+        /* --- CAMBIOS CSS --- */
+
+        /* 1. Corrección del panel de notas */
+        #sidebar { 
+            position: fixed; top: 0; right: 0; /* Anclado a la derecha */
+            width: 100%; max-width: 350px; height: 100%; 
+            background-color: var(--surface-color); 
+            transition: transform 0.3s ease-in-out; 
+            z-index: 110; display: flex; flex-direction: column; 
+            border-left: 1px solid var(--surface-border-color);
+            transform: translateX(100%); /* Oculto fuera de la pantalla a la derecha */
+        }
+        #sidebar.open { 
+            transform: translateX(0); /* Se desliza a su posición visible */
+        }
+
         #sidebar-overlay { position: fixed; inset: 0; background-color: rgba(0,0,0,0.6); z-index: 105; display: none; }
         #sidebar.open + #sidebar-overlay { display: block; }
+
+        /* 2. Estilos para el nuevo contador de página flotante */
+        #page-indicator {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            width: 50px;
+            height: 50px;
+            background-color: var(--surface-color);
+            border: 1px solid var(--surface-border-color);
+            border-radius: 9999px; /* Círculo perfecto */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem; /* 14px */
+            font-weight: 600;
+            color: #9ca3af;
+            z-index: 50;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            transition: opacity 0.3s;
+        }
+
     </style>
 </head>
 <body>
@@ -57,7 +94,6 @@
                 <button class="tool-btn" id="tool-erase" title="Borrar"><i class="fas fa-eraser"></i></button>
                 <input type="color" id="color-picker" class="w-8 h-8 rounded-full cursor-pointer bg-transparent border-none p-1" value="#FFDD00" title="Color">
                 <div class="w-px h-6 bg-[#2a2a2a] mx-2"></div>
-                <span id="page-indicator" class="text-sm text-gray-400 mx-2 hidden md:inline">1 / 1</span>
                 <button id="fullscreen-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]" title="Pantalla Completa"><i class="fas fa-expand"></i></button>
                 <button id="read-aloud-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]" title="Leer en voz alta"><i class="fas fa-volume-up"></i></button>
                 <button id="open-notes-btn" class="p-2 rounded-md hover:bg-[#2a2a2a]" title="Ver Cuaderno"><i class="fas fa-book"></i></button>
@@ -72,6 +108,7 @@
                     <div id="pdf-content-wrapper" style="display: none;"></div>
                 </div>
             </div>
+            <span id="page-indicator">1 / 1</span>
         </main>
     </div>
 
@@ -144,7 +181,6 @@
                 });
             }
             
-            // --- GESTIÓN DE EVENTOS (LÓGICA TÁCTIL RESTAURADA Y ROBUSTA) ---
             function setupAllEventListeners() {
                 document.getElementById('tool-select').addEventListener('click', () => setActiveTool('select'));
                 document.getElementById('tool-draw').addEventListener('click', () => setActiveTool('draw'));
@@ -181,7 +217,6 @@
                     if (pageToGo) { scrollToPage(pageToGo); }
                 });
 
-                // Lógica de touch restaurada
                 pdfWrapper.addEventListener('touchstart', (e) => {
                     if (activeTool !== 'select') { 
                         startDrawing(e); 
@@ -234,7 +269,6 @@
                 activeTool = tool;
                 document.querySelectorAll('#main-tools .tool-btn').forEach(btn => btn.classList.remove('active'));
                 document.getElementById(`tool-${tool}`).classList.add('active');
-                // Habilitar/deshabilitar pointer events en el canvas para permitir scroll
                 const canvases = document.querySelectorAll('.annotation-canvas');
                 canvases.forEach(canvas => {
                     canvas.style.pointerEvents = (tool === 'select') ? 'none' : 'auto';
@@ -294,7 +328,7 @@
                 pdfWrapper.style.width = `${originalContentSize.width}px`;
                 startPageObserver();
                 updatePageIndicator();
-                setActiveTool('select'); // Empezar con la herramienta de mover por defecto
+                setActiveTool('select'); 
             }
 
             async function renderPage(pageContainer, pageNum) {
@@ -385,11 +419,9 @@
             function findCanvasUnderPointer(e, isEndEvent = false) {
                 const touch = isEndEvent ? (e.changedTouches ? e.changedTouches[0] : e) : (e.touches ? e.touches[0] : e);
                 if (!touch) return null;
-                // Temporalmente habilitar pointer-events para encontrar el canvas
                 const canvases = document.querySelectorAll('.annotation-canvas');
                 canvases.forEach(c => c.style.pointerEvents = 'auto');
                 const element = document.elementFromPoint(touch.clientX, touch.clientY);
-                // Restaurar el estado original
                 canvases.forEach(c => c.style.pointerEvents = (activeTool === 'select') ? 'none' : 'auto');
                 return element ? element.closest('.pdf-page-container')?.querySelector('.annotation-canvas') : null;
             }
@@ -454,6 +486,7 @@
 
             function updatePageIndicator() {
                 if(!pdfDocument) return;
+                const indicator = document.getElementById('page-indicator');
                 const scrollCenterY = scrollContainer.scrollTop + scrollContainer.clientHeight / 2;
                 let mostVisiblePage = 1;
                 let elements = document.querySelectorAll('.pdf-page-container');
@@ -467,7 +500,7 @@
                     }
                 }
                 currentPageNum = mostVisiblePage;
-                document.getElementById('page-indicator').textContent = `${currentPageNum} / ${pdfDocument.numPages}`;
+                indicator.textContent = `${currentPageNum} / ${pdfDocument.numPages}`;
             }
             
             function renderNotesToSidebar() {
