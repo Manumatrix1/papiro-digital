@@ -26,8 +26,7 @@
         #pdf-content-wrapper {
             width: 100%;
             margin: 1rem 0;
-            /* --- AJUSTE CLAVE: Anclaje del zoom en el centro --- */
-            transform-origin: center top; 
+            transform-origin: center top;
         }
         .pdf-page-container { 
             position: relative; 
@@ -76,7 +75,12 @@
     </div>
 
     <aside id="sidebar" class="p-4">
-        </aside>
+        <div class="flex justify-between items-center mb-4 flex-shrink-0">
+            <h3 class="text-xl font-bold">Cuaderno de Notas</h3>
+            <button id="close-sidebar-btn" class="text-gray-400 hover:text-white p-2"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="notes-list" class="space-y-4 flex-grow overflow-y-auto"></div>
+    </aside>
     <div id="sidebar-overlay"></div>
 
     <script>
@@ -85,10 +89,10 @@
     <script type="module">
         import { auth, db } from './firebase-config.js';
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { doc, getDoc, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { doc, getDoc, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
 
-        // VARIABLES GLOBALES
-        let currentUser, projectId, pdfId, pdfDocument;
+        // --- VARIABLES GLOBALES ---
+        let currentUser, projectId, pdfId, pdfDocument, annotationsUnsubscribe;
         let activeTool = 'select', activeColor = '#FFDD00', isDrawing = false;
         let annotationsByPage = {}, currentPath = [];
         let currentPageNum = 1;
@@ -98,7 +102,7 @@
         const scrollContainer = document.querySelector('.scroll-wrapper');
         let pageIntersectionObserver;
 
-        // FUNCIONES DE CACHÉ (SIN CAMBIOS)
+        // --- FUNCIONES DE CACHÉ ---
         const DB_NAME = 'PapiroDigitalDB', STORE_NAME = 'pdfCache';
         function openDB() {
             return new Promise((resolve, reject) => {
@@ -121,7 +125,7 @@
             });
         }
 
-        // INICIO DE LA APLICACIÓN
+        // --- INICIO DE LA APLICACIÓN ---
         onAuthStateChanged(auth, (user) => {
             if (user) iniciarAplicacion(user); else window.location.href = 'index.html';
         });
@@ -135,7 +139,7 @@
             loadPdfDocument();
         }
         
-        // GESTIÓN DE EVENTOS
+        // --- GESTIÓN DE EVENTOS ---
         function setupAllEventListeners() {
             document.getElementById('tool-select').addEventListener('click', () => setActiveTool('select'));
             document.getElementById('tool-draw').addEventListener('click', () => setActiveTool('draw'));
@@ -143,10 +147,13 @@
             document.getElementById('tool-erase').addEventListener('click', () => setActiveTool('erase'));
             document.getElementById('color-picker').addEventListener('input', (e) => activeColor = e.target.value);
             scrollContainer.addEventListener('scroll', updatePageIndicator);
+            document.getElementById('open-notes-btn').addEventListener('click', () => document.getElementById('sidebar').classList.add('open'));
+            document.getElementById('close-sidebar-btn').addEventListener('click', () => document.getElementById('sidebar').classList.remove('open'));
+            document.getElementById('sidebar-overlay').addEventListener('click', () => document.getElementById('sidebar').classList.remove('open'));
+            document.getElementById('read-aloud-btn').addEventListener('click', toggleReadAloud);
 
             let initialDistance = null;
             
-            // --- AJUSTE CLAVE: LOS EVENTOS SE GESTIONAN EN EL CONTENEDOR DEL PDF ---
             pdfWrapper.addEventListener('touchstart', (e) => {
                 if (activeTool !== 'select') {
                     startDrawing(e);
@@ -156,8 +163,6 @@
             });
 
             pdfWrapper.addEventListener('touchmove', (e) => {
-                // SOLO prevenimos el scroll si estamos dibujando o haciendo zoom.
-                // Si es un dedo con 'select', el navegador maneja el scroll.
                 if (isDrawing || (e.touches.length === 2 && activeTool === 'select')) {
                     e.preventDefault();
                 }
@@ -185,7 +190,7 @@
             document.getElementById(`tool-${tool}`).classList.add('active');
         }
 
-        // CARGA Y RENDERIZADO
+        // --- CARGA Y RENDERIZADO ---
         async function loadPdfDocument() {
             const statusText = document.getElementById('status-text');
             try {
@@ -209,7 +214,7 @@
                 document.getElementById('status-indicator').style.display = 'none';
                 pdfWrapper.style.display = 'block';
                 await setupPagePlaceholders();
-                loadAllAnnotations();
+                loadAllAnnotations(); // <<-- ESTA FUNCIÓN AHORA EXISTE
             } catch (error) {
                 console.error("Error al cargar PDF:", error);
                 statusText.textContent = `Error: ${error.message}`;
@@ -246,7 +251,7 @@
             pageContainer.innerHTML = '';
             pageContainer.append(canvas, annotationCanvas);
             await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-            redrawAnnotations(pageNum);
+            redrawAnnotations(pageNum); // <<-- ESTA FUNCIÓN AHORA EXISTE
         }
 
         function startPageObserver() {
@@ -268,7 +273,7 @@
             });
         }
         
-        // DIBUJO Y OTRAS FUNCIONES
+        // --- DIBUJO Y ANOTACIONES (FUNCIONES RESTAURADAS) ---
         function startDrawing(e) { 
             isDrawing = true;
             const canvas = findCanvasUnderPointer(e);
@@ -279,7 +284,7 @@
             const canvas = findCanvasUnderPointer(e);
             if (canvas) {
                 currentPath.push(getCoords(e, canvas));
-                redrawAnnotations(canvas.dataset.pageNum);
+                redrawAnnotations(canvas.dataset.pageNum); // <<-- ESTA FUNCIÓN AHORA EXISTE
             }
         }
         async function stopDrawing(e) {
@@ -288,7 +293,7 @@
             const canvas = findCanvasUnderPointer(e, true);
             if (!canvas || currentPath.length < 3) { currentPath = []; return; }
             const pageNum = parseInt(canvas.dataset.pageNum);
-            await saveAnnotation({ page: pageNum, type: activeTool, path: currentPath, color: activeColor });
+            await saveAnnotation({ page: pageNum, type: activeTool, path: currentPath, color: activeColor }); // <<-- ESTA FUNCIÓN AHORA EXISTE
             currentPath = [];
         }
         function getCoords(e, canvas) {
@@ -299,22 +304,99 @@
             return { x: (touch.clientX - rect.left) * scaleX, y: (touch.clientY - rect.top) * scaleY };
         }
         function findCanvasUnderPointer(e, isEndEvent = false) {
-            const eventPoint = isEndEvent ? (e.changedTouches ? e.changedTouches[0] : e) : (e.touches ? e.changedTouches[0] : e);
+            const eventPoint = isEndEvent ? (e.changedTouches ? e.changedTouches[0] : e) : (e.touches ? e.touches[0] : e);
             return document.elementFromPoint(eventPoint.clientX, eventPoint.clientY)?.closest('.pdf-page-container')?.querySelector('.annotation-canvas');
         }
+        
+        // --- **DEFINICIÓN DE FUNCIONES FALTANTES** ---
+
+        async function saveAnnotation(annotationData) {
+            const annotationsRef = collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations");
+            await addDoc(annotationsRef, { ...annotationData, createdAt: serverTimestamp() });
+        }
+
+        function loadAllAnnotations() {
+            const annotationsQuery = query(collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations"), orderBy("createdAt"));
+            annotationsUnsubscribe = onSnapshot(annotationsQuery, (snapshot) => {
+                annotationsByPage = {};
+                snapshot.forEach(doc => {
+                    const annotation = { id: doc.id, ...doc.data() };
+                    if (!annotationsByPage[annotation.page]) annotationsByPage[annotation.page] = [];
+                    annotationsByPage[annotation.page].push(annotation);
+                });
+                document.querySelectorAll('.pdf-page-container').forEach(pageContainer => {
+                    if (pageContainer.querySelector('canvas')) {
+                         redrawAnnotations(pageContainer.dataset.pageNumber);
+                    }
+                });
+                // renderNotesToSidebar(); // Puedes descomentar esto si tienes esa función
+            });
+        }
+       
+        function redrawAnnotations(pageNum) {
+            const canvas = document.querySelector(`.annotation-canvas[data-page-num='${pageNum}']`);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            (annotationsByPage[pageNum] || []).forEach(annotation => drawPath(ctx, annotation));
+            if (isDrawing && parseInt(canvas.dataset.pageNum) == currentPageNum) { // Se podría ajustar esta lógica de página
+                drawPath(ctx, { type: activeTool, path: currentPath, color: activeColor });
+            }
+        }
+
+        function drawPath(ctx, annotation) {
+            if (!annotation.path || annotation.path.length < 2) return;
+            ctx.save();
+            ctx.strokeStyle = annotation.color;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(annotation.path[0].x, annotation.path[0].y);
+            annotation.path.forEach(point => ctx.lineTo(point.x, point.y));
+            
+            if (annotation.type === 'erase') {
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.lineWidth = 40;
+            } else {
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.lineWidth = annotation.type === 'highlight' ? 20 : 3;
+                ctx.globalAlpha = annotation.type === 'highlight' ? 0.4 : 1.0;
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // --- FUNCIONES ADICIONALES ---
         function updatePageIndicator() {
             if(!pdfDocument) return;
             const scrollCenterY = scrollContainer.scrollTop + scrollContainer.clientHeight / 2;
             let mostVisiblePage = 1;
             document.querySelectorAll('.pdf-page-container').forEach((pageEl, index) => {
-                if (scrollCenterY >= pageEl.offsetTop * zoomScale && scrollCenterY < (pageEl.offsetTop + pageEl.offsetHeight) * zoomScale) {
+                const pageTop = pageEl.offsetTop * zoomScale;
+                const pageBottom = pageTop + (pageEl.offsetHeight * zoomScale);
+                if (scrollCenterY >= pageTop && scrollCenterY < pageBottom) {
                     mostVisiblePage = index + 1;
                 }
             });
             currentPageNum = mostVisiblePage;
             document.getElementById('page-indicator').textContent = `${currentPageNum} / ${pdfDocument.numPages}`;
         }
-        // ... (resto de funciones auxiliares como saveAnnotation, loadAllAnnotations, etc.)
+
+        window.scrollToPage = (pageNum) => {
+            const pageEl = document.querySelector(`.pdf-page-container[data-page-number='${pageNum}']`);
+            if(pageEl) {
+                scrollContainer.scrollTop = pageEl.offsetTop * zoomScale - 20;
+                document.getElementById('sidebar').classList.remove('open');
+            }
+        };
+
+        async function toggleReadAloud() {
+            // ... (Función de voz)
+        }
+        function speakText(text) {
+            // ... (Función de voz)
+        }
+
     </script>
 </body>
 </html>
