@@ -14,8 +14,6 @@
         :root {
             --primary-color: #88c999; --background-color: #0f0f0f;
             --surface-color: #181818; --surface-border-color: #2a2a2a;
-            /* Novedad: Color para el resaltado de búsqueda */
-            --highlight-color: rgba(255, 221, 0, 0.4); 
         }
         html, body { height: 100%; width: 100%; overflow: hidden; background-color: var(--background-color); color: white; font-family: 'Inter', sans-serif; }
         .app-container { height: 100vh; display: flex; flex-direction: column; background-color: var(--background-color); position: relative; }
@@ -205,9 +203,6 @@
             let initialDistance = null;
             let drawingStartPoint = null;
             
-            // --- NOVEDAD: Variable global para guardar los resultados con coordenadas ---
-            let pdfSearchResults = [];
-
             const appContainer = document.querySelector('.app-container');
             const zoomContainer = document.getElementById('zoom-container');
             const pdfWrapper = document.getElementById('pdf-content-wrapper');
@@ -271,22 +266,6 @@
                         handlePdfSearch();
                     }
                 });
-                
-                // --- NOVEDAD: Event listener delegado para manejar clics en resultados ---
-                document.getElementById('pdf-search-results').addEventListener('click', (e) => {
-                    const resultLink = e.target.closest('a.search-result-link');
-                    if (resultLink) {
-                        e.preventDefault();
-                        const resultIndex = parseInt(resultLink.dataset.resultIndex, 10);
-                        const result = pdfSearchResults[resultIndex];
-                        if (result) {
-                            // Llamamos a scrollToPage con un callback para resaltar después
-                            scrollToPage(result.pageNum, () => {
-                                highlightWordsOnPage(result.pageNum, result.coords);
-                            });
-                        }
-                    }
-                });
 
                 document.getElementById('sidebar-overlay').addEventListener('click', () => sidebar.classList.remove('open'));
                 document.getElementById('read-aloud-btn').addEventListener('click', toggleReadAloud);
@@ -315,7 +294,7 @@
                     
                     const link = e.target.closest('.note-link');
                     if (link) {
-                        e.stopPropagation();
+                        e.stopPropagation(); // Prevenir que el click en el enlace dispare el scroll
                         return;
                     }
 
@@ -324,7 +303,6 @@
                 });
 
                 pdfWrapper.addEventListener('touchstart', (e) => {
-                    clearAllHighlights(); // Limpiar resaltados al tocar el PDF
                     if (e.target.id !== 'promote-note-btn') {
                         clearPromoteButton();
                     }
@@ -538,6 +516,7 @@
                 }
             }
             
+            // --- MODIFICADO: Ahora usa 'Enlace web' y guarda en el campo 'link' ---
             async function handleAddNewNote() {
                 const { value: formValues } = await Swal.fire({
                     target: '.app-container',
@@ -616,12 +595,13 @@
                 }
             }
 
+            // --- MODIFICADO: Muestra un ícono de enlace genérico ---
             function renderNotesToSidebar(searchTerm = '') {
                 const lowerCaseSearchTerm = searchTerm.toLowerCase();
                 notesList.innerHTML = '';
                 const annotationsWithNotes = Object.values(annotationsByPage)
                     .flat()
-                    .filter(a => a.id && (a.note || a.path?.length > 0))
+                    .filter(a => a.id && (a.note || a.path?.length > 0)) // Mostrar si tiene nota o es un dibujo/resaltado
                     .sort((a, b) => (a.page - b.page));
                 
                 const filteredAnnotations = lowerCaseSearchTerm ?
@@ -665,6 +645,7 @@
                 notesList.innerHTML = htmlContent;
             }
 
+            // --- MODIFICADO: Ahora usa 'Enlace web' y actualiza el campo 'link' ---
             async function handleEditNote(annotationId) {
                 if (!annotationId) return;
                 const originalAnnotation = Object.values(annotationsByPage).flat().find(a => a.id === annotationId);
@@ -821,43 +802,14 @@
                 currentPageNum = mostVisiblePage;
                 indicator.textContent = `${currentPageNum} / ${pdfDocument.numPages}`;
             }
-            
-            // --- NOVEDAD: Modificado para aceptar un callback de forma segura ---
-            window.scrollToPage = (pageNum, callback) => {
+
+            window.scrollToPage = (pageNum) => {
                 const pageEl = document.querySelector(`.pdf-page-container[data-page-number='${pageNum}']`);
                 if(pageEl) {
-                    if (document.getElementById('sidebar').classList.contains('open')) {
-                        document.getElementById('sidebar').classList.remove('open');
-                    }
-                    
-                    const onScrollEnd = () => {
-                        scrollContainer.removeEventListener('scroll', checkScrollEnd);
-                        if (callback && typeof callback === 'function') {
-                            // Pequeña demora para asegurar que el renderizado ha terminado
-                            setTimeout(callback, 200); 
-                        }
-                    };
-
-                    let scrollTimeout;
-                    const checkScrollEnd = () => {
-                        clearTimeout(scrollTimeout);
-                        scrollTimeout = setTimeout(onScrollEnd, 150);
-                    };
-                    
-                    // Si la página ya está visible, no habrá evento de scroll, así que llamamos al callback directamente
-                    const rect = pageEl.getBoundingClientRect();
-                    const isVisible = rect.top >= 0 && rect.bottom <= scrollContainer.clientHeight;
-                    
-                    if(isVisible) {
-                         if (callback && typeof callback === 'function') callback();
-                    } else {
-                        scrollContainer.addEventListener('scroll', checkScrollEnd);
-                        scrollContainer.scrollTop = pageEl.offsetTop - 20;
-                        checkScrollEnd(); // Iniciar el primer chequeo
-                    }
+                    scrollContainer.scrollTop = pageEl.offsetTop - 20;
+                    document.getElementById('sidebar').classList.remove('open');
                 }
             };
-
 
             async function toggleReadAloud() {
                 let isReading = speechSynthesis.speaking;
@@ -869,7 +821,7 @@
                     btn.classList.add('text-[var(--primary-color)]');
                     for (let i = currentPageNum; i <= pdfDocument.numPages; i++) {
                         if (!speechSynthesis.speaking && i > currentPageNum) break;
-                        await new Promise(resolve => scrollToPage(i, resolve));
+                        scrollToPage(i);
                         const page = await pdfDocument.getPage(i);
                         const textContent = await page.getTextContent();
                         const pageText = textContent.items.map(item => item.str).join(' ');
@@ -899,16 +851,11 @@
                 });
             }
 
-            // =================================================================
-            // INICIO: BÚSQUEDA Y RESALTADO DE TEXTO (NUEVA VERSIÓN ESTABLE)
-            // =================================================================
-
+            // --- ¡MEJORADO! Ahora busca y extrae un fragmento de texto ---
             async function handlePdfSearch() {
                 const resultsContainer = document.getElementById('pdf-search-results');
                 const searchInput = document.getElementById('pdf-search-input');
                 const searchTerm = searchInput.value;
-                pdfSearchResults = [];
-                
                 if (!searchTerm || !pdfDocument) {
                     resultsContainer.innerHTML = '';
                     return;
@@ -916,83 +863,53 @@
                 
                 resultsContainer.innerHTML = `<p class="text-sm text-gray-400 p-2">Buscando...</p>`;
 
+                const searchResults = [];
                 const numPages = pdfDocument.numPages;
                 const searchTermLower = searchTerm.toLowerCase();
 
                 for (let i = 1; i <= numPages; i++) {
                     const page = await pdfDocument.getPage(i);
                     const textContent = await page.getTextContent();
-                    const pageText = textContent.items.map(item => item.str).join('');
+                    const pageText = textContent.items.map(item => item.str).join(' ');
                     const pageTextLower = pageText.toLowerCase();
                     
                     let lastIndex = -1;
                     while ((lastIndex = pageTextLower.indexOf(searchTermLower, lastIndex + 1)) !== -1) {
-                        
-                        let charCount = 0;
-                        let firstItemIndex = -1, lastItemIndex = -1;
-
-                        for(let k = 0; k < textContent.items.length; k++) {
-                            const item = textContent.items[k];
-                            const itemEnd = charCount + item.str.length;
-                            
-                            // Si el item está dentro del rango del término buscado
-                            if (itemEnd > lastIndex && charCount < lastIndex + searchTerm.length) {
-                                if (firstItemIndex === -1) {
-                                    firstItemIndex = k;
-                                }
-                                lastItemIndex = k;
-                            }
-                            charCount = itemEnd;
-                            if (charCount > lastIndex + searchTerm.length) break;
-                        }
-
-                        if(firstItemIndex !== -1) {
-                             const firstItem = textContent.items[firstItemIndex];
-                             const lastItem = textContent.items[lastItemIndex];
-                             
-                             const viewport = page.getViewport({ scale: 2.0 }); // Usar la escala de renderizado
-                             const firstTransform = pdfjsLib.util.transform(viewport.transform, firstItem.transform);
-                             const lastTransform = pdfjsLib.util.transform(viewport.transform, lastItem.transform);
-
-                             const coords = {
-                                x: firstTransform[4],
-                                y: firstTransform[5] - firstItem.height,
-                                width: (lastTransform[4] + lastItem.width) - firstTransform[4],
-                                height: firstItem.height * 1.2
-                             };
-
-                            const contextChars = 40;
-                            const start = Math.max(0, lastIndex - contextChars);
-                            const end = Math.min(pageText.length, lastIndex + searchTerm.length + contextChars);
-                            const snippet = pageText.substring(start, end);
-                            
-                            pdfSearchResults.push({ pageNum: i, snippet, coords });
-                        }
+                        const contextChars = 40;
+                        const start = Math.max(0, lastIndex - contextChars);
+                        const end = Math.min(pageText.length, lastIndex + searchTerm.length + contextChars);
+                        const snippet = pageText.substring(start, end);
+                        searchResults.push({ pageNum: i, snippet: snippet });
                     }
                 }
-                displaySearchResults(searchTerm);
+
+                displaySearchResults(searchResults, searchTerm);
             }
             
-            function displaySearchResults(searchTerm) {
+            // --- ¡MEJORADO! Muestra el fragmento de texto en los resultados ---
+            function displaySearchResults(results, searchTerm) {
                 const resultsContainer = document.getElementById('pdf-search-results');
                 resultsContainer.innerHTML = '';
 
-                if (pdfSearchResults.length === 0) {
+                if (results.length === 0) {
                     resultsContainer.innerHTML = `<p class="text-sm text-center text-gray-500 p-2">No se encontró "${searchTerm}".</p>`;
                     return;
                 }
 
+                // Usamos una expresión regular para resaltar todas las ocurrencias, ignorando mayúsculas/minúsculas
                 const regex = new RegExp(searchTerm.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi');
                 
                 let resultsHtml = `
-                    <h4 class="text-sm font-bold text-white mb-2">Resultados (${pdfSearchResults.length}):</h4>
+                    <h4 class="text-sm font-bold text-white mb-2">Resultados (${results.length}):</h4>
                     <ul class="text-left list-none pl-0" style="max-height: 250px; overflow-y: auto;">`;
                 
-                pdfSearchResults.forEach((result, index) => {
+                results.forEach(result => {
                     const highlightedSnippet = result.snippet.replace(regex, '<strong class="text-[var(--primary-color)]">$&</strong>');
+                    
                     resultsHtml += `
                         <li class="mb-1">
-                            <a href="#" class="search-result-link block p-2 rounded-md hover:bg-[#2a2a2a] text-xs" data-result-index="${index}">
+                            <a href="#" onclick="window.scrollToPage(${result.pageNum}); return false;" 
+                               class="block p-2 rounded-md hover:bg-[#2a2a2a] text-xs">
                                 <span class="font-bold block mb-1">Página ${result.pageNum}</span>
                                 <span class="text-gray-400">...${highlightedSnippet}...</span>
                             </a>
@@ -1002,33 +919,6 @@
                 
                 resultsContainer.innerHTML = resultsHtml;
             }
-            
-            // --- NOVEDAD: Funciones para dibujar y limpiar el resaltado ---
-            function highlightWordsOnPage(pageNum, coords) {
-                clearAllHighlights(); 
-                const canvas = document.querySelector(`.annotation-canvas[data-page-num='${pageNum}']`);
-                if (!canvas) return;
-
-                const ctx = canvas.getContext('2d');
-                ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--highlight-color').trim();
-                
-                ctx.fillRect(coords.x, coords.y, coords.width, coords.height);
-                
-                setTimeout(clearAllHighlights, 3000);
-            }
-            
-            function clearAllHighlights() {
-                for (let i = 1; i <= (pdfDocument?.numPages || 0); i++) {
-                    const canvas = document.querySelector(`.annotation-canvas[data-page-num='${i}']`);
-                    // Solo redibujar las visibles para optimizar
-                    if (canvas && canvas.offsetParent !== null) { 
-                        redrawAnnotations(i);
-                    }
-                }
-            }
-            // =================================================================
-            // FIN: BÚSQUEDA Y RESALTADO DE TEXTO
-            // =================================================================
         });
     </script>
 </body>
