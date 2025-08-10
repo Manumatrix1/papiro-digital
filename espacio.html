@@ -14,6 +14,8 @@
         :root {
             --primary-color: #88c999; --background-color: #0f0f0f;
             --surface-color: #181818; --surface-border-color: #2a2a2a;
+            /* Novedad: Color para el resaltado de búsqueda */
+            --highlight-color: rgba(255, 221, 0, 0.4); 
         }
         html, body { height: 100%; width: 100%; overflow: hidden; background-color: var(--background-color); color: white; font-family: 'Inter', sans-serif; }
         .app-container { height: 100vh; display: flex; flex-direction: column; background-color: var(--background-color); position: relative; }
@@ -203,6 +205,7 @@
             let initialDistance = null;
             let drawingStartPoint = null;
             
+            // --- NOVEDAD: Variable global para guardar los resultados con coordenadas ---
             let pdfSearchResults = [];
 
             const appContainer = document.querySelector('.app-container');
@@ -268,6 +271,22 @@
                         handlePdfSearch();
                     }
                 });
+                
+                // --- NOVEDAD: Event listener delegado para manejar clics en resultados ---
+                document.getElementById('pdf-search-results').addEventListener('click', (e) => {
+                    const resultLink = e.target.closest('a.search-result-link');
+                    if (resultLink) {
+                        e.preventDefault();
+                        const resultIndex = parseInt(resultLink.dataset.resultIndex, 10);
+                        const result = pdfSearchResults[resultIndex];
+                        if (result) {
+                            // Llamamos a scrollToPage con un callback para resaltar después
+                            scrollToPage(result.pageNum, () => {
+                                highlightWordsOnPage(result.pageNum, result.coords);
+                            });
+                        }
+                    }
+                });
 
                 document.getElementById('sidebar-overlay').addEventListener('click', () => sidebar.classList.remove('open'));
                 document.getElementById('read-aloud-btn').addEventListener('click', toggleReadAloud);
@@ -305,6 +324,7 @@
                 });
 
                 pdfWrapper.addEventListener('touchstart', (e) => {
+                    clearAllHighlights(); // Limpiar resaltados al tocar el PDF
                     if (e.target.id !== 'promote-note-btn') {
                         clearPromoteButton();
                     }
@@ -468,4 +488,548 @@
                 };
                 try {
                     const docRef = await saveAnnotation(annotationData);
-                    showPromoteButton(
+                    showPromoteButton(docRef.id, e, canvas);
+                } catch (error) {
+                    console.error("Error al guardar la anotación inicial:", error);
+                }
+                currentPath = [];
+                drawingStartPoint = null;
+            }
+            
+            function showPromoteButton(annotationId, endEvent, canvas) {
+                clearPromoteButton();
+                const rect = canvas.getBoundingClientRect();
+                const touch = endEvent.changedTouches[0] || endEvent;
+                const btn = document.createElement('button');
+                btn.id = 'promote-note-btn';
+                btn.textContent = 'G';
+                btn.title = 'Guardar en el Cuaderno';
+                btn.style.left = `${touch.clientX - rect.left + scrollContainer.scrollLeft + 15}px`;
+                btn.style.top = `${touch.clientY - rect.top + scrollContainer.scrollTop - 18}px`;
+                const handleClick = (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    handleEditNote(annotationId);
+                    clearPromoteButton();
+                };
+                btn.addEventListener('click', handleClick);
+                btn.addEventListener('touchend', handleClick);
+                appContainer.appendChild(btn);
+                setTimeout(clearPromoteButton, 5000);
+            }
+
+            function clearPromoteButton() {
+                const existingBtn = document.getElementById('promote-note-btn');
+                if (existingBtn) {
+                    existingBtn.remove();
+                }
+            }
+
+            function redrawAnnotations(pageNum) {
+                const canvas = document.querySelector(`.annotation-canvas[data-page-num='${pageNum}']`);
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                (annotationsByPage[pageNum] || []).forEach(annotation => {
+                    if (annotation.path?.length > 0) drawPath(ctx, annotation);
+                });
+                if (isDrawing && currentPageNum == pageNum) {
+                    drawPath(ctx, { type: activeTool, path: currentPath, color: activeColor });
+                }
+            }
+            
+            async function handleAddNewNote() {
+                const { value: formValues } = await Swal.fire({
+                    target: '.app-container',
+                    title: 'Nueva Nota',
+                    html: `
+                        <div class="swal-note-container">
+                            <div><label for="swal-note">Nota</label><textarea id="swal-note" class="swal2-textarea" placeholder="Escribe tu nota..."></textarea></div>
+                            <div><label for="swal-page">Número de página</label><input type="number" id="swal-page" class="swal2-input" placeholder="Ej: 5" min="1" max="${pdfDocument.numPages}"></div>
+                            <div><label for="swal-link">Enlace web (opcional)</label><input type="url" id="swal-link" class="swal2-input" placeholder="https://..."></div>
+                            <div class="swal-color-container"><label for="swal-color">Color de la etiqueta</label><input type="color" id="swal-color" value="#88c999"><div id="swal-color-preview" style="background-color: #88c999;"></div></div>
+                        </div>`,
+                    focusConfirm: false,
+                    showCancelButton: true,
+                    confirmButtonText: 'Guardar',
+                    didOpen: () => {
+                        const colorInput = document.getElementById('swal-color');
+                        const colorPreview = document.getElementById('swal-color-preview');
+                        colorInput.oninput = (e) => { colorPreview.style.backgroundColor = e.target.value; };
+                    },
+                    preConfirm: () => {
+                        return {
+                            note: document.getElementById('swal-note').value,
+                            page: parseInt(document.getElementById('swal-page').value),
+                            color: document.getElementById('swal-color').value,
+                            link: document.getElementById('swal-link').value
+                        }
+                    }
+                });
+                if (formValues && formValues.note && formValues.page) {
+                    await saveAnnotation({
+                        type: 'text', note: formValues.note, page: formValues.page,
+                        color: formValues.color, link: formValues.link || "", path: []
+                    });
+                }
+            }
+
+            async function handleClearNotes() {
+                const result = await Swal.fire({
+                    target: '.app-container',
+                    title: '¿Limpiar todas las notas?',
+                    text: "Se borrará el texto y enlaces de todas las notas, pero los resaltados y dibujos permanecerán.",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    confirmButtonText: 'Sí, limpiar',
+                    cancelButtonText: 'Cancelar'
+                });
+                if (result.isConfirmed) {
+                    const batch = writeBatch(db);
+                    Object.values(annotationsByPage).flat().filter(a => a.note || a.link).forEach(a => {
+                        const docRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", a.id);
+                        batch.update(docRef, { note: "", link: "" });
+                    });
+                    await batch.commit();
+                }
+            }
+
+            async function handleClearAll() {
+                 const result = await Swal.fire({
+                    target: '.app-container',
+                    title: '¿Limpiar todo el documento?',
+                    text: "Se borrarán TODAS las anotaciones. Esta acción no se puede deshacer.",
+                    icon: 'error',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    confirmButtonText: 'Sí, borrar todo',
+                    cancelButtonText: 'Cancelar'
+                });
+                if (result.isConfirmed) {
+                    const batch = writeBatch(db);
+                    Object.values(annotationsByPage).flat().forEach(a => {
+                        const docRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", a.id);
+                        batch.delete(docRef);
+                    });
+                    await batch.commit();
+                }
+            }
+
+            function renderNotesToSidebar(searchTerm = '') {
+                const lowerCaseSearchTerm = searchTerm.toLowerCase();
+                notesList.innerHTML = '';
+                const annotationsWithNotes = Object.values(annotationsByPage)
+                    .flat()
+                    .filter(a => a.id && (a.note || a.path?.length > 0))
+                    .sort((a, b) => (a.page - b.page));
+                
+                const filteredAnnotations = lowerCaseSearchTerm ?
+                    annotationsWithNotes.filter(a => a.note && a.note.toLowerCase().includes(lowerCaseSearchTerm)) :
+                    annotationsWithNotes;
+
+                if (filteredAnnotations.length === 0) {
+                    notesList.innerHTML = `<p class="text-gray-500 text-center p-4">No hay notas guardadas.</p>`;
+                    return;
+                }
+
+                let htmlContent = '';
+                filteredAnnotations.forEach(annotation => {
+                    const linkIcon = annotation.link ?
+                        `<a href="${annotation.link}" target="_blank" class="note-link text-blue-400 hover:text-blue-300 ml-2" title="Abrir enlace"><i class="fas fa-link"></i></a>` : '';
+                    
+                    const noteText = annotation.note ? 
+                         `<p class="text-white text-sm break-words note-text">${annotation.note}</p>` : 
+                         `<p class="text-gray-400 text-sm italic">Anotación en página ${annotation.page}</p>`;
+                    
+                    htmlContent += `
+                        <div class="note-card" data-id="${annotation.id}" data-page="${annotation.page}" style="cursor: pointer;">
+                            <div class="relative">
+                                <div class="flex justify-between items-center">
+                                    <div class="flex items-center gap-2" onclick="window.scrollToPage(${annotation.page})">
+                                        <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color:${annotation.color};"></span>
+                                        <span class="text-xs font-bold text-gray-400 hover:text-white">Página ${annotation.page}</span>
+                                        ${linkIcon}
+                                    </div>
+                                    <div class="note-actions flex gap-2">
+                                        <button class="edit-note-btn text-gray-400 hover:text-white" data-id="${annotation.id}"><i class="fas fa-edit"></i></button>
+                                        <button class="delete-note-btn text-gray-400 hover:text-red-500" data-id="${annotation.id}"><i class="fas fa-trash"></i></button>
+                                    </div>
+                                </div>
+                                <div class="mt-2 pl-5" onclick="window.scrollToPage(${annotation.page})">
+                                     ${noteText}
+                                </div>
+                            </div>
+                        </div>`;
+                });
+                notesList.innerHTML = htmlContent;
+            }
+
+            async function handleEditNote(annotationId) {
+                if (!annotationId) return;
+                const originalAnnotation = Object.values(annotationsByPage).flat().find(a => a.id === annotationId);
+                if (!originalAnnotation) return;
+                const { value: formValues } = await Swal.fire({
+                    target: '.app-container',
+                    title: 'Editar Nota',
+                    html: `
+                        <div class="swal-note-container">
+                            <div><label for="swal-note-edit">Nota</label><textarea id="swal-note-edit" class="swal2-textarea" placeholder="Escribe tu nota...">${originalAnnotation.note || ''}</textarea></div>
+                            <div><label for="swal-link-edit">Enlace web (opcional)</label><input type="url" id="swal-link-edit" class="swal2-input" placeholder="https://..." value="${originalAnnotation.link || ''}"></div>
+                        </div>`,
+                    showCancelButton: true,
+                    confirmButtonText: 'Guardar',
+                    cancelButtonText: 'Cancelar',
+                    preConfirm: () => {
+                        return {
+                            note: document.getElementById('swal-note-edit').value,
+                            link: document.getElementById('swal-link-edit').value
+                        }
+                    }
+                });
+                if (formValues) {
+                    const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
+                    await updateDoc(noteRef, { note: formValues.note, link: formValues.link });
+                }
+            }
+
+            function handleDeleteNote(annotationId) {
+                if (!annotationId) return;
+                Swal.fire({
+                    target: '.app-container',
+                    title: '¿Borrar anotación?',
+                    text: "Se borrará la anotación por completo. Esta acción no se puede deshacer.",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    confirmButtonText: 'Sí, borrar',
+                    cancelButtonText: 'Cancelar'
+                }).then(async (result) => {
+                    if (result.isConfirmed) {
+                        const noteRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations", annotationId);
+                        await deleteDoc(noteRef);
+                    }
+                });
+            }
+
+            function saveAnnotation(annotationData) {
+                return addDoc(collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations"), {
+                    ...annotationData,
+                    createdAt: serverTimestamp()
+                });
+            }
+
+            function loadAllAnnotations() {
+                if (annotationsUnsubscribe) annotationsUnsubscribe();
+                const annotationsQuery = query(collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations"), orderBy("createdAt"));
+                annotationsUnsubscribe = onSnapshot(annotationsQuery, (snapshot) => {
+                    annotationsByPage = {};
+                    snapshot.docs.forEach(doc => {
+                        const annotation = { id: doc.id, ...doc.data() };
+                        if (!annotationsByPage[annotation.page]) annotationsByPage[annotation.page] = [];
+                        annotationsByPage[annotation.page].push(annotation);
+                    });
+                    const currentSearch = document.getElementById('note-search-input')?.value || '';
+                    renderNotesToSidebar(currentSearch);
+                    document.querySelectorAll('.pdf-page-container').forEach(pageContainer => {
+                        if (pageContainer.querySelector('canvas')) redrawAnnotations(pageContainer.dataset.pageNumber);
+                    });
+                });
+            }
+
+            function setActiveTool(tool) {
+                clearPromoteButton();
+                activeTool = tool;
+                document.querySelectorAll('#main-tools .tool-btn').forEach(btn => btn.classList.remove('active'));
+                document.getElementById(`tool-${tool}`).classList.add('active');
+            }
+
+            function startDrawing(e) {
+                clearPromoteButton();
+                if (activeTool === 'select' || !e.touches) return;
+                e.preventDefault();
+                isDrawing = true;
+                const canvas = findCanvasUnderPointer(e);
+                if (canvas) {
+                    currentPageNum = parseInt(canvas.dataset.pageNum);
+                    const coords = getCoords(e, canvas);
+                    drawingStartPoint = coords;
+                    currentPath = [coords];
+                }
+            }
+
+            function draw(e) {
+                if (!isDrawing) return;
+                const canvas = findCanvasUnderPointer(e);
+                if (canvas) {
+                    const currentCoords = getCoords(e, canvas);
+                    if (activeTool === 'highlight') {
+                        currentPath = [drawingStartPoint, { x: currentCoords.x, y: drawingStartPoint.y }];
+                    } else {
+                        currentPath.push(currentCoords);
+                    }
+                    redrawAnnotations(canvas.dataset.pageNum);
+                }
+            }
+
+            function getCoords(e, canvas) {
+                const rect = canvas.getBoundingClientRect();
+                const touch = e.touches?.[0] || e.changedTouches?.[0];
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                return { x: (touch.clientX - rect.left) * scaleX, y: (touch.clientY - rect.top) * scaleY };
+            }
+
+            function findCanvasUnderPointer(e, isEndEvent = false) {
+                const touch = isEndEvent ? (e.changedTouches?.[0]) : (e.touches?.[0]);
+                if (!touch) return null;
+                const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                return element?.closest('.pdf-page-container')?.querySelector('.annotation-canvas');
+            }
+
+            function drawPath(ctx, annotation) {
+                if (!annotation.path || annotation.path.length < 2) return;
+                ctx.save();
+                ctx.strokeStyle = annotation.color;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                ctx.moveTo(annotation.path[0].x, annotation.path[0].y);
+                annotation.path.forEach(point => ctx.lineTo(point.x, point.y));
+                if (annotation.type === 'erase') {
+                    ctx.globalCompositeOperation = 'destination-out';
+                    ctx.lineWidth = 40;
+                } else {
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.lineWidth = annotation.type === 'highlight' ? 20 : 3;
+                    ctx.globalAlpha = annotation.type === 'highlight' ? 0.4 : 1.0;
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            function updatePageIndicator() {
+                if(!pdfDocument) return;
+                const indicator = document.getElementById('page-indicator');
+                const scrollCenterY = scrollContainer.scrollTop + scrollContainer.clientHeight / 2;
+                let mostVisiblePage = 1;
+                document.querySelectorAll('.pdf-page-container').forEach((pageEl, index) => {
+                    const pageTop = pageEl.offsetTop * zoomScale;
+                    const pageBottom = pageTop + (pageEl.offsetHeight * zoomScale);
+                    if (scrollCenterY >= pageTop && scrollCenterY < pageBottom) mostVisiblePage = index + 1;
+                });
+                currentPageNum = mostVisiblePage;
+                indicator.textContent = `${currentPageNum} / ${pdfDocument.numPages}`;
+            }
+            
+            // --- NOVEDAD: Modificado para aceptar un callback de forma segura ---
+            window.scrollToPage = (pageNum, callback) => {
+                const pageEl = document.querySelector(`.pdf-page-container[data-page-number='${pageNum}']`);
+                if(pageEl) {
+                    if (document.getElementById('sidebar').classList.contains('open')) {
+                        document.getElementById('sidebar').classList.remove('open');
+                    }
+                    
+                    const onScrollEnd = () => {
+                        scrollContainer.removeEventListener('scroll', checkScrollEnd);
+                        if (callback && typeof callback === 'function') {
+                            // Pequeña demora para asegurar que el renderizado ha terminado
+                            setTimeout(callback, 200); 
+                        }
+                    };
+
+                    let scrollTimeout;
+                    const checkScrollEnd = () => {
+                        clearTimeout(scrollTimeout);
+                        scrollTimeout = setTimeout(onScrollEnd, 150);
+                    };
+                    
+                    // Si la página ya está visible, no habrá evento de scroll, así que llamamos al callback directamente
+                    const rect = pageEl.getBoundingClientRect();
+                    const isVisible = rect.top >= 0 && rect.bottom <= scrollContainer.clientHeight;
+                    
+                    if(isVisible) {
+                         if (callback && typeof callback === 'function') callback();
+                    } else {
+                        scrollContainer.addEventListener('scroll', checkScrollEnd);
+                        scrollContainer.scrollTop = pageEl.offsetTop - 20;
+                        checkScrollEnd(); // Iniciar el primer chequeo
+                    }
+                }
+            };
+
+
+            async function toggleReadAloud() {
+                let isReading = speechSynthesis.speaking;
+                const btn = document.getElementById('read-aloud-btn');
+                if (isReading) {
+                    speechSynthesis.cancel();
+                    btn.classList.remove('text-[var(--primary-color)]');
+                } else {
+                    btn.classList.add('text-[var(--primary-color)]');
+                    for (let i = currentPageNum; i <= pdfDocument.numPages; i++) {
+                        if (!speechSynthesis.speaking && i > currentPageNum) break;
+                        await new Promise(resolve => scrollToPage(i, resolve));
+                        const page = await pdfDocument.getPage(i);
+                        const textContent = await page.getTextContent();
+                        const pageText = textContent.items.map(item => item.str).join(' ');
+                        const shouldContinue = await speakText(pageText);
+                        if (!shouldContinue) break;
+                    }
+                    btn.classList.remove('text-[var(--primary-color)]');
+                }
+            }
+
+            function speakText(text) {
+                return new Promise(resolve => {
+                    if (!speechSynthesis) return resolve(false);
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'es-ES';
+                    let cancelled = false;
+                    utterance.onend = () => resolve(!cancelled);
+                    utterance.onerror = () => resolve(false);
+                    const checkCancelInterval = setInterval(() => {
+                        if (!speechSynthesis.speaking) {
+                            cancelled = true;
+                            clearInterval(checkCancelInterval);
+                            resolve(false);
+                        }
+                    }, 250);
+                    speechSynthesis.speak(utterance);
+                });
+            }
+
+            // =================================================================
+            // INICIO: BÚSQUEDA Y RESALTADO DE TEXTO (NUEVA VERSIÓN ESTABLE)
+            // =================================================================
+
+            async function handlePdfSearch() {
+                const resultsContainer = document.getElementById('pdf-search-results');
+                const searchInput = document.getElementById('pdf-search-input');
+                const searchTerm = searchInput.value;
+                pdfSearchResults = [];
+                
+                if (!searchTerm || !pdfDocument) {
+                    resultsContainer.innerHTML = '';
+                    return;
+                }
+                
+                resultsContainer.innerHTML = `<p class="text-sm text-gray-400 p-2">Buscando...</p>`;
+
+                const numPages = pdfDocument.numPages;
+                const searchTermLower = searchTerm.toLowerCase();
+
+                for (let i = 1; i <= numPages; i++) {
+                    const page = await pdfDocument.getPage(i);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join('');
+                    const pageTextLower = pageText.toLowerCase();
+                    
+                    let lastIndex = -1;
+                    while ((lastIndex = pageTextLower.indexOf(searchTermLower, lastIndex + 1)) !== -1) {
+                        
+                        let charCount = 0;
+                        let firstItemIndex = -1, lastItemIndex = -1;
+
+                        for(let k = 0; k < textContent.items.length; k++) {
+                            const item = textContent.items[k];
+                            const itemEnd = charCount + item.str.length;
+                            
+                            // Si el item está dentro del rango del término buscado
+                            if (itemEnd > lastIndex && charCount < lastIndex + searchTerm.length) {
+                                if (firstItemIndex === -1) {
+                                    firstItemIndex = k;
+                                }
+                                lastItemIndex = k;
+                            }
+                            charCount = itemEnd;
+                            if (charCount > lastIndex + searchTerm.length) break;
+                        }
+
+                        if(firstItemIndex !== -1) {
+                             const firstItem = textContent.items[firstItemIndex];
+                             const lastItem = textContent.items[lastItemIndex];
+                             
+                             const viewport = page.getViewport({ scale: 2.0 }); // Usar la escala de renderizado
+                             const firstTransform = pdfjsLib.util.transform(viewport.transform, firstItem.transform);
+                             const lastTransform = pdfjsLib.util.transform(viewport.transform, lastItem.transform);
+
+                             const coords = {
+                                x: firstTransform[4],
+                                y: firstTransform[5] - firstItem.height,
+                                width: (lastTransform[4] + lastItem.width) - firstTransform[4],
+                                height: firstItem.height * 1.2
+                             };
+
+                            const contextChars = 40;
+                            const start = Math.max(0, lastIndex - contextChars);
+                            const end = Math.min(pageText.length, lastIndex + searchTerm.length + contextChars);
+                            const snippet = pageText.substring(start, end);
+                            
+                            pdfSearchResults.push({ pageNum: i, snippet, coords });
+                        }
+                    }
+                }
+                displaySearchResults(searchTerm);
+            }
+            
+            function displaySearchResults(searchTerm) {
+                const resultsContainer = document.getElementById('pdf-search-results');
+                resultsContainer.innerHTML = '';
+
+                if (pdfSearchResults.length === 0) {
+                    resultsContainer.innerHTML = `<p class="text-sm text-center text-gray-500 p-2">No se encontró "${searchTerm}".</p>`;
+                    return;
+                }
+
+                const regex = new RegExp(searchTerm.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi');
+                
+                let resultsHtml = `
+                    <h4 class="text-sm font-bold text-white mb-2">Resultados (${pdfSearchResults.length}):</h4>
+                    <ul class="text-left list-none pl-0" style="max-height: 250px; overflow-y: auto;">`;
+                
+                pdfSearchResults.forEach((result, index) => {
+                    const highlightedSnippet = result.snippet.replace(regex, '<strong class="text-[var(--primary-color)]">$&</strong>');
+                    resultsHtml += `
+                        <li class="mb-1">
+                            <a href="#" class="search-result-link block p-2 rounded-md hover:bg-[#2a2a2a] text-xs" data-result-index="${index}">
+                                <span class="font-bold block mb-1">Página ${result.pageNum}</span>
+                                <span class="text-gray-400">...${highlightedSnippet}...</span>
+                            </a>
+                        </li>`;
+                });
+                resultsHtml += '</ul>';
+                
+                resultsContainer.innerHTML = resultsHtml;
+            }
+            
+            // --- NOVEDAD: Funciones para dibujar y limpiar el resaltado ---
+            function highlightWordsOnPage(pageNum, coords) {
+                clearAllHighlights(); 
+                const canvas = document.querySelector(`.annotation-canvas[data-page-num='${pageNum}']`);
+                if (!canvas) return;
+
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--highlight-color').trim();
+                
+                ctx.fillRect(coords.x, coords.y, coords.width, coords.height);
+                
+                setTimeout(clearAllHighlights, 3000);
+            }
+            
+            function clearAllHighlights() {
+                for (let i = 1; i <= (pdfDocument?.numPages || 0); i++) {
+                    const canvas = document.querySelector(`.annotation-canvas[data-page-num='${i}']`);
+                    // Solo redibujar las visibles para optimizar
+                    if (canvas && canvas.offsetParent !== null) { 
+                        redrawAnnotations(i);
+                    }
+                }
+            }
+            // =================================================================
+            // FIN: BÚSQUEDA Y RESALTADO DE TEXTO
+            // =================================================================
+        });
+    </script>
+</body>
+</html>
