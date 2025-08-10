@@ -204,7 +204,6 @@
             let initialDistance = null;
             let drawingStartPoint = null;
             
-            // Novedad: Variable para almacenar los resultados de búsqueda completos
             let pdfSearchResults = [];
 
             const appContainer = document.querySelector('.app-container');
@@ -271,7 +270,6 @@
                     }
                 });
 
-                // Novedad: Event listener delegado para los resultados de búsqueda
                 document.getElementById('pdf-search-results').addEventListener('click', (e) => {
                     const resultLink = e.target.closest('a.search-result-link');
                     if (resultLink) {
@@ -285,7 +283,6 @@
                         }
                     }
                 });
-
 
                 document.getElementById('sidebar-overlay').addEventListener('click', () => sidebar.classList.remove('open'));
                 document.getElementById('read-aloud-btn').addEventListener('click', toggleReadAloud);
@@ -820,7 +817,6 @@
                 indicator.textContent = `${currentPageNum} / ${pdfDocument.numPages}`;
             }
 
-            // --- MODIFICADO: Acepta un 'callback' para ejecutar después de hacer scroll ---
             window.scrollToPage = (pageNum, callback) => {
                 const pageEl = document.querySelector(`.pdf-page-container[data-page-number='${pageNum}']`);
                 if(pageEl) {
@@ -829,7 +825,6 @@
                     const onScrollEnd = () => {
                         scrollContainer.removeEventListener('scroll', checkScrollEnd);
                         if (callback) {
-                            // Pequeña demora para asegurar que el renderizado ha terminado
                             setTimeout(callback, 100); 
                         }
                     };
@@ -842,9 +837,8 @@
                     
                     scrollContainer.addEventListener('scroll', checkScrollEnd);
                     scrollContainer.scrollTop = pageEl.offsetTop - 20;
-                    // Si no hay scroll, el evento no se dispara, así que llamamos directamente
-                    if (scrollContainer.scrollTop === pageEl.offsetTop - 20) {
-                        checkScrollEnd();
+                    if (Math.abs(scrollContainer.scrollTop - (pageEl.offsetTop - 20)) < 1) {
+                       checkScrollEnd();
                     }
                 }
             };
@@ -893,12 +887,12 @@
             // INICIO: BÚSQUEDA Y RESALTADO DE TEXTO
             // =================================================================
 
-            // --- ¡MEJORADO! Ahora busca y guarda las coordenadas del texto ---
+            // --- FUNCIÓN CORREGIDA Y SIMPLIFICADA ---
             async function handlePdfSearch() {
                 const resultsContainer = document.getElementById('pdf-search-results');
                 const searchInput = document.getElementById('pdf-search-input');
                 const searchTerm = searchInput.value;
-                pdfSearchResults = []; // Limpia resultados anteriores
+                pdfSearchResults = [];
                 
                 if (!searchTerm || !pdfDocument) {
                     resultsContainer.innerHTML = '';
@@ -913,35 +907,31 @@
                 for (let i = 1; i <= numPages; i++) {
                     const page = await pdfDocument.getPage(i);
                     const textContent = await page.getTextContent();
-                    const viewport = page.getViewport({ scale: 2.0 }); // Usar la misma escala del renderizado
+                    const viewport = page.getViewport({ scale: 1.0 }); // Escala base para coordenadas
 
-                    const pageText = textContent.items.map(item => item.str).join('');
-                    const pageTextLower = pageText.toLowerCase();
-                    
-                    let lastIndex = -1;
-                    while ((lastIndex = pageTextLower.indexOf(searchTermLower, lastIndex + 1)) !== -1) {
-                        const contextChars = 40;
-                        const startSnippet = Math.max(0, lastIndex - contextChars);
-                        const endSnippet = Math.min(pageText.length, lastIndex + searchTerm.length + contextChars);
-                        const snippet = pageText.substring(startSnippet, endSnippet);
+                    for (let j = 0; j < textContent.items.length; j++) {
+                        const item = textContent.items[j];
+                        if (item.str.toLowerCase().includes(searchTermLower)) {
+                            // Construir un snippet de contexto
+                            const contextRange = 5;
+                            const start = Math.max(0, j - contextRange);
+                            const end = Math.min(textContent.items.length, j + contextRange + 1);
+                            const snippet = textContent.items.slice(start, end).map(i => i.str).join('');
 
-                        // Encontrar los items de texto que corresponden a la coincidencia para obtener sus coordenadas
-                        let textItem = textContent.items.find(item => pageText.indexOf(item.str) === lastIndex);
-                        if(textItem){
+                            const transform = pdfjsLib.util.transform(viewport.transform, item.transform);
                             const coords = {
-                                x: textItem.transform[4],
-                                y: viewport.height - textItem.transform[5] - textItem.height, // Y se mide desde abajo
-                                width: textItem.width,
-                                height: textItem.height
+                                x: transform[4],
+                                y: transform[5],
+                                width: item.width,
+                                height: item.height
                             };
-                            pdfSearchResults.push({ pageNum: i, snippet: snippet, coords: coords });
+                            pdfSearchResults.push({ pageNum: i, snippet, coords });
                         }
                     }
                 }
                 displaySearchResults(searchTerm);
             }
             
-            // --- ¡MEJORADO! Usa la variable global y data-attributes ---
             function displaySearchResults(searchTerm) {
                 const resultsContainer = document.getElementById('pdf-search-results');
                 resultsContainer.innerHTML = '';
@@ -972,38 +962,39 @@
                 resultsContainer.innerHTML = resultsHtml;
             }
 
-            // --- ¡NUEVO! Dibuja los resaltados en la página ---
             function highlightWordsOnPage(pageNum, coordsArray) {
-                clearAllHighlights(); // Limpia resaltados anteriores
+                clearAllHighlights();
                 const canvas = document.querySelector(`.annotation-canvas[data-page-num='${pageNum}']`);
-                if (!canvas) {
-                    console.log("Canvas no encontrado para la página", pageNum, ". Esperando a que se renderice.");
-                    return; 
-                }
+                if (!canvas) return;
 
+                const pageContainer = canvas.closest('.pdf-page-container');
+                const baseCanvas = pageContainer.querySelector('canvas:not(.annotation-canvas)');
+                if(!baseCanvas) return;
+                
+                const scale = baseCanvas.width / pdfDocument.getPage(pageNum).then(p => p.getViewport({scale: 1.0}).width);
                 const ctx = canvas.getContext('2d');
                 ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--highlight-color').trim();
-
-                const originalScale = 2.0; // La escala con la que se renderizó la página
                 
-                coordsArray.forEach(coords => {
-                    ctx.fillRect(
-                        coords.x * originalScale, 
-                        (coords.y - coords.height) * originalScale, // Ajuste fino de posición Y
-                        coords.width * originalScale, 
-                        coords.height * originalScale
-                    );
+                const pageViewport = pdfDocument.getPage(pageNum).then(p => p.getViewport({ scale: 1.0 }));
+                
+                pageViewport.then(viewport => {
+                    coordsArray.forEach(coords => {
+                        const scaledX = coords.x * scale;
+                        const scaledY = (viewport.height - coords.y) * scale;
+                        const scaledWidth = coords.width * scale;
+                        const scaledHeight = coords.height * scale * 1.2; // Un poco más alto para mejor visibilidad
+
+                        ctx.fillRect(scaledX, scaledY, scaledWidth, scaledHeight);
+                    });
                 });
                 
-                // Hacer que el resaltado desaparezca
                 setTimeout(clearAllHighlights, 3000);
             }
             
-            // --- ¡NUEVO! Limpia todos los resaltados temporales ---
             function clearAllHighlights() {
                 for (let i = 1; i <= (pdfDocument?.numPages || 0); i++) {
                     const canvas = document.querySelector(`.annotation-canvas[data-page-num='${i}']`);
-                    if (canvas) {
+                    if (canvas && canvas.offsetParent !== null) { // Solo redibujar las visibles
                         redrawAnnotations(i);
                     }
                 }
