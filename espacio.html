@@ -391,11 +391,20 @@
                             if (!response.ok) {
                                 throw new Error(`Error de red: ${response.status} ${response.statusText}`);
                             }
+                            // MEJORA: Validar que el tipo de contenido sea PDF
+                            const contentType = response.headers.get('content-type');
+                            if (!contentType || !contentType.includes('application/pdf')) {
+                                // Obtener los primeros 100 bytes para ver si es un archivo de error
+                                const text = await response.text();
+                                console.error('El archivo descargado no es un PDF. Encabezados:', response.headers);
+                                throw new Error(`El archivo descargado no es un PDF. Tipo de contenido: ${contentType}`);
+                            }
+                            pdfData = await response.arrayBuffer();
+
                         } catch (networkError) {
                             throw new Error(`Error de descarga: ${networkError.message}. Revisa tus reglas de Firebase Storage.`);
                         }
                         
-                        pdfData = await response.arrayBuffer();
                         await savePdfToDB(pdfId, pdfData);
                     }
                     
