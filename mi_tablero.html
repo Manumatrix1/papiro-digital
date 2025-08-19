@@ -14,7 +14,6 @@
         .project-card { transition: transform 0.2s ease-in-out, border-color 0.2s ease-in-out; aspect-ratio: 1 / 1; }
         .project-card:hover { transform: translateY(-5px); border-color: #88c999; }
         .hidden { display: none; }
-        /* Estilo para que el contenido principal crezca y empuje el footer hacia abajo */
         body { display: flex; flex-direction: column; min-height: 100vh; }
         #app-content { flex-grow: 1; }
     </style>
@@ -24,19 +23,16 @@
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#88c999]"></div>
         <p class="mt-4 text-lg">Cargando...</p>
     </div>
-
     <div id="app-content" class="hidden w-full flex flex-col">
         <header class="bg-[#181818] border-b border-[#2a2a2a] p-4 flex justify-between items-center">
             <div>
                 <img src="https://i.postimg.cc/g0HxbpQF/PAPIRO-1.png" alt="Papiro Digital Logo" class="h-8">
             </div>
-            
             <div class="flex items-center gap-4">
                 <span id="user-greeting" class="text-lg font-semibold"></span>
                 <button id="logout-btn" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition">Cerrar Sesión</button>
             </div>
         </header>
-
         <main class="p-6 flex-grow">
             <h2 class="text-2xl font-semibold mb-6">Tus Tableros</h2>
             <div id="projects-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
@@ -45,7 +41,6 @@
                 </div>
                 </div>
         </main>
-
         <footer id="footer-search" class="bg-[#181818] border-t border-[#2a2a2a] p-4">
             <div class="relative w-full max-w-lg mx-auto">
                 <span class="absolute inset-y-0 left-0 flex items-center pl-4">
@@ -55,13 +50,11 @@
             </div>
         </footer>
     </div>
-
     <script type="module">
         import { auth, db, storage } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
         import { collection, query, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
         import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
-
         const pageLoader = document.getElementById('page-loader');
         const appContent = document.getElementById('app-content');
         const footerSearch = document.getElementById('footer-search');
@@ -72,26 +65,20 @@
         const logoutBtn = document.getElementById('logout-btn');
         let allProjects = [];
         let currentUserId = null;
-
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUserId = user.uid;
-                
-                // CÓDIGO CORREGIDO: Añadir una verificación de seguridad para user.displayName
                 const name = user.displayName && user.displayName.length > 0 ? user.displayName.split(' ')[0] : user.email.split('@')[0];
                 const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
                 userGreeting.textContent = `Hola, ${capitalizedName}`;
-                
                 loadProjects(currentUserId);
                 pageLoader.style.display = 'none';
                 appContent.classList.add('flex', 'flex-col', 'min-h-screen');
                 appContent.classList.remove('hidden');
-
             } else {
                 window.location.href = 'index.html';
             }
         });
-
         function loadProjects(userId) {
             const projectsRef = collection(db, 'users', userId, 'projects');
             const q = query(projectsRef);
@@ -100,17 +87,14 @@
                 renderProjects(allProjects);
             });
         }
-        
         function renderProjects(projectsToRender) {
             while (projectsGrid.children.length > 1) {
                 projectsGrid.removeChild(projectsGrid.lastChild);
             }
-            
             projectsToRender.forEach(project => {
                 const card = document.createElement('div');
                 card.className = 'project-card bg-[#181818] rounded-lg shadow-lg border border-[#2a2a2a] relative cursor-pointer flex flex-col group';
                 const coverStyle = project.coverURL ? `background-image: url('${project.coverURL}'); background-size: cover; background-position: center;` : 'background-color: #2a2a2a;';
-                
                 card.innerHTML = `
                     <div class="h-3/4 w-full rounded-t-lg flex items-center justify-center" style="${coverStyle}">
                         ${!project.coverURL ? '<i class="fas fa-book-open text-4xl text-gray-500"></i>' : ''}
@@ -136,15 +120,12 @@
                 projectsGrid.appendChild(card);
             });
         }
-
         searchBar.addEventListener('input', (e) => {
             const searchTerm = e.target.value.toLowerCase();
             const filteredProjects = allProjects.filter(p => p.name.toLowerCase().includes(searchTerm));
             renderProjects(filteredProjects);
         });
-        
         logoutBtn.addEventListener('click', () => signOut(auth));
-
         addProjectCard.addEventListener('click', () => {
              Swal.fire({
                 title: 'Nuevo Proyecto',
@@ -163,7 +144,6 @@
                 }
             });
         });
-
         async function addProject(userId, projectName, file) {
             try {
                 let coverURL = '';
@@ -183,7 +163,6 @@
                 Swal.fire('Error', 'No se pudo crear el proyecto.', 'error');
             }
         }
-
         async function deleteProject(userId, projectId, projectName) {
             Swal.fire({
                 title: `¿Borrar "${projectName}"?`,
