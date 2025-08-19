@@ -1,74 +1,40 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bienvenido a Papiro Digital</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <style>
-        body { font-family: 'Inter', sans-serif; background-color: #0f0f0f; }
-        .form-container { display: none; background-color: #181818; border: 1px solid #2a2a2a; }
-        .password-container { position: relative; }
-        .toggle-password { position: absolute; top: 50%; right: 1rem; transform: translateY(-50%); cursor: pointer; color: #9ca3af; }
-    </style>
-</head>
-<body class="text-white">
-    <div id="loader" class="min-h-screen flex items-center justify-center p-4">
-        <p>Verificando sesión...</p>
-    </div>
-    <div id="login-container" class="form-container min-h-screen items-center justify-center p-4">
-        <div class="w-full max-w-md p-8 rounded-xl shadow-lg">
-            <div class="text-center mb-8">
-                <h1 class="text-3xl font-bold text-white">Iniciar Sesión</h1>
-            </div>
-            <form id="login-form" class="space-y-4">
-                <div>
-                    <label for="login-email" class="text-sm font-medium text-gray-400">Email</label>
-                    <input id="login-email" type="email" required class="w-full mt-2 bg-[#2a2a2a] text-white p-3 rounded-lg border border-transparent focus:outline-none focus:ring-2 focus:ring-[#88c999]">
-                </div>
-                <div class="password-container">
-                    <label for="login-password" class="text-sm font-medium text-gray-400">Contraseña</label>
-                    <input id="login-password" type="password" required class="w-full mt-2 bg-[#2a2a2a] text-white p-3 rounded-lg border border-transparent focus:outline-none focus:ring-2 focus:ring-[#88c999]">
-                    <span id="login-toggle" class="toggle-password"><i id="login-eye-open" class="fas fa-eye"></i><i id="login-eye-closed" class="fas fa-eye-slash hidden"></i></span>
-                </div>
-                 <div id="login-error-message" class="text-red-400 text-sm h-4"></div>
-                <button type="submit" class="w-full mt-2 bg-[#88c999] text-[#1C1C1C] font-bold py-3 rounded-lg hover:brightness-110 transition">Ingresar</button>
-            </form>
-             <div class="mt-4 flex items-center justify-center">
-                 <hr class="w-full border-gray-600"><span class="px-2 text-gray-500">o</span><hr class="w-full border-gray-600">
-             </div>
-            <div class="mt-4">
-                <button id="google-login-btn" class="w-full bg-white text-black font-semibold py-3 rounded-lg hover:bg-gray-200 transition flex items-center justify-center">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" class="h-6 w-6 mr-3" alt="Google icon">
-                    Continuar con Google
-                </button>
-            </div>
-        </div>
-    </div>
-    <script type="module">
-        import { auth } from './firebase-config.js';
-        import { onAuthStateChanged, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        
-        const loader = document.getElementById('loader');
-        const loginContainer = document.getElementById('login-container');
+<script type="module">
+    // Importaciones necesarias. getAuth ya no es necesario aquí.
+    import { auth } from './firebase-config.js';
+    import { onAuthStateChanged, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+    
+    // El resto de tu script de login (manejo de formulario, google, etc.)
+    const loader = document.getElementById('loader');
+    const loginContainer = document.getElementById('login-container');
 
-        onAuthStateChanged(auth, user => {
-            if (user) {
-                window.location.href = 'mi_tablero.html';
+    onAuthStateChanged(auth, user => {
+        if (user) {
+            window.location.href = 'mi_tablero.html';
+        } else {
+            loader.style.display = 'none';
+            loginContainer.style.display = 'flex';
+        }
+    });
+
+    const loginForm = document.getElementById('login-form'), googleLoginBtn = document.getElementById('google-login-btn'), loginErrorMessage = document.getElementById('login-error-message');
+    loginForm.addEventListener('submit', async (e) => { e.preventDefault(); loginErrorMessage.textContent = ''; try { await signInWithEmailAndPassword(auth, loginForm['login-email'].value, loginForm['login-password'].value); } catch (error) { loginErrorMessage.textContent = 'Email o contraseña incorrectos.'; } });
+    
+    googleLoginBtn.addEventListener('click', async () => {
+        loginErrorMessage.textContent = '';
+        try {
+            await signInWithPopup(auth, new GoogleAuthProvider());
+        } catch (error) {
+            console.error(error); // Mantén el log para ver el error completo
+            if (error.code === 'auth/popup-closed-by-user') {
+                loginErrorMessage.textContent = 'La ventana de inicio de sesión de Google fue cerrada.';
+            } else if (error.code === 'auth/cancelled-popup-request') {
+                loginErrorMessage.textContent = 'Ya hay una ventana de inicio de sesión en curso.';
             } else {
-                loader.style.display = 'none';
-                loginContainer.style.display = 'flex';
+                loginErrorMessage.textContent = 'No se pudo iniciar sesión con Google. Inténtalo de nuevo más tarde.';
             }
-        });
-
-        // El resto del script de login (manejo de formulario, google, etc.)
-        const loginForm = document.getElementById('login-form'), googleLoginBtn = document.getElementById('google-login-btn'), loginErrorMessage = document.getElementById('login-error-message');
-        loginForm.addEventListener('submit', async (e) => { e.preventDefault(); loginErrorMessage.textContent = ''; try { await signInWithEmailAndPassword(auth, loginForm['login-email'].value, loginForm['login-password'].value); } catch (error) { loginErrorMessage.textContent = 'Email o contraseña incorrectos.'; } });
-        googleLoginBtn.addEventListener('click', async () => { loginErrorMessage.textContent = ''; try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch (error) { loginErrorMessage.textContent = 'No se pudo iniciar sesión con Google.'; } });
-        function setupPasswordToggle(inputId, toggleId, eyeOpenId, eyeClosedId) { const passwordInput = document.getElementById(inputId), toggle = document.getElementById(toggleId), eyeOpen = document.getElementById(eyeOpenId), eyeClosed = document.getElementById(eyeClosedId); if (!passwordInput || !toggle || !eyeOpen || !eyeClosed) return; toggle.addEventListener('click', () => { if (passwordInput.type === 'password') { passwordInput.type = 'text'; eyeOpen.classList.add('hidden'); eyeClosed.classList.remove('hidden'); } else { passwordInput.type = 'password'; eyeOpen.classList.remove('hidden'); eyeClosed.classList.add('hidden'); } }); }
-        setupPasswordToggle('login-password', 'login-toggle', 'login-eye-open', 'login-eye-closed');
-    </script>
-</body>
-</html>
+        }
+    });
+    
+    function setupPasswordToggle(inputId, toggleId, eyeOpenId, eyeClosedId) { const passwordInput = document.getElementById(inputId), toggle = document.getElementById(toggleId), eyeOpen = document.getElementById(eyeOpenId), eyeClosed = document.getElementById(eyeClosedId); if (!passwordInput || !toggle || !eyeOpen || !eyeClosed) return; toggle.addEventListener('click', () => { if (passwordInput.type === 'password') { passwordInput.type = 'text'; eyeOpen.classList.add('hidden'); eyeClosed.classList.remove('hidden'); } else { passwordInput.type = 'password'; eyeOpen.classList.remove('hidden'); eyeClosed.classList.add('hidden'); } }); }
+    setupPasswordToggle('login-password', 'login-toggle', 'login-eye-open', 'login-eye-closed');
+</script>
