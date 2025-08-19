@@ -356,7 +356,6 @@
                 });
             }
             
-            // --- CÓDIGO CORREGIDO PARA LA FUNCIÓN loadPdfDocument ---
             async function loadPdfDocument() {
                 const statusText = document.getElementById('status-text');
                 try {
@@ -368,11 +367,9 @@
                         pdfData = cachedPdf;
                     } else {
                         statusText.textContent = 'Descargando documento...';
-                        // Añadir una capa de validación para asegurar que el usuario y el ID del proyecto existen
                         if (!currentUser || !projectId || !pdfId) {
                             throw new Error("Faltan datos de usuario o de proyecto para cargar el PDF.");
                         }
-
                         const pdfDocRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId);
                         const docSnap = await getDoc(pdfDocRef);
                         
@@ -391,12 +388,8 @@
                             if (!response.ok) {
                                 throw new Error(`Error de red: ${response.status} ${response.statusText}`);
                             }
-                            // MEJORA: Validar que el tipo de contenido sea PDF
                             const contentType = response.headers.get('content-type');
                             if (!contentType || !contentType.includes('application/pdf')) {
-                                // Obtener los primeros 100 bytes para ver si es un archivo de error
-                                const text = await response.text();
-                                console.error('El archivo descargado no es un PDF. Encabezados:', response.headers);
                                 throw new Error(`El archivo descargado no es un PDF. Tipo de contenido: ${contentType}`);
                             }
                             pdfData = await response.arrayBuffer();
@@ -419,7 +412,6 @@
                     statusText.textContent = `Error: ${error.message}`;
                 }
             }
-            // --- FIN DEL CÓDIGO CORREGIDO ---
             
             async function setupPagePlaceholders() {
                 pdfWrapper.innerHTML = '';
