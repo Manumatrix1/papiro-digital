@@ -88,7 +88,6 @@
         function loadPdfs() {
             const pdfsCollectionRef = collection(projectRef, "pdfs");
             onSnapshot(pdfsCollectionRef, (snapshot) => {
-                // Limpiar grid excepto el botón de subir
                 document.querySelectorAll('.pdf-card-item').forEach(el => el.remove());
 
                 if(snapshot.empty) {
@@ -105,7 +104,6 @@
                     card.className = 'pdf-card-item pdf-card rounded-lg p-4 flex flex-col justify-between cursor-pointer';
                     card.style.aspectRatio = '1/1';
 
-                    // MEJORA: Añadir una verificación de seguridad para el objeto pdfData y sus campos
                     if (pdfData && pdfData.name && pdfData.fileName && pdfData.url) {
                         card.innerHTML = `<h3 class="font-bold text-white truncate">${pdfData.name}</h3>
                                           <p class="text-sm text-gray-500 truncate">${pdfData.fileName}</p>`;
@@ -114,7 +112,6 @@
                             window.location.href = `espacio.html?id=${projectId}&pdfId=${pdfId}`;
                         });
                     } else {
-                        // En caso de que los datos estén corruptos o incompletos
                         card.classList.add('cursor-not-allowed');
                         card.innerHTML = `<div class="text-center text-red-500">
                                             <i class="fas fa-exclamation-triangle fa-2x"></i>
@@ -130,6 +127,11 @@
         async function handlePdfUpload(e) {
             const file = e.target.files[0];
             if (!file) return;
+
+            if (file.type !== "application/pdf") {
+                Swal.fire('Error', 'Solo se permiten archivos PDF.', 'error');
+                return;
+            }
 
             const newPdfRef = doc(collection(projectRef, 'pdfs'));
             const storageRef = ref(storage, `proyectos/${currentUser.uid}/${projectId}/pdfs/${newPdfRef.id}-${file.name}`);
