@@ -26,7 +26,6 @@
         </div>
         <button id="logout-btn" class="text-gray-400 hover:text-white transition">Cerrar Sesión</button>
     </header>
-
     <main class="flex-1 p-6">
         <div class="w-full max-w-4xl mx-auto">
             <div id="pdf-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
@@ -41,13 +40,11 @@
             </div>
         </div>
     </main>
-
     <script type="module">
         import { auth, db, storage } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
         import { doc, getDoc, collection, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
         import { ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
-
         const projectNameTitle = document.getElementById('project-name-title');
         const projectNameHeader = document.getElementById('project-name-header');
         const pdfGrid = document.getElementById('pdf-grid');
@@ -55,27 +52,22 @@
         const pdfFileInput = document.getElementById('pdf-file-input');
         const noPdfsMessage = document.getElementById('no-pdfs-message');
         const logoutBtn = document.getElementById('logout-btn');
-
         let currentUser, projectId, projectRef;
-
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
                 const urlParams = new URLSearchParams(window.location.search);
                 projectId = urlParams.get('id');
                 if (!projectId) { window.location.href = 'mi_tablero.html'; return; }
-                
                 projectRef = doc(db, "users", currentUser.uid, "projects", projectId);
                 loadProjectName();
                 loadPdfs();
-
                 uploadCard.addEventListener('click', () => pdfFileInput.click());
                 pdfFileInput.addEventListener('change', handlePdfUpload);
             } else {
                 window.location.href = 'index.html';
             }
         });
-
         async function loadProjectName() {
             const docSnap = await getDoc(projectRef);
             if (docSnap.exists()) {
@@ -84,30 +76,24 @@
                 projectNameHeader.textContent = name;
             }
         }
-
         function loadPdfs() {
             const pdfsCollectionRef = collection(projectRef, "pdfs");
             onSnapshot(pdfsCollectionRef, (snapshot) => {
                 document.querySelectorAll('.pdf-card-item').forEach(el => el.remove());
-
                 if(snapshot.empty) {
                     noPdfsMessage.classList.remove('hidden');
                 } else {
                     noPdfsMessage.classList.add('hidden');
                 }
-
                 snapshot.forEach(pdfDoc => {
                     const pdfData = pdfDoc.data();
                     const pdfId = pdfDoc.id;
-
                     const card = document.createElement('div');
                     card.className = 'pdf-card-item pdf-card rounded-lg p-4 flex flex-col justify-between cursor-pointer';
                     card.style.aspectRatio = '1/1';
-
                     if (pdfData && pdfData.name && pdfData.fileName && pdfData.url) {
                         card.innerHTML = `<h3 class="font-bold text-white truncate">${pdfData.name}</h3>
                                           <p class="text-sm text-gray-500 truncate">${pdfData.fileName}</p>`;
-                        
                         card.addEventListener('click', () => {
                             window.location.href = `espacio.html?id=${projectId}&pdfId=${pdfId}`;
                         });
@@ -118,27 +104,21 @@
                                             <p class="mt-2 text-sm font-semibold">Error en el archivo</p>
                                           </div>`;
                     }
-                    
                     pdfGrid.appendChild(card);
                 });
             });
         }
-        
         async function handlePdfUpload(e) {
             const file = e.target.files[0];
             if (!file) return;
-
             if (file.type !== "application/pdf") {
                 Swal.fire('Error', 'Solo se permiten archivos PDF.', 'error');
                 return;
             }
-
             const newPdfRef = doc(collection(projectRef, 'pdfs'));
             const storageRef = ref(storage, `proyectos/${currentUser.uid}/${projectId}/pdfs/${newPdfRef.id}-${file.name}`);
             const uploadTask = uploadBytesResumable(storageRef, file);
-            
             Swal.fire({ title: 'Subiendo PDF...', text: 'Por favor, espera.', didOpen: () => { Swal.showLoading() } });
-
             uploadTask.on('state_changed', 
               (snapshot) => {}, 
               (error) => { 
@@ -166,7 +146,6 @@
               }
             );
         }
-
         logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = 'index.html'));
     </script>
 </body>
