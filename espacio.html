@@ -150,7 +150,6 @@
             </div>
             <span id="page-indicator">1 / 1</span>
         </main>
-
         <aside id="sidebar" class="p-4">
             <div class="flex justify-between items-center mb-2 flex-shrink-0">
                 <h3 class="text-xl font-bold">Cuaderno de Notas</h3>
@@ -181,8 +180,6 @@
         </aside>
         <div id="sidebar-overlay"></div>
     </div>
-
-
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
     </script>
@@ -190,9 +187,7 @@
         import { auth, db } from './firebase-config.js';
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
         import { doc, getDoc, collection, query, onSnapshot, addDoc, serverTimestamp, updateDoc, deleteDoc, writeBatch, orderBy } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
-
         document.addEventListener('DOMContentLoaded', () => {
-            
             let currentUser, projectId, pdfId, pdfDocument, annotationsUnsubscribe;
             let activeTool = 'select', activeColor = '#FFDD00', isDrawing = false;
             let annotationsByPage = {}, currentPath = [];
@@ -202,16 +197,13 @@
             let originalContentSize = { width: 0, height: 0 };
             let initialDistance = null;
             let drawingStartPoint = null;
-            
             const appContainer = document.querySelector('.app-container');
             const zoomContainer = document.getElementById('zoom-container');
             const pdfWrapper = document.getElementById('pdf-content-wrapper');
             const scrollContainer = document.querySelector('.scroll-wrapper');
             const notesList = document.getElementById('notes-list');
             let pageIntersectionObserver;
-
             onAuthStateChanged(auth, (user) => { if (user) iniciarAplicacion(user); else window.location.href = 'index.html'; });
-
             function iniciarAplicacion(user) {
                 currentUser = user;
                 const urlParams = new URLSearchParams(window.location.search);
@@ -224,7 +216,6 @@
                 setupAllEventListeners();
                 loadPdfDocument();
             }
-            
             const DB_NAME = 'PapiroDigitalDB', STORE_NAME = 'pdfCache';
             function openDB() {
                 return new Promise((resolve, reject) => {
@@ -246,7 +237,6 @@
                     request.onerror = () => resolve(null);
                 });
             }
-            
             function setupAllEventListeners() {
                 document.getElementById('tool-select').addEventListener('click', () => setActiveTool('select'));
                 document.getElementById('tool-draw').addEventListener('click', () => setActiveTool('draw'));
@@ -254,14 +244,12 @@
                 document.getElementById('tool-erase').addEventListener('click', () => setActiveTool('erase'));
                 document.getElementById('color-picker').addEventListener('input', (e) => activeColor = e.target.value);
                 document.getElementById('open-notes-btn').addEventListener('click', () => document.getElementById('sidebar').classList.add('open'));
-                
                 const sidebar = document.getElementById('sidebar');
                 sidebar.querySelector('#add-note-btn')?.addEventListener('click', handleAddNewNote);
                 sidebar.querySelector('#note-search-input')?.addEventListener('input', (e) => renderNotesToSidebar(e.target.value));
                 sidebar.querySelector('#close-sidebar-btn')?.addEventListener('click', () => sidebar.classList.remove('open'));
                 sidebar.querySelector('#clear-notes-btn')?.addEventListener('click', handleClearNotes);
                 sidebar.querySelector('#clear-all-btn')?.addEventListener('click', handleClearAll);
-
                 document.getElementById('pdf-search-btn').addEventListener('click', handlePdfSearch);
                 document.getElementById('pdf-search-input').addEventListener('keypress', (e) => {
                     if (e.key === 'Enter') {
@@ -269,11 +257,9 @@
                         handlePdfSearch();
                     }
                 });
-
                 document.getElementById('sidebar-overlay').addEventListener('click', () => sidebar.classList.remove('open'));
                 document.getElementById('read-aloud-btn').addEventListener('click', toggleReadAloud);
                 scrollContainer.addEventListener('scroll', updatePageIndicator);
-                
                 const fullscreenBtn = document.getElementById('fullscreen-btn');
                 fullscreenBtn.addEventListener('click', () => {
                     const icon = fullscreenBtn.querySelector('i');
@@ -285,7 +271,6 @@
                         icon.classList.replace('fa-compress', 'fa-expand');
                     }
                 });
-                
                 notesList.addEventListener('click', (e) => {
                     const noteCard = e.target.closest('.note-card');
                     if (!noteCard) return;
@@ -294,17 +279,14 @@
                     if (editBtn) { handleEditNote(annotationId); return; }
                     const deleteBtn = e.target.closest('.delete-note-btn');
                     if (deleteBtn) { handleDeleteNote(annotationId); return; }
-                    
                     const link = e.target.closest('.note-link');
                     if (link) {
-                        e.stopPropagation(); // Prevenir que el click en el enlace dispare el scroll
+                        e.stopPropagation();
                         return;
                     }
-
                     const pageToGo = noteCard.dataset.page;
                     if (pageToGo) { scrollToPage(pageToGo); }
                 });
-
                 pdfWrapper.addEventListener('touchstart', (e) => {
                     if (e.target.id !== 'promote-note-btn') {
                         clearPromoteButton();
@@ -322,7 +304,6 @@
                         scrollStart.top = scrollContainer.scrollTop;
                     }
                 }, { passive: false });
-
                 pdfWrapper.addEventListener('touchmove', (e) => {
                     if (isDrawing || isPanning || (e.touches.length === 2 && activeTool === 'select')) { 
                         e.preventDefault(); 
@@ -344,7 +325,6 @@
                         scrollContainer.scrollTop = scrollStart.top - dy;
                     }
                 }, { passive: false });
-
                 pdfWrapper.addEventListener('touchend', (e) => {
                     if (isDrawing) {
                         stopDrawing(e);
@@ -355,7 +335,6 @@
                     isPanning = false;
                 });
             }
-            
             async function loadPdfDocument() {
                 const statusText = document.getElementById('status-text');
                 try {
@@ -372,16 +351,13 @@
                         }
                         const pdfDocRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId);
                         const docSnap = await getDoc(pdfDocRef);
-                        
                         if (!docSnap || !docSnap.exists()) {
                             throw new Error("El documento no se encontró en la base de datos de Firestore.");
                         }
-                        
                         const pdfUrl = docSnap.data().url;
                         if (!pdfUrl) {
                             throw new Error("La URL del PDF no se encontró en el documento de Firestore.");
                         }
-                        
                         let response;
                         try {
                             response = await fetch(pdfUrl);
@@ -393,14 +369,11 @@
                                 throw new Error(`El archivo descargado no es un PDF. Tipo de contenido: ${contentType}`);
                             }
                             pdfData = await response.arrayBuffer();
-
                         } catch (networkError) {
                             throw new Error(`Error de descarga: ${networkError.message}. Revisa tus reglas de Firebase Storage.`);
                         }
-                        
                         await savePdfToDB(pdfId, pdfData);
                     }
-                    
                     const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(pdfData) });
                     pdfDocument = await loadingTask.promise;
                     document.getElementById('status-indicator').style.display = 'none';
@@ -412,7 +385,6 @@
                     statusText.textContent = `Error: ${error.message}`;
                 }
             }
-            
             async function setupPagePlaceholders() {
                 pdfWrapper.innerHTML = '';
                 const page = await pdfDocument.getPage(1);
@@ -438,7 +410,6 @@
                 updatePageIndicator();
                 setActiveTool('select'); 
             }
-
             async function renderPage(pageContainer, pageNum) {
                 if (!pdfDocument) return;
                 const page = await pdfDocument.getPage(pageNum);
@@ -455,7 +426,6 @@
                 await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
                 redrawAnnotations(pageNum);
             }
-
             function startPageObserver() {
                 if (pageIntersectionObserver) pageIntersectionObserver.disconnect();
                 const options = { root: scrollContainer, rootMargin: '500px 0px' };
@@ -473,7 +443,6 @@
                     pageIntersectionObserver.observe(page);
                 });
             }
-
             async function stopDrawing(e) {
                 if (!isDrawing) return;
                 isDrawing = false;
@@ -503,7 +472,6 @@
                 currentPath = [];
                 drawingStartPoint = null;
             }
-            
             function showPromoteButton(annotationId, endEvent, canvas) {
                 clearPromoteButton();
                 const rect = canvas.getBoundingClientRect();
@@ -525,14 +493,12 @@
                 appContainer.appendChild(btn);
                 setTimeout(clearPromoteButton, 5000);
             }
-
             function clearPromoteButton() {
                 const existingBtn = document.getElementById('promote-note-btn');
                 if (existingBtn) {
                     existingBtn.remove();
                 }
             }
-
             function redrawAnnotations(pageNum) {
                 const canvas = document.querySelector(`.annotation-canvas[data-page-num='${pageNum}']`);
                 if (!canvas) return;
@@ -545,8 +511,6 @@
                     drawPath(ctx, { type: activeTool, path: currentPath, color: activeColor });
                 }
             }
-            
-            // --- MODIFICADO: Ahora usa 'Enlace web' y guarda en el campo 'link' ---
             async function handleAddNewNote() {
                 const { value: formValues } = await Swal.fire({
                     target: '.app-container',
@@ -582,7 +546,6 @@
                     });
                 }
             }
-
             async function handleClearNotes() {
                 const result = await Swal.fire({
                     target: '.app-container',
@@ -603,7 +566,6 @@
                     await batch.commit();
                 }
             }
-
             async function handleClearAll() {
                  const result = await Swal.fire({
                     target: '.app-container',
@@ -624,34 +586,27 @@
                     await batch.commit();
                 }
             }
-
-            // --- MODIFICADO: Muestra un ícono de enlace genérico ---
             function renderNotesToSidebar(searchTerm = '') {
                 const lowerCaseSearchTerm = searchTerm.toLowerCase();
                 notesList.innerHTML = '';
                 const annotationsWithNotes = Object.values(annotationsByPage)
                     .flat()
-                    .filter(a => a.id && (a.note || a.path?.length > 0)) // Mostrar si tiene nota o es un dibujo/resaltado
+                    .filter(a => a.id && (a.note || a.path?.length > 0))
                     .sort((a, b) => (a.page - b.page));
-                
                 const filteredAnnotations = lowerCaseSearchTerm ?
                     annotationsWithNotes.filter(a => a.note && a.note.toLowerCase().includes(lowerCaseSearchTerm)) :
                     annotationsWithNotes;
-
                 if (filteredAnnotations.length === 0) {
                     notesList.innerHTML = `<p class="text-gray-500 text-center p-4">No hay notas guardadas.</p>`;
                     return;
                 }
-
                 let htmlContent = '';
                 filteredAnnotations.forEach(annotation => {
                     const linkIcon = annotation.link ?
                         `<a href="${annotation.link}" target="_blank" class="note-link text-blue-400 hover:text-blue-300 ml-2" title="Abrir enlace"><i class="fas fa-link"></i></a>` : '';
-                    
                     const noteText = annotation.note ? 
                          `<p class="text-white text-sm break-words note-text">${annotation.note}</p>` : 
                          `<p class="text-gray-400 text-sm italic">Anotación en página ${annotation.page}</p>`;
-                    
                     htmlContent += `
                         <div class="note-card" data-id="${annotation.id}" data-page="${annotation.page}" style="cursor: pointer;">
                             <div class="relative">
@@ -674,8 +629,6 @@
                 });
                 notesList.innerHTML = htmlContent;
             }
-
-            // --- MODIFICADO: Ahora usa 'Enlace web' y actualiza el campo 'link' ---
             async function handleEditNote(annotationId) {
                 if (!annotationId) return;
                 const originalAnnotation = Object.values(annotationsByPage).flat().find(a => a.id === annotationId);
@@ -703,7 +656,6 @@
                     await updateDoc(noteRef, { note: formValues.note, link: formValues.link });
                 }
             }
-
             function handleDeleteNote(annotationId) {
                 if (!annotationId) return;
                 Swal.fire({
@@ -722,14 +674,12 @@
                     }
                 });
             }
-
             function saveAnnotation(annotationData) {
                 return addDoc(collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations"), {
                     ...annotationData,
                     createdAt: serverTimestamp()
                 });
             }
-
             function loadAllAnnotations() {
                 if (annotationsUnsubscribe) annotationsUnsubscribe();
                 const annotationsQuery = query(collection(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId, "annotations"), orderBy("createdAt"));
@@ -747,14 +697,12 @@
                     });
                 });
             }
-
             function setActiveTool(tool) {
                 clearPromoteButton();
                 activeTool = tool;
                 document.querySelectorAll('#main-tools .tool-btn').forEach(btn => btn.classList.remove('active'));
                 document.getElementById(`tool-${tool}`).classList.add('active');
             }
-
             function startDrawing(e) {
                 clearPromoteButton();
                 if (activeTool === 'select' || !e.touches) return;
@@ -768,7 +716,6 @@
                     currentPath = [coords];
                 }
             }
-
             function draw(e) {
                 if (!isDrawing) return;
                 const canvas = findCanvasUnderPointer(e);
@@ -782,7 +729,6 @@
                     redrawAnnotations(canvas.dataset.pageNum);
                 }
             }
-
             function getCoords(e, canvas) {
                 const rect = canvas.getBoundingClientRect();
                 const touch = e.touches?.[0] || e.changedTouches?.[0];
@@ -790,14 +736,12 @@
                 const scaleY = canvas.height / rect.height;
                 return { x: (touch.clientX - rect.left) * scaleX, y: (touch.clientY - rect.top) * scaleY };
             }
-
             function findCanvasUnderPointer(e, isEndEvent = false) {
                 const touch = isEndEvent ? (e.changedTouches?.[0]) : (e.touches?.[0]);
                 if (!touch) return null;
                 const element = document.elementFromPoint(touch.clientX, touch.clientY);
                 return element?.closest('.pdf-page-container')?.querySelector('.annotation-canvas');
             }
-
             function drawPath(ctx, annotation) {
                 if (!annotation.path || annotation.path.length < 2) return;
                 ctx.save();
@@ -818,7 +762,6 @@
                 ctx.stroke();
                 ctx.restore();
             }
-
             function updatePageIndicator() {
                 if(!pdfDocument) return;
                 const indicator = document.getElementById('page-indicator');
@@ -832,7 +775,6 @@
                 currentPageNum = mostVisiblePage;
                 indicator.textContent = `${currentPageNum} / ${pdfDocument.numPages}`;
             }
-
             window.scrollToPage = (pageNum) => {
                 const pageEl = document.querySelector(`.pdf-page-container[data-page-number='${pageNum}']`);
                 if(pageEl) {
@@ -840,7 +782,6 @@
                     document.getElementById('sidebar').classList.remove('open');
                 }
             };
-
             async function toggleReadAloud() {
                 let isReading = speechSynthesis.speaking;
                 const btn = document.getElementById('read-aloud-btn');
@@ -861,7 +802,6 @@
                     btn.classList.remove('text-[var(--primary-color)]');
                 }
             }
-
             function speakText(text) {
                 return new Promise(resolve => {
                     if (!speechSynthesis) return resolve(false);
@@ -880,8 +820,6 @@
                     speechSynthesis.speak(utterance);
                 });
             }
-
-            // --- ¡MEJORADO! Ahora busca y extrae un fragmento de texto ---
             async function handlePdfSearch() {
                 const resultsContainer = document.getElementById('pdf-search-results');
                 const searchInput = document.getElementById('pdf-search-input');
@@ -890,19 +828,15 @@
                     resultsContainer.innerHTML = '';
                     return;
                 }
-                
                 resultsContainer.innerHTML = `<p class="text-sm text-gray-400 p-2">Buscando...</p>`;
-
                 const searchResults = [];
                 const numPages = pdfDocument.numPages;
                 const searchTermLower = searchTerm.toLowerCase();
-
                 for (let i = 1; i <= numPages; i++) {
                     const page = await pdfDocument.getPage(i);
                     const textContent = await page.getTextContent();
                     const pageText = textContent.items.map(item => item.str).join(' ');
                     const pageTextLower = pageText.toLowerCase();
-                    
                     let lastIndex = -1;
                     while ((lastIndex = pageTextLower.indexOf(searchTermLower, lastIndex + 1)) !== -1) {
                         const contextChars = 40;
@@ -912,30 +846,21 @@
                         searchResults.push({ pageNum: i, snippet: snippet });
                     }
                 }
-
                 displaySearchResults(searchResults, searchTerm);
             }
-            
-            // --- ¡MEJORADO! Muestra el fragmento de texto en los resultados ---
             function displaySearchResults(results, searchTerm) {
                 const resultsContainer = document.getElementById('pdf-search-results');
                 resultsContainer.innerHTML = '';
-
                 if (results.length === 0) {
                     resultsContainer.innerHTML = `<p class="text-sm text-center text-gray-500 p-2">No se encontró "${searchTerm}".</p>`;
                     return;
                 }
-
-                // Usamos una expresión regular para resaltar todas las ocurrencias, ignorando mayúsculas/minúsculas
                 const regex = new RegExp(searchTerm.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi');
-                
                 let resultsHtml = `
                     <h4 class="text-sm font-bold text-white mb-2">Resultados (${results.length}):</h4>
                     <ul class="text-left list-none pl-0" style="max-height: 250px; overflow-y: auto;">`;
-                
                 results.forEach(result => {
                     const highlightedSnippet = result.snippet.replace(regex, '<strong class="text-[var(--primary-color)]">$&</strong>');
-                    
                     resultsHtml += `
                         <li class="mb-1">
                             <a href="#" onclick="window.scrollToPage(${result.pageNum}); return false;" 
@@ -946,7 +871,6 @@
                         </li>`;
                 });
                 resultsHtml += '</ul>';
-                
                 resultsContainer.innerHTML = resultsHtml;
             }
         });
