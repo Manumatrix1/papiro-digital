@@ -358,18 +358,28 @@
                         if (!pdfUrl) {
                             throw new Error("La URL del PDF no se encontró en el documento de Firestore.");
                         }
-                        
-                        const loadingTask = pdfjsLib.getDocument({
-                            url: pdfUrl,
-                            withCredentials: false
-                        });
-
-                        pdfDocument = await loadingTask.promise;
-                        document.getElementById('status-indicator').style.display = 'none';
-                        pdfWrapper.style.display = 'block';
-                        await setupPagePlaceholders();
-                        loadAllAnnotations();
+                        let response;
+                        try {
+                            response = await fetch(pdfUrl);
+                            if (!response.ok) {
+                                throw new Error(`Error de red: ${response.status} ${response.statusText}`);
+                            }
+                            const contentType = response.headers.get('content-type');
+                            if (!contentType || !contentType.includes('application/pdf')) {
+                                throw new Error(`El archivo descargado no es un PDF. Tipo de contenido: ${contentType}`);
+                            }
+                            pdfData = await response.arrayBuffer();
+                        } catch (networkError) {
+                            throw new Error(`Error de descarga: ${networkError.message}. Revisa tus reglas de Firebase Storage.`);
+                        }
+                        await savePdfToDB(pdfId, pdfData);
                     }
+                    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(pdfData) });
+                    pdfDocument = await loadingTask.promise;
+                    document.getElementById('status-indicator').style.display = 'none';
+                    pdfWrapper.style.display = 'block';
+                    await setupPagePlaceholders();
+                    loadAllAnnotations();
                 } catch (error) {
                     console.error("Error al cargar PDF:", error);
                     statusText.textContent = `Error: ${error.message}`;
