@@ -1,11 +1,11 @@
 // firebase-config.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
-import { getAuth, initializeAuth, indexedDBLocalPersistence } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
 import { getStorage } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyB0kigSEw-8yTyBTdHeynPNVskxkr5H2W0", // La llave nueva
+    apiKey: "AIzaSyB0kigSEw-8yTyBTdHeynPNVskxkr5H2W0",
     authDomain: "papiro2025-d09e0.firebaseapp.com",
     projectId: "papiro2025-d09e0",
     storageBucket: "papiro2025-d09e0.firebasestorage.app",
@@ -14,9 +14,7 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const auth = initializeAuth(app, {
-    persistence: indexedDBLocalPersistence
-});
+const auth = getAuth(app); // Usamos getAuth para simplificar y evitar conflictos
 const db = getFirestore(app);
 const storage = getStorage(app);
 
