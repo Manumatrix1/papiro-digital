@@ -353,6 +353,7 @@
                 });
             }
             
+            // --- CÓDIGO CORREGIDO PARA LA FUNCIÓN loadPdfDocument ---
             async function loadPdfDocument() {
                 const statusText = document.getElementById('status-text');
                 try {
@@ -364,16 +365,37 @@
                         pdfData = cachedPdf;
                     } else {
                         statusText.textContent = 'Descargando documento...';
+                        // Añadir una capa de validación para asegurar que el usuario y el ID del proyecto existen
+                        if (!currentUser || !projectId || !pdfId) {
+                            throw new Error("Faltan datos de usuario o de proyecto para cargar el PDF.");
+                        }
+
                         const pdfDocRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId);
                         const docSnap = await getDoc(pdfDocRef);
-                        if (!docSnap.exists() || !docSnap.data().url) {
-                            throw new Error("URL del PDF no encontrada en Firebase");
+                        
+                        if (!docSnap.exists()) {
+                            throw new Error("El documento no se encontró en la base de datos de Firestore.");
                         }
+                        
                         const pdfUrl = docSnap.data().url;
-                        const response = await fetch(pdfUrl);
+                        if (!pdfUrl) {
+                            throw new Error("La URL del PDF no se encontró en el documento de Firestore.");
+                        }
+                        
+                        let response;
+                        try {
+                            response = await fetch(pdfUrl);
+                            if (!response.ok) {
+                                throw new Error(`Error de red: ${response.status} ${response.statusText}`);
+                            }
+                        } catch (networkError) {
+                            throw new Error(`Error de descarga: ${networkError.message}. Revisa tus reglas de Firebase Storage.`);
+                        }
+                        
                         pdfData = await response.arrayBuffer();
                         await savePdfToDB(pdfId, pdfData);
                     }
+                    
                     const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(pdfData) });
                     pdfDocument = await loadingTask.promise;
                     document.getElementById('status-indicator').style.display = 'none';
@@ -385,6 +407,7 @@
                     statusText.textContent = `Error: ${error.message}`;
                 }
             }
+            // --- FIN DEL CÓDIGO CORREGIDO ---
             
             async function setupPagePlaceholders() {
                 pdfWrapper.innerHTML = '';
