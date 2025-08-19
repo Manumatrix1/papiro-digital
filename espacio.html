@@ -366,8 +366,11 @@
                         statusText.textContent = 'Descargando documento...';
                         const pdfDocRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId);
                         const docSnap = await getDoc(pdfDocRef);
-                        if (!docSnap.exists()) throw new Error("PDF no encontrado en Firebase");
-                        const response = await fetch(docSnap.data().url);
+                        if (!docSnap.exists() || !docSnap.data().url) {
+                            throw new Error("URL del PDF no encontrada en Firebase");
+                        }
+                        const pdfUrl = docSnap.data().url;
+                        const response = await fetch(pdfUrl);
                         pdfData = await response.arrayBuffer();
                         await savePdfToDB(pdfId, pdfData);
                     }
