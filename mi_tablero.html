@@ -3,159 +3,208 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="project-name-title">Cargando Tablero...</title>
+    <title>Mis Tableros</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #0f0f0f; }
-        .pdf-card { transition: transform 0.2s ease-in-out; background-color: #181818; }
-        .pdf-card:hover { transform: translateY(-5px); }
+        .project-card { transition: transform 0.2s ease-in-out, border-color 0.2s ease-in-out; aspect-ratio: 1 / 1; }
+        .project-card:hover { transform: translateY(-5px); border-color: #88c999; }
+        .hidden { display: none; }
+        /* Estilo para que el contenido principal crezca y empuje el footer hacia abajo */
+        body { display: flex; flex-direction: column; min-height: 100vh; }
+        #app-content { flex-grow: 1; }
     </style>
 </head>
-<body class="text-white flex flex-col min-h-screen">
-    <header class="bg-[#181818] border-b border-[#2a2a2a] py-3 px-6 flex justify-between items-center">
-        <div class="flex items-center gap-4">
-            <a href="mi_tablero.html" class="flex items-center text-gray-400 hover:text-white transition group">
-                <i class="fas fa-arrow-left"></i>
-                <span class="ml-2 font-medium hidden sm:inline">Volver a Mis Tableros</span>
-            </a>
-            <h1 id="project-name-header" class="text-xl font-bold text-white truncate">Cargando...</h1>
-        </div>
-        <button id="logout-btn" class="text-gray-400 hover:text-white transition">Cerrar Sesión</button>
-    </header>
+<body class="text-white">
+    <div id="page-loader" class="fixed inset-0 bg-[#0f0f0f] flex flex-col items-center justify-center z-50">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#88c999]"></div>
+        <p class="mt-4 text-lg">Cargando...</p>
+    </div>
 
-    <main class="flex-1 p-6">
-        <div class="w-full max-w-4xl mx-auto">
-            <div id="pdf-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                <div id="upload-card" class="pdf-card flex flex-col items-center justify-center rounded-lg p-6 border-2 border-dashed border-gray-600 transition hover:bg-[#2a2a2a] cursor-pointer" style="aspect-ratio: 1/1;">
-                    <i class="fas fa-plus fa-2x text-gray-400"></i>
-                    <span class="mt-4 font-semibold text-gray-400 text-center">Añadir PDF</span>
+    <div id="app-content" class="hidden w-full flex flex-col">
+        <header class="bg-[#181818] border-b border-[#2a2a2a] p-4 flex justify-between items-center">
+            <div>
+                <img src="https://i.postimg.cc/g0HxbpQF/PAPIRO-1.png" alt="Papiro Digital Logo" class="h-8">
+            </div>
+            
+            <div class="flex items-center gap-4">
+                <span id="user-greeting" class="text-lg font-semibold"></span>
+                <button id="logout-btn" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition">Cerrar Sesión</button>
+            </div>
+        </header>
+
+        <main class="p-6 flex-grow">
+            <h2 class="text-2xl font-semibold mb-6">Tus Tableros</h2>
+            <div id="projects-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+                <div id="add-project-card" class="project-card bg-[#181818] rounded-lg shadow-lg border-2 border-dashed border-[#2a2a2a] cursor-pointer flex flex-col items-center justify-center text-gray-500 hover:text-[#88c999]">
+                    <i class="fas fa-plus text-5xl"></i>
                 </div>
-                <input type="file" id="pdf-file-input" class="hidden" accept="application/pdf">
+                </div>
+        </main>
+
+        <footer id="footer-search" class="bg-[#181818] border-t border-[#2a2a2a] p-4">
+            <div class="relative w-full max-w-lg mx-auto">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-4">
+                    <i class="fas fa-search text-gray-500"></i>
+                </span>
+                <input id="search-bar" type="text" placeholder="Buscar proyectos..." class="bg-[#2a2a2a] text-white w-full py-3 pl-12 pr-4 rounded-full focus:outline-none focus:ring-2 focus:ring-[#88c999] transition-all">
             </div>
-            <div id="no-pdfs-message" class="text-gray-400 text-center mt-8 hidden">
-                <p>Este tablero no tiene archivos PDF. ¡Sube el primero!</p>
-            </div>
-        </div>
-    </main>
+        </footer>
+    </div>
 
     <script type="module">
         import { auth, db, storage } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { doc, getDoc, collection, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
-        import { ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
+        import { collection, query, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
 
-        const projectNameTitle = document.getElementById('project-name-title');
-        const projectNameHeader = document.getElementById('project-name-header');
-        const pdfGrid = document.getElementById('pdf-grid');
-        const uploadCard = document.getElementById('upload-card');
-        const pdfFileInput = document.getElementById('pdf-file-input');
-        const noPdfsMessage = document.getElementById('no-pdfs-message');
+        const pageLoader = document.getElementById('page-loader');
+        const appContent = document.getElementById('app-content');
+        const footerSearch = document.getElementById('footer-search');
+        const userGreeting = document.getElementById('user-greeting');
+        const projectsGrid = document.getElementById('projects-grid');
+        const addProjectCard = document.getElementById('add-project-card');
+        const searchBar = document.getElementById('search-bar');
         const logoutBtn = document.getElementById('logout-btn');
-
-        let currentUser, projectId, projectRef;
+        let allProjects = [];
+        let currentUserId = null;
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                currentUser = user;
-                const urlParams = new URLSearchParams(window.location.search);
-                projectId = urlParams.get('id');
-                if (!projectId) { window.location.href = 'mi_tablero.html'; return; }
+                currentUserId = user.uid;
                 
-                projectRef = doc(db, "users", currentUser.uid, "projects", projectId);
-                loadProjectName();
-                loadPdfs();
+                const name = user.displayName ? user.displayName.split(' ')[0] : user.email.split('@')[0];
+                const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
+                userGreeting.textContent = `Hola, ${capitalizedName}`;
+                
+                loadProjects(currentUserId);
+                pageLoader.style.display = 'none';
+                appContent.classList.add('flex', 'flex-col', 'min-h-screen');
+                appContent.classList.remove('hidden');
 
-                uploadCard.addEventListener('click', () => pdfFileInput.click());
-                pdfFileInput.addEventListener('change', handlePdfUpload);
             } else {
                 window.location.href = 'index.html';
             }
         });
 
-        async function loadProjectName() {
-            const docSnap = await getDoc(projectRef);
-            if (docSnap.exists()) {
-                const name = docSnap.data().name;
-                projectNameTitle.textContent = name;
-                projectNameHeader.textContent = name;
-            }
-        }
-
-        function loadPdfs() {
-            const pdfsCollectionRef = collection(projectRef, "pdfs");
-            onSnapshot(pdfsCollectionRef, (snapshot) => {
-                // Limpiar grid excepto el botón de subir
-                document.querySelectorAll('.pdf-card-item').forEach(el => el.remove());
-
-                if(snapshot.empty) {
-                    noPdfsMessage.classList.remove('hidden');
-                } else {
-                    noPdfsMessage.classList.add('hidden');
-                }
-
-                snapshot.forEach(pdfDoc => {
-                    const pdfData = pdfDoc.data();
-                    const pdfId = pdfDoc.id;
-
-                    const card = document.createElement('div');
-                    card.className = 'pdf-card-item pdf-card rounded-lg p-4 flex flex-col justify-between cursor-pointer';
-                    card.style.aspectRatio = '1/1';
-                    card.innerHTML = `<h3 class="font-bold text-white truncate">${pdfData.name || 'Sin nombre'}</h3>
-                                      <p class="text-sm text-gray-500 truncate">${pdfData.fileName}</p>`;
-                    
-                    // ESTE ES EL ENLACE CORRECTO AHORA
-                    card.addEventListener('click', () => {
-                        window.location.href = `espacio.html?id=${projectId}&pdfId=${pdfId}`;
-                    });
-                    
-                    pdfGrid.appendChild(card);
-                });
+        function loadProjects(userId) {
+            const projectsRef = collection(db, 'users', userId, 'projects');
+            const q = query(projectsRef);
+            onSnapshot(q, (snapshot) => {
+                allProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderProjects(allProjects);
             });
         }
         
-        async function handlePdfUpload(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const newPdfRef = doc(collection(projectRef, 'pdfs'));
-            const storageRef = ref(storage, `proyectos/${currentUser.uid}/${projectId}/pdfs/${newPdfRef.id}-${file.name}`);
-            const uploadTask = uploadBytesResumable(storageRef, file);
+        function renderProjects(projectsToRender) {
+            while (projectsGrid.children.length > 1) {
+                projectsGrid.removeChild(projectsGrid.lastChild);
+            }
             
-            Swal.fire({ title: 'Subiendo PDF...', text: 'Por favor, espera.', didOpen: () => { Swal.showLoading() } });
-
-            uploadTask.on('state_changed', 
-              (snapshot) => {}, 
-              (error) => { 
-                console.error("Error al subir el archivo a Storage:", error);
-                Swal.fire('Error de subida', 'No se pudo subir el archivo.', 'error'); 
-              },
-              () => {
-                getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
-                  try {
-                    await setDoc(newPdfRef, {
-                      name: file.name.replace(/\.[^/.]+$/, ""),
-                      fileName: file.name,
-                      url: downloadURL,
-                      createdAt: new Date()
-                    });
-                    Swal.fire('¡Éxito!', 'Archivo subido y guardado correctamente.', 'success');
-                  } catch (firestoreError) {
-                    console.error("Error al guardar la URL en Firestore:", firestoreError);
-                    Swal.fire('Error de Firestore', 'El archivo se subió, pero no se pudo guardar la referencia. Intenta subir de nuevo.', 'error');
-                  }
-                }).catch((urlError) => {
-                  console.error("Error al obtener la URL de descarga:", urlError);
-                  Swal.fire('Error de URL', 'El archivo se subió, pero no se pudo obtener la URL.', 'error');
+            projectsToRender.forEach(project => {
+                const card = document.createElement('div');
+                card.className = 'project-card bg-[#181818] rounded-lg shadow-lg border border-[#2a2a2a] relative cursor-pointer flex flex-col group';
+                const coverStyle = project.coverURL ? `background-image: url('${project.coverURL}'); background-size: cover; background-position: center;` : 'background-color: #2a2a2a;';
+                
+                card.innerHTML = `
+                    <div class="h-3/4 w-full rounded-t-lg flex items-center justify-center" style="${coverStyle}">
+                        ${!project.coverURL ? '<i class="fas fa-book-open text-4xl text-gray-500"></i>' : ''}
+                    </div>
+                    <div class="absolute inset-x-0 top-0 p-2 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button class="text-red-400 hover:text-red-300 delete-btn" data-id="${project.id}">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                    <div class="h-1/4 p-3 flex items-center">
+                        <h3 class="font-semibold truncate w-full">${project.name}</h3>
+                    </div>
+                `;
+                card.addEventListener('click', (e) => {
+                    if (!e.target.closest('.delete-btn')) {
+                        window.location.href = `tablero_detalle.html?id=${project.id}`;
+                    }
                 });
-              }
-            );
+                card.querySelector('.delete-btn').addEventListener('click', (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    deleteProject(currentUserId, project.id, project.name);
+                });
+                projectsGrid.appendChild(card);
+            });
         }
 
-        logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = 'index.html'));
+        searchBar.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const filteredProjects = allProjects.filter(p => p.name.toLowerCase().includes(searchTerm));
+            renderProjects(filteredProjects);
+        });
+        
+        logoutBtn.addEventListener('click', () => signOut(auth));
+
+        addProjectCard.addEventListener('click', () => {
+             Swal.fire({
+                title: 'Nuevo Proyecto',
+                html: `
+                    <input id="swal-input1" class="swal2-input" placeholder="Nombre del proyecto">
+                    <input id="swal-input2" type="file" class="swal2-file" accept="image/*" aria-label="Subir portada (opcional)">
+                `,
+                focusConfirm: false,
+                preConfirm: () => ({
+                    name: document.getElementById('swal-input1').value,
+                    file: document.getElementById('swal-input2').files[0]
+                })
+            }).then(async (result) => {
+                if (result.isConfirmed && result.value.name) {
+                    await addProject(currentUserId, result.value.name, result.value.file);
+                }
+            });
+        });
+
+        async function addProject(userId, projectName, file) {
+            try {
+                let coverURL = '';
+                if (file) {
+                    const storageRef = ref(storage, `users/${userId}/covers/${Date.now()}_${file.name}`);
+                    await uploadBytes(storageRef, file);
+                    coverURL = await getDownloadURL(storageRef);
+                }
+                const projectsRef = collection(db, 'users', userId, 'projects');
+                await addDoc(projectsRef, {
+                    name: projectName,
+                    coverURL: coverURL,
+                    createdAt: serverTimestamp()
+                });
+            } catch (error) {
+                console.error("Error al crear proyecto:", error);
+                Swal.fire('Error', 'No se pudo crear el proyecto.', 'error');
+            }
+        }
+
+        async function deleteProject(userId, projectId, projectName) {
+            Swal.fire({
+                title: `¿Borrar "${projectName}"?`,
+                text: "Esta acción no se puede deshacer.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Sí, ¡bórralo!',
+                cancelButtonText: 'Cancelar'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    try {
+                        await deleteDoc(doc(db, 'users', userId, 'projects', projectId));
+                        Swal.fire('¡Borrado!', 'El proyecto ha sido eliminado.', 'success');
+                    } catch (error) {
+                        console.error("Error al borrar proyecto:", error);
+                        Swal.fire('Error', 'No se pudo borrar el proyecto.', 'error');
+                    }
+                }
+            });
+        }
     </script>
 </body>
 </html>
