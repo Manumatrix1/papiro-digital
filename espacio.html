@@ -340,10 +340,10 @@
                 try {
                     statusText.textContent = 'Buscando en caché...';
                     const cachedPdf = await getPdfFromDB(pdfId);
-                    let pdfData;
+                    let loadingTask;
                     if (cachedPdf) {
                         statusText.textContent = 'Cargando desde caché...';
-                        pdfData = cachedPdf;
+                        loadingTask = pdfjsLib.getDocument({ data: cachedPdf });
                     } else {
                         statusText.textContent = 'Descargando documento...';
                         if (!currentUser || !projectId || !pdfId) {
@@ -358,26 +358,22 @@
                         if (!pdfUrl) {
                             throw new Error("La URL del PDF no se encontró en el documento de Firestore.");
                         }
-                        let response;
-                        try {
-                            // Cambio 1: Añadimos 'withCredentials: false' al fetch para evitar problemas de CORS
-                            response = await fetch(pdfUrl, { withCredentials: false });
-                            if (!response.ok) {
-                                throw new Error(`Error de red: ${response.status} ${response.statusText}`);
-                            }
-                            const contentType = response.headers.get('content-type');
-                            if (!contentType || !contentType.includes('application/pdf')) {
-                                throw new Error(`El archivo descargado no es un PDF. Tipo de contenido: ${contentType}`);
-                            }
-                            pdfData = await response.arrayBuffer();
-                        } catch (networkError) {
-                            throw new Error(`Error de descarga: ${networkError.message}. Revisa tus reglas de Firebase Storage.`);
-                        }
-                        await savePdfToDB(pdfId, pdfData);
+                        loadingTask = pdfjsLib.getDocument({
+                            url: pdfUrl,
+                            withCredentials: false
+                        });
+                        // Esperamos a que la tarea de carga termine para obtener los datos y guardarlos en caché
+                        const pdfDocumentProxy = await loadingTask.promise;
+                        const originalPdfData = await pdfDocumentProxy.getData();
+                        await savePdfToDB(pdfId, originalPdfData.buffer);
+                        // Reasignamos la tarea de carga original para usarla después
+                        pdfDocument = pdfDocumentProxy;
+                        document.getElementById('status-indicator').style.display = 'none';
+                        pdfWrapper.style.display = 'block';
+                        await setupPagePlaceholders();
+                        loadAllAnnotations();
+                        return;
                     }
-                    // Cambio 2: Esta parte del código se movió fuera del bloque 'if/else'
-                    // para asegurar que siempre se ejecute y reciba 'pdfData'
-                    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(pdfData) });
                     pdfDocument = await loadingTask.promise;
                     document.getElementById('status-indicator').style.display = 'none';
                     pdfWrapper.style.display = 'block';
