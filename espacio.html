@@ -335,17 +335,49 @@
                     isPanning = false;
                 });
             }
+
+            // Aquí empieza la función loadPdfDocument corregida
             async function loadPdfDocument() {
                 const statusText = document.getElementById('status-text');
                 try {
                     statusText.textContent = 'Buscando en caché...';
                     const cachedPdf = await getPdfFromDB(pdfId);
                     let loadingTask;
+
+                    // Manejador de contraseña
+                    const onPasswordCallback = (callback) => {
+                        Swal.fire({
+                            title: 'PDF Protegido',
+                            text: 'Este documento requiere una contraseña.',
+                            input: 'password',
+                            inputPlaceholder: 'Introduce la contraseña',
+                            showCancelButton: true,
+                            confirmButtonText: 'Abrir',
+                            cancelButtonText: 'Cancelar',
+                            allowOutsideClick: false,
+                            backdrop: `
+                                rgba(0,0,0,0.4)
+                                left top
+                                no-repeat
+                            `,
+                            preConfirm: (password) => {
+                                if (password) {
+                                    callback(password);
+                                }
+                            }
+                        }).then((result) => {
+                            if (result.dismiss === Swal.DismissReason.cancel) {
+                                loadingTask.destroy();
+                            }
+                        });
+                    };
+
                     if (cachedPdf) {
                         statusText.textContent = 'Cargando desde caché...';
-                        loadingTask = pdfjsLib.getDocument({ data: cachedPdf });
+                        loadingTask = pdfjsLib.getDocument({ data: cachedPdf, onPassword: onPasswordCallback });
                     } else {
                         statusText.textContent = 'Descargando documento...';
+                        
                         if (!currentUser || !projectId || !pdfId) {
                             throw new Error("Faltan datos de usuario o de proyecto para cargar el PDF.");
                         }
@@ -358,16 +390,17 @@
                         if (!pdfUrl) {
                             throw new Error("La URL del PDF no se encontró en el documento de Firestore.");
                         }
-                        // La solución más robusta: le pasamos la URL directamente a pdf.js para evitar el error de CORS
+
                         loadingTask = pdfjsLib.getDocument({
                             url: pdfUrl,
-                            withCredentials: false
+                            withCredentials: false,
+                            onPassword: onPasswordCallback
                         });
-                        // Esperamos a que la tarea de carga termine para obtener los datos y guardarlos en caché
+                    
                         const pdfDocumentProxy = await loadingTask.promise;
                         const originalPdfData = await pdfDocumentProxy.getData();
                         await savePdfToDB(pdfId, originalPdfData.buffer);
-                        // Reasignamos la tarea de carga original para usarla después
+
                         pdfDocument = pdfDocumentProxy;
                         document.getElementById('status-indicator').style.display = 'none';
                         pdfWrapper.style.display = 'block';
@@ -375,16 +408,20 @@
                         loadAllAnnotations();
                         return;
                     }
+                    
                     pdfDocument = await loadingTask.promise;
                     document.getElementById('status-indicator').style.display = 'none';
                     pdfWrapper.style.display = 'block';
                     await setupPagePlaceholders();
                     loadAllAnnotations();
+
                 } catch (error) {
                     console.error("Error al cargar PDF:", error);
                     statusText.textContent = `Error: ${error.message}`;
                 }
             }
+            // Aquí termina la función loadPdfDocument corregida
+
             async function setupPagePlaceholders() {
                 pdfWrapper.innerHTML = '';
                 const page = await pdfDocument.getPage(1);
@@ -857,16 +894,16 @@
                 }
                 const regex = new RegExp(searchTerm.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi');
                 let resultsHtml = `
-                    <h4 class="text-sm font-bold text-white mb-2">Resultados (${results.length}):</h4>
-                    <ul class="text-left list-none pl-0" style="max-height: 250px; overflow-y: auto;">`;
+                    <h4 class=\"text-sm font-bold text-white mb-2\">Resultados (${results.length}):</h4>
+                    <ul class=\"text-left list-none pl-0\" style=\"max-height: 250px; overflow-y: auto;\">`;
                 results.forEach(result => {
                     const highlightedSnippet = result.snippet.replace(regex, '<strong class="text-[var(--primary-color)]">$&</strong>');
                     resultsHtml += `
-                        <li class="mb-1">
-                            <a href="#" onclick="window.scrollToPage(${result.pageNum}); return false;" 
-                               class="block p-2 rounded-md hover:bg-[#2a2a2a] text-xs">
-                                <span class="font-bold block mb-1">Página ${result.pageNum}</span>
-                                <span class="text-gray-400">...${highlightedSnippet}...</span>
+                        <li class=\"mb-1\">
+                            <a href=\"#\" onclick=\"window.scrollToPage(${result.pageNum}); return false;\" 
+                               class=\"block p-2 rounded-md hover:bg-[#2a2a2a] text-xs\">
+                                <span class=\"font-bold block mb-1\">Página ${result.pageNum}</span>
+                                <span class=\"text-gray-400\">...${highlightedSnippet}...</span>
                             </a>
                         </li>`;
                 });
