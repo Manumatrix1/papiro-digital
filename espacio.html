@@ -358,6 +358,7 @@
                         if (!pdfUrl) {
                             throw new Error("La URL del PDF no se encontró en el documento de Firestore.");
                         }
+                        // La solución más robusta: le pasamos la URL directamente a pdf.js para evitar el error de CORS
                         loadingTask = pdfjsLib.getDocument({
                             url: pdfUrl,
                             withCredentials: false
