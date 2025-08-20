@@ -360,7 +360,8 @@
                         }
                         let response;
                         try {
-                            response = await fetch(pdfUrl);
+                            // Cambio 1: Añadimos 'withCredentials: false' al fetch para evitar problemas de CORS
+                            response = await fetch(pdfUrl, { withCredentials: false });
                             if (!response.ok) {
                                 throw new Error(`Error de red: ${response.status} ${response.statusText}`);
                             }
@@ -374,6 +375,8 @@
                         }
                         await savePdfToDB(pdfId, pdfData);
                     }
+                    // Cambio 2: Esta parte del código se movió fuera del bloque 'if/else'
+                    // para asegurar que siempre se ejecute y reciba 'pdfData'
                     const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(pdfData) });
                     pdfDocument = await loadingTask.promise;
                     document.getElementById('status-indicator').style.display = 'none';
