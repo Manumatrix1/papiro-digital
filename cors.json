@@ -1,6 +1,6 @@
 [
   {
-    "origin": ["*"],
+    "origin": ["https://papirodigital.net.ar"],
     "method": ["GET"],
     "maxAgeSeconds": 3600
   }
