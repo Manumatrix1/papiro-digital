@@ -183,10 +183,12 @@
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
     </script>
+    <script src="./patch-cors.js"></script>
     <script type="module">
         import { auth, db } from './firebase-config.js';
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
         import { doc, getDoc, collection, query, onSnapshot, addDoc, serverTimestamp, updateDoc, deleteDoc, writeBatch, orderBy } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { loadPDFWithFallback } from './pdf-loader-alternative.js';
         document.addEventListener('DOMContentLoaded', () => {
             let currentUser, projectId, pdfId, pdfDocument, annotationsUnsubscribe;
             let activeTool = 'select', activeColor = '#FFDD00', isDrawing = false;
@@ -392,20 +394,32 @@
                     }
 
                     // Configuración mejorada para manejar CORS y carga de PDFs
-                    const loadConfig = {
-                        url: pdfUrl,
-                        withCredentials: false,
-                        onPassword: onPasswordCallback,
-                        // Configuraciones adicionales para manejar CORS
-                        httpHeaders: {
-                            'Access-Control-Allow-Origin': '*'
-                        },
-                        // Usar modo no-cors si hay problemas
-                        requestInit: {
-                            mode: 'cors',
-                            credentials: 'omit'
-                        }
-                    };
+                    let loadConfig;
+                    
+                    // Si estamos en producción y hay problemas de CORS, usar proxy
+                    if (location.hostname === 'papirodigital.net.ar' && pdfUrl.includes('firebasestorage')) {
+                        const proxyUrl = `/.netlify/functions/proxy-pdf?url=${encodeURIComponent(pdfUrl)}`;
+                        loadConfig = {
+                            url: proxyUrl,
+                            withCredentials: false,
+                            onPassword: onPasswordCallback
+                        };
+                    } else {
+                        loadConfig = {
+                            url: pdfUrl,
+                            withCredentials: false,
+                            onPassword: onPasswordCallback,
+                            // Configuraciones adicionales para manejar CORS
+                            httpHeaders: {
+                                'Access-Control-Allow-Origin': '*'
+                            },
+                            // Usar modo no-cors si hay problemas
+                            requestInit: {
+                                mode: 'cors',
+                                credentials: 'omit'
+                            }
+                        };
+                    }
 
                     loadingTask = pdfjsLib.getDocument(loadConfig);                        const pdfDocumentProxy = await loadingTask.promise;
                         const originalPdfData = await pdfDocumentProxy.getData();
