@@ -1,7 +1,23 @@
 [
   {
-    "origin": ["https://papirodigital.net.ar"],
-    "method": ["GET"],
-    "maxAgeSeconds": 3600
+    "origin": [
+      "https://papirodigital.net.ar",
+      "https://*.papirodigital.net.ar", 
+      "https://*.netlify.app",
+      "https://*.firebaseapp.com",
+      "http://localhost:3000",
+      "http://localhost:8000",
+      "http://127.0.0.1:5500"
+    ],
+    "method": ["GET", "HEAD", "PUT", "POST", "DELETE", "OPTIONS"],
+    "maxAgeSeconds": 3600,
+    "responseHeader": [
+      "Content-Type",
+      "Access-Control-Allow-Origin",
+      "Access-Control-Allow-Methods", 
+      "Access-Control-Allow-Headers",
+      "Access-Control-Allow-Credentials",
+      "x-goog-resumable"
+    ]
   }
 ]

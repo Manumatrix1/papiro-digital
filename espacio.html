@@ -386,18 +386,28 @@
                         if (!docSnap || !docSnap.exists()) {
                             throw new Error("El documento no se encontró en la base de datos de Firestore.");
                         }
-                        const pdfUrl = docSnap.data().url;
-                        if (!pdfUrl) {
-                            throw new Error("La URL del PDF no se encontró en el documento de Firestore.");
-                        }
+                    const pdfUrl = docSnap.data().url;
+                    if (!pdfUrl) {
+                        throw new Error("La URL del PDF no se encontró en el documento de Firestore.");
+                    }
 
-                        loadingTask = pdfjsLib.getDocument({
-                            url: pdfUrl,
-                            withCredentials: false,
-                            onPassword: onPasswordCallback
-                        });
-                    
-                        const pdfDocumentProxy = await loadingTask.promise;
+                    // Configuración mejorada para manejar CORS y carga de PDFs
+                    const loadConfig = {
+                        url: pdfUrl,
+                        withCredentials: false,
+                        onPassword: onPasswordCallback,
+                        // Configuraciones adicionales para manejar CORS
+                        httpHeaders: {
+                            'Access-Control-Allow-Origin': '*'
+                        },
+                        // Usar modo no-cors si hay problemas
+                        requestInit: {
+                            mode: 'cors',
+                            credentials: 'omit'
+                        }
+                    };
+
+                    loadingTask = pdfjsLib.getDocument(loadConfig);                        const pdfDocumentProxy = await loadingTask.promise;
                         const originalPdfData = await pdfDocumentProxy.getData();
                         await savePdfToDB(pdfId, originalPdfData.buffer);
 
@@ -417,7 +427,31 @@
 
                 } catch (error) {
                     console.error("Error al cargar PDF:", error);
-                    statusText.textContent = `Error: ${error.message}`;
+                    
+                    // Manejo específico de errores CORS
+                    if (error.message.includes('CORS') || error.message.includes('fetch')) {
+                        statusText.innerHTML = `
+                            <div style="text-align: center; padding: 2rem;">
+                                <h3 style="color: #ef4444; margin-bottom: 1rem;">Error de CORS</h3>
+                                <p style="margin-bottom: 1rem;">
+                                    No se puede cargar el PDF debido a restricciones de CORS.
+                                </p>
+                                <p style="font-size: 0.875rem; color: #9ca3af;">
+                                    Verifica la configuración de Firebase Storage y 
+                                    asegúrate de que el dominio esté autorizado.
+                                </p>
+                                <button onclick="location.reload()" style="
+                                    margin-top: 1rem; background: #88c999; color: black; 
+                                    border: none; padding: 0.75rem 1.5rem; border-radius: 0.5rem;
+                                    cursor: pointer; font-weight: bold;
+                                ">
+                                    Reintentar
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        statusText.textContent = `Error: ${error.message}`;
+                    }
                 }
             }
             // Aquí termina la función loadPdfDocument corregida

@@ -1,1 +1,33 @@
-/* /index.html   200
+# Papiro Digital - Netlify Redirects Configuration
+
+# Admin panel
+/admin /admin.html 200
+/admin/* /admin.html 200
+
+# Main panel 
+/panel /panel.html 200
+/panel/* /panel.html 200
+
+# Dashboard
+/dashboard /mi_tablero.html 200
+/dashboard/* /mi_tablero.html 200
+
+# Project detail
+/proyecto/:id /tablero_detalle.html 200
+/project/:id /tablero_detalle.html 200
+
+# PDF viewer
+/visor/:id/:pdfId /espacio.html 200
+/viewer/:id/:pdfId /espacio.html 200
+
+# Service Worker
+/sw.js /sw.js 200
+
+# Static assets
+/assets/* /assets/:splat 200
+
+# API redirects for future use
+/api/* /.netlify/functions/:splat 200
+
+# SPA fallback - DEBE IR AL FINAL
+/* /index.html 200
