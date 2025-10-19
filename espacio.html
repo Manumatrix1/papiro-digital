@@ -137,9 +137,12 @@
     <!-- Scripts externos -->
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+        console.log('🔧 NUEVA VERSIÓN CARGADA - v2.0 - COMPLETAMENTE REPARADA');
+        console.log('🚨 Sistema de emergencia PDF listo');
     </script>
-    <script src="./emergency-pdf-fix.js"></script>
-    <script src="./force-emergency-load.js"></script>
+    <script src="./cache-buster.js?v=2.0"></script>
+    <script src="./emergency-pdf-fix.js?v=2.0"></script>
+    <script src="./force-emergency-load.js?v=2.0"></script>
 
     <!-- Script principal completamente funcional -->
     <script type="module">
@@ -217,7 +220,8 @@
             const statusText = document.getElementById('status-text');
 
             try {
-                console.log('🚨 Iniciando carga de PDF con sistema de emergencia...');
+                console.log('� NUEVA VERSIÓN v2.0 ACTIVA - Sistema completamente reparado');
+                console.log('�🚨 Iniciando carga de PDF con sistema de emergencia...');
                 statusText.textContent = '🚨 Cargando PDF con sistema anti-CORS...';
 
                 if (!currentUser || !projectId || !pdfId) {

@@ -1,20 +1,12 @@
 [build]
   # Directorio de publicación (la raíz del proyecto)
   publish = "."
-  
-  # Comando de build (no necesario para sitio estático, pero bueno tenerlo)
-  command = "echo 'Papiro Digital - Static Site Ready'"
-
-[build.environment]
-  # Variables de entorno para el build
-  NODE_VERSION = "18"
 
 [[redirects]]
   # SPA routing - todas las rutas van al index.html
   from = "/*"
   to = "/index.html"
   status = 200
-  conditions = {Role = ["admin"], Country = ["!"]]}
 
 [[redirects]]
   # Admin panel routing
