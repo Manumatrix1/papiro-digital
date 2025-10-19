@@ -183,7 +183,7 @@
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
     </script>
-    <script src="./patch-cors.js"></script>
+    <script src="./emergency-pdf-fix.js"></script>
     <script type="module">
         import { auth, db } from './firebase-config.js';
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
@@ -442,29 +442,24 @@
                 } catch (error) {
                     console.error("Error al cargar PDF:", error);
                     
-                    // Manejo específico de errores CORS
-                    if (error.message.includes('CORS') || error.message.includes('fetch')) {
-                        statusText.innerHTML = `
-                            <div style="text-align: center; padding: 2rem;">
-                                <h3 style="color: #ef4444; margin-bottom: 1rem;">Error de CORS</h3>
-                                <p style="margin-bottom: 1rem;">
-                                    No se puede cargar el PDF debido a restricciones de CORS.
-                                </p>
-                                <p style="font-size: 0.875rem; color: #9ca3af;">
-                                    Verifica la configuración de Firebase Storage y 
-                                    asegúrate de que el dominio esté autorizado.
-                                </p>
-                                <button onclick="location.reload()" style="
-                                    margin-top: 1rem; background: #88c999; color: black; 
-                                    border: none; padding: 0.75rem 1.5rem; border-radius: 0.5rem;
-                                    cursor: pointer; font-weight: bold;
-                                ">
-                                    Reintentar
-                                </button>
-                            </div>
-                        `;
-                    } else {
-                        statusText.textContent = `Error: ${error.message}`;
+                    // ACTIVAR SISTEMA DE EMERGENCIA
+                    statusText.textContent = 'Activando sistema de emergencia...';
+                    
+                    try {
+                        console.log('🚨 Activando cargador de emergencia...');
+                        const pdfName = docSnap.data().fileName || 'documento.pdf';
+                        pdfDocument = await window.emergencyPDFLoader.loadPDF(pdfUrl, onPasswordCallback);
+                        
+                        if (pdfDocument) {
+                            console.log('✅ PDF cargado con sistema de emergencia');
+                            document.getElementById('status-indicator').style.display = 'none';
+                            pdfWrapper.style.display = 'block';
+                            await setupPagePlaceholders();
+                            loadAllAnnotations();
+                        }
+                    } catch (emergencyError) {
+                        console.error('❌ Sistema de emergencia también falló:', emergencyError);
+                        // El modal de emergencia ya se mostró en emergencyPDFLoader
                     }
                 }
             }
