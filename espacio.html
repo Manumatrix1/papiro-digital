@@ -146,6 +146,7 @@
     <script src="./cache-buster.js?v=2.0&t=1729283400"></script>
     <script src="./emergency-pdf-fix.js?v=2.0&t=1729283400"></script>
     <script src="./force-emergency-load.js?v=2.0&t=1729283400"></script>
+    <script src="./ultimate-pdf-fix.js?v=2.0&t=1729283400"></script>
 
     <!-- Script principal completamente funcional -->
     <script type="module">
@@ -257,9 +258,9 @@
                     });
                 };
 
-                // 🚨 USAR EL SISTEMA DE EMERGENCIA DIRECTAMENTE
-                console.log('🚨 Activando cargador de emergencia...');
-                pdfDocument = await window.emergencyPDFLoader.loadPDF(pdfUrl, onPasswordCallback);
+                // 🚨 USAR EL SISTEMA DEFINITIVO (SIN PROXIES)
+                console.log('🚨 Activando cargador definitivo...');
+                pdfDocument = await window.ultimatePDFLoader.loadPDF(pdfUrl, onPasswordCallback);
 
                 if (pdfDocument) {
                     statusText.textContent = '✅ PDF cargado correctamente';
@@ -271,9 +272,9 @@
 
                     console.log('✅ PDF completamente cargado y configurado');
                 } else {
-                    // Si falló, mostrar modal de emergencia
-                    console.log('❌ Carga falló - Mostrando modal de emergencia');
-                    window.emergencyPDFLoader.showEmergencyModal(pdfUrl);
+                    // Si falló, mostrar modal de emergencia mejorado
+                    console.log('❌ Carga falló - Mostrando modal definitivo');
+                    window.ultimatePDFLoader.showEmergencyModal(pdfUrl);
                 }
 
             } catch (error) {
