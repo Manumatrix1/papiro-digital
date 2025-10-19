@@ -184,6 +184,7 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
     </script>
     <script src="./emergency-pdf-fix.js"></script>
+    <script src="./force-emergency-load.js"></script>
     <script type="module">
         import { auth, db } from './firebase-config.js';
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
@@ -338,13 +339,12 @@
                 });
             }
 
-            // Aquí empieza la función loadPdfDocument corregida
+            // 🚨 FUNCIÓN COMPLETAMENTE NUEVA CON SISTEMA DE EMERGENCIA
             async function loadPdfDocument() {
                 const statusText = document.getElementById('status-text');
                 try {
                     statusText.textContent = 'Buscando en caché...';
                     const cachedPdf = await getPdfFromDB(pdfId);
-                    let loadingTask;
 
                     // Manejador de contraseña
                     const onPasswordCallback = (callback) => {
@@ -357,75 +357,62 @@
                             confirmButtonText: 'Abrir',
                             cancelButtonText: 'Cancelar',
                             allowOutsideClick: false,
-                            backdrop: `
-                                rgba(0,0,0,0.4)
-                                left top
-                                no-repeat
-                            `,
+                            backdrop: `rgba(0,0,0,0.4) left top no-repeat`,
                             preConfirm: (password) => {
-                                if (password) {
-                                    callback(password);
-                                }
-                            }
-                        }).then((result) => {
-                            if (result.dismiss === Swal.DismissReason.cancel) {
-                                loadingTask.destroy();
+                                if (password) callback(password);
                             }
                         });
                     };
 
                     if (cachedPdf) {
                         statusText.textContent = 'Cargando desde caché...';
-                        loadingTask = pdfjsLib.getDocument({ data: cachedPdf, onPassword: onPasswordCallback });
+                        const loadingTask = pdfjsLib.getDocument({ data: cachedPdf, onPassword: onPasswordCallback });
+                        currentPdfDoc = await loadingTask.promise;
                     } else {
-                        statusText.textContent = 'Descargando documento...';
+                        statusText.textContent = '🚨 Activando sistema de emergencia...';
+                        console.log('🚨 CORS detectado - Usando sistema anti-fallos');
                         
                         if (!currentUser || !projectId || !pdfId) {
-                            throw new Error("Faltan datos de usuario o de proyecto para cargar el PDF.");
+                            throw new Error("Faltan datos de usuario o de proyecto");
                         }
+                        
                         const pdfDocRef = doc(db, "users", currentUser.uid, "projects", projectId, "pdfs", pdfId);
                         const docSnap = await getDoc(pdfDocRef);
-                        if (!docSnap || !docSnap.exists()) {
-                            throw new Error("El documento no se encontró en la base de datos de Firestore.");
+                        if (!docSnap?.exists()) {
+                            throw new Error("Documento no encontrado");
                         }
-                    const pdfUrl = docSnap.data().url;
-                    if (!pdfUrl) {
-                        throw new Error("La URL del PDF no se encontró en el documento de Firestore.");
+                        
+                        const pdfUrl = docSnap.data().url;
+                        if (!pdfUrl) {
+                            throw new Error("URL del PDF no encontrada");
+                        }
+                        
+                        // 🚨 USAR SIEMPRE EL SISTEMA DE EMERGENCIA
+                        statusText.textContent = 'Cargando con tecnología anti-CORS...';
+                        currentPdfDoc = await window.emergencyPDFLoader.loadPDF(pdfUrl, onPasswordCallback);
+                        
+                        if (!currentPdfDoc) {
+                            // Si falló, mostrar modal de opciones
+                            window.emergencyPDFLoader.showEmergencyModal(pdfUrl);
+                            return;
+                        }
+                        
+                        // Guardar en caché para próxima vez
+                        try {
+                            const pdfData = await currentPdfDoc.getData();
+                            await savePdfToDB(pdfId, pdfData.buffer);
+                        } catch (e) {
+                            console.log('No se pudo cachear:', e);
+                        }
                     }
 
-                    // Configuración mejorada para manejar CORS y carga de PDFs
-                    let loadConfig;
+                    // Si llegamos aquí, tenemos el PDF cargado
+                    statusText.textContent = '✅ PDF cargado correctamente';
+                    document.getElementById('status-indicator').style.display = 'none';
+                    document.getElementById('pdf-content-wrapper').style.display = 'block';
                     
-                    // Si estamos en producción y hay problemas de CORS, usar proxy
-                    if (location.hostname === 'papirodigital.net.ar' && pdfUrl.includes('firebasestorage')) {
-                        const proxyUrl = `/.netlify/functions/proxy-pdf?url=${encodeURIComponent(pdfUrl)}`;
-                        loadConfig = {
-                            url: proxyUrl,
-                            withCredentials: false,
-                            onPassword: onPasswordCallback
-                        };
-                    } else {
-                        loadConfig = {
-                            url: pdfUrl,
-                            withCredentials: false,
-                            onPassword: onPasswordCallback,
-                            // Configuraciones adicionales para manejar CORS
-                            httpHeaders: {
-                                'Access-Control-Allow-Origin': '*'
-                            },
-                            // Usar modo no-cors si hay problemas
-                            requestInit: {
-                                mode: 'cors',
-                                credentials: 'omit'
-                            }
-                        };
-                    }
-
-                    loadingTask = pdfjsLib.getDocument(loadConfig);                        const pdfDocumentProxy = await loadingTask.promise;
-                        const originalPdfData = await pdfDocumentProxy.getData();
-                        await savePdfToDB(pdfId, originalPdfData.buffer);
-
-                        pdfDocument = pdfDocumentProxy;
+                    await displayPdf(currentPdfDoc);
+                    loadAnnotations();
                         document.getElementById('status-indicator').style.display = 'none';
                         pdfWrapper.style.display = 'block';
                         await setupPagePlaceholders();
