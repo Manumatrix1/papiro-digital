@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Papiro Digital - Test</title>
+    <style>
+        body {
+            background: #0f0f0f;
+            color: white;
+            font-family: Arial, sans-serif;
+            padding: 2rem;
+            text-align: center;
+        }
+        .status {
+            background: #88c999;
+            color: black;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin: 1rem 0;
+            display: inline-block;
+        }
+        .error {
+            background: #ef4444;
+            color: white;
+        }
+        .info {
+            background: #3b82f6;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Papiro Digital - Test de Deployment</h1>
+    
+    <div class="status">
+        ✅ Esta página se carga = Netlify funciona
+    </div>
+    
+    <div id="test-results"></div>
+    
+    <script>
+        const results = document.getElementById('test-results');
+        
+        // Test 1: Verificar dominio
+        const domain = window.location.hostname;
+        results.innerHTML += `<div class="info">🌍 Dominio actual: ${domain}</div>`;
+        
+        // Test 2: Verificar si es el dominio personalizado
+        if (domain === 'papirodigital.net.ar') {
+            results.innerHTML += `<div class="error">⚠️ Estás en el dominio personalizado que puede tener problemas</div>`;
+        } else if (domain.includes('netlify.app')) {
+            results.innerHTML += `<div class="status">✅ Estás en el dominio por defecto de Netlify - Debería funcionar</div>`;
+        }
+        
+        // Test 3: Verificar scripts
+        setTimeout(() => {
+            if (window.pdfjsLib) {
+                results.innerHTML += `<div class="status">✅ PDF.js cargado correctamente</div>`;
+            } else {
+                results.innerHTML += `<div class="error">❌ PDF.js no se cargó</div>`;
+            }
+            
+            if (window.emergencyPDFLoader) {
+                results.innerHTML += `<div class="status">✅ Sistema de emergencia PDF cargado</div>`;
+            } else {
+                results.innerHTML += `<div class="error">❌ Sistema de emergencia no cargado</div>`;
+            }
+        }, 2000);
+        
+        console.log('🔧 PÁGINA DE TEST CARGADA');
+        console.log('Dominio:', domain);
+        console.log('URL completa:', window.location.href);
+    </script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script src="./emergency-pdf-fix.js?v=2.0"></script>
+    
+    <div style="margin-top: 2rem;">
+        <a href="index.html" style="color: #88c999; text-decoration: none; padding: 1rem; background: #2a2a2a; border-radius: 0.5rem; display: inline-block;">
+            🏠 Ir a la aplicación principal
+        </a>
+    </div>
+</body>
+</html>
