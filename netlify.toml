@@ -43,11 +43,13 @@
     Permissions-Policy = "geolocation=(), microphone=(), camera=()"
 
 [[headers]]
-  # Headers específicos para JavaScript modules
+  # Headers específicos para JavaScript modules - SIN CACHÉ PARA FORZAR ACTUALIZACIÓN
   for = "*.js"
   [headers.values]
     Content-Type = "text/javascript; charset=utf-8"
-    Cache-Control = "public, max-age=31536000"
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Pragma = "no-cache"
+    Expires = "0"
 
 [[headers]]  
   # Headers para Service Worker

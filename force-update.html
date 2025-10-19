@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forzar Actualización - Papiro Digital</title>
+    <style>
+        body {
+            background: #0f0f0f;
+            color: white;
+            font-family: Arial, sans-serif;
+            padding: 2rem;
+            text-align: center;
+        }
+        .button {
+            background: #88c999;
+            color: black;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 0.5rem;
+            margin: 1rem;
+            cursor: pointer;
+            font-size: 1.1rem;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .info {
+            background: #2a2a2a;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔄 Forzar Actualización del Sistema</h1>
+    
+    <div class="info">
+        <h3>Versión actual: <span id="version">Verificando...</span></h3>
+        <p>Última actualización: <span id="timestamp"></span></p>
+    </div>
+    
+    <div class="info">
+        <h3>🧪 Instrucciones para ver las actualizaciones:</h3>
+        <ol style="text-align: left; max-width: 500px; margin: 0 auto;">
+            <li><strong>Ctrl + F5</strong> (Windows) o <strong>Cmd + Shift + R</strong> (Mac)</li>
+            <li><strong>Abrir modo incógnito</strong> en tu navegador</li>
+            <li><strong>Borrar caché y cookies</strong> del sitio</li>
+            <li>Usar un <strong>navegador diferente</strong></li>
+        </ol>
+    </div>
+    
+    <a href="?v=2.0&t=${Date.now()}" class="button">🔄 Recargar con cache buster</a>
+    <a href="index.html?v=2.0&t=${Date.now()}" class="button">🏠 Ir a la aplicación</a>
+    
+    <script>
+        // Mostrar timestamp actual
+        document.getElementById('timestamp').textContent = new Date().toLocaleString();
+        
+        // Detectar versión
+        setTimeout(() => {
+            const scripts = document.querySelectorAll('script[src*="emergency"]');
+            if (scripts.length > 0) {
+                document.getElementById('version').textContent = 'v2.0 (Nueva)';
+                document.getElementById('version').style.color = '#88c999';
+            } else {
+                document.getElementById('version').textContent = 'v1.0 (Antigua)';
+                document.getElementById('version').style.color = '#ef4444';
+            }
+        }, 1000);
+        
+        // Forzar limpieza de caché
+        console.log('%c🔄 FORZANDO ACTUALIZACIÓN DE CACHÉ', 'background: #ef4444; color: white; padding: 10px; font-size: 16px; border-radius: 5px;');
+        
+        // Cache busting automático
+        if (!window.location.search.includes('t=')) {
+            const url = new URL(window.location);
+            url.searchParams.set('v', '2.0');
+            url.searchParams.set('t', Date.now());
+            window.history.replaceState({}, '', url);
+        }
+    </script>
+</body>
+</html>
