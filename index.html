@@ -48,42 +48,249 @@
         </div>
     </div>
     <script type="module">
-        import { auth } from './firebase-config.js';
+        import { auth, FirebaseUtils, checkFirebaseConnection } from './firebase-config.js';
         import { onAuthStateChanged, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        import { APP_CONFIG, logger } from './config.js';
         
         const loader = document.getElementById('loader');
         const loginContainer = document.getElementById('login-container');
-
-        onAuthStateChanged(auth, user => {
-            if (user) {
-                window.location.href = 'mi_tablero.html';
-            } else {
-                loader.style.display = 'none';
-                loginContainer.style.display = 'flex';
-            }
-        });
-
-        const loginForm = document.getElementById('login-form'), googleLoginBtn = document.getElementById('google-login-btn'), loginErrorMessage = document.getElementById('login-error-message');
-        loginForm.addEventListener('submit', async (e) => { e.preventDefault(); loginErrorMessage.textContent = ''; try { await signInWithEmailAndPassword(auth, loginForm['login-email'].value, loginForm['login-password'].value); } catch (error) { loginErrorMessage.textContent = 'Email o contraseña incorrectos.'; } });
+        const loginForm = document.getElementById('login-form');
+        const googleLoginBtn = document.getElementById('google-login-btn');
+        const loginErrorMessage = document.getElementById('login-error-message');
         
-        googleLoginBtn.addEventListener('click', async () => {
-            loginErrorMessage.textContent = '';
+        // Variables de estado
+        let isAuthStateListening = false;
+        let authStateTimeout = null;
+        
+        // Inicializar la aplicación
+        async function initializeApp() {
             try {
-                await signInWithPopup(auth, new GoogleAuthProvider());
+                logger.info('Inicializando Papiro Digital...');
+                
+                // Verificar conexión a Firebase
+                const connectionStatus = await checkFirebaseConnection();
+                if (!connectionStatus.connected) {
+                    throw new Error(connectionStatus.message);
+                }
+                
+                // Configurar timeout para el loader
+                authStateTimeout = setTimeout(() => {
+                    if (!isAuthStateListening) {
+                        loader.querySelector('p').textContent = 'Error de conexión. Reintentando...';
+                        setTimeout(() => window.location.reload(), 2000);
+                    }
+                }, APP_CONFIG.UI.LOADER_TIMEOUT);
+                
+                // Escuchar cambios de autenticación
+                setupAuthStateListener();
+                
             } catch (error) {
-                console.error(error);
-                if (error.code === 'auth/popup-closed-by-user') {
-                    loginErrorMessage.textContent = 'La ventana de inicio de sesión de Google fue cerrada.';
-                } else if (error.code === 'auth/cancelled-popup-request') {
-                    loginErrorMessage.textContent = 'Ya hay una ventana de inicio de sesión en curso.';
+                logger.error('Error al inicializar la aplicación:', error);
+                showError('Error de inicialización: ' + error.message);
+            }
+        }
+        
+        // Configurar listener de estado de autenticación
+        function setupAuthStateListener() {
+            onAuthStateChanged(auth, (user) => {
+                isAuthStateListening = true;
+                clearTimeout(authStateTimeout);
+                
+                logger.debug('Estado de auth cambió:', user ? 'Usuario logueado' : 'Usuario no logueado');
+                
+                if (user) {
+                    logger.info('Usuario autenticado, redirigiendo al dashboard...');
+                    // Pequeño delay para mejor UX
+                    setTimeout(() => {
+                        window.location.href = APP_CONFIG.PAGES.DASHBOARD;
+                    }, 500);
                 } else {
-                    loginErrorMessage.textContent = 'No se pudo iniciar sesión con Google. Inténtalo de nuevo más tarde.';
+                    showLoginForm();
+                }
+            }, (error) => {
+                logger.error('Error en auth state listener:', error);
+                showError(FirebaseUtils.handleAuthError(error));
+            });
+        }
+        
+        // Mostrar formulario de login
+        function showLoginForm() {
+            loader.style.display = 'none';
+            loginContainer.style.display = 'flex';
+            
+            // Focus en el primer input
+            setTimeout(() => {
+                const emailInput = document.getElementById('login-email');
+                if (emailInput) emailInput.focus();
+            }, 100);
+        }
+        
+        // Mostrar mensaje de error
+        function showError(message) {
+            loader.style.display = 'none';
+            loginContainer.style.display = 'flex';
+            loginErrorMessage.textContent = message;
+            loginErrorMessage.className = 'text-red-400 text-sm h-auto p-2 bg-red-900/20 border border-red-500/30 rounded-md';
+        }
+        
+        // Manejar envío del formulario de login
+        async function handleLogin(e) {
+            e.preventDefault();
+            
+            const email = loginForm['login-email'].value.trim();
+            const password = loginForm['login-password'].value;
+            
+            // Validaciones básicas
+            if (!email || !password) {
+                loginErrorMessage.textContent = 'Por favor completa todos los campos';
+                return;
+            }
+            
+            if (!APP_CONFIG.UTILS.validateEmail(email)) {
+                loginErrorMessage.textContent = 'Por favor ingresa un email válido';
+                return;
+            }
+            
+            // Deshabilitar botón y mostrar loading
+            const submitBtn = loginForm.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Iniciando sesión...';
+            loginErrorMessage.textContent = '';
+            
+            try {
+                logger.info('Intentando login con email:', email);
+                await signInWithEmailAndPassword(auth, email, password);
+                logger.info('Login exitoso');
+            } catch (error) {
+                logger.error('Error en login:', error);
+                loginErrorMessage.textContent = FirebaseUtils.handleAuthError(error);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }
+        }
+        
+        // Manejar login con Google
+        async function handleGoogleLogin() {
+            loginErrorMessage.textContent = '';
+            
+            const originalText = googleLoginBtn.textContent;
+            googleLoginBtn.disabled = true;
+            googleLoginBtn.textContent = 'Conectando con Google...';
+            
+            try {
+                logger.info('Intentando login con Google');
+                const provider = new GoogleAuthProvider();
+                provider.addScope('email');
+                provider.addScope('profile');
+                
+                await signInWithPopup(auth, provider);
+                logger.info('Login con Google exitoso');
+            } catch (error) {
+                logger.error('Error en login con Google:', error);
+                loginErrorMessage.textContent = FirebaseUtils.handleAuthError(error);
+            } finally {
+                googleLoginBtn.disabled = false;
+                googleLoginBtn.textContent = originalText;
+            }
+        }
+        
+        // Configurar toggle de contraseña
+        function setupPasswordToggle(inputId, toggleId, eyeOpenId, eyeClosedId) {
+            const passwordInput = document.getElementById(inputId);
+            const toggle = document.getElementById(toggleId);
+            const eyeOpen = document.getElementById(eyeOpenId);
+            const eyeClosed = document.getElementById(eyeClosedId);
+            
+            if (!passwordInput || !toggle || !eyeOpen || !eyeClosed) {
+                logger.warn('Elementos para toggle de contraseña no encontrados');
+                return;
+            }
+            
+            toggle.addEventListener('click', () => {
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    eyeOpen.classList.add('hidden');
+                    eyeClosed.classList.remove('hidden');
+                } else {
+                    passwordInput.type = 'password';
+                    eyeOpen.classList.remove('hidden');
+                    eyeClosed.classList.add('hidden');
+                }
+            });
+        }
+        
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            logger.info('DOM cargado, configurando event listeners...');
+            
+            // Configurar formulario de login
+            loginForm.addEventListener('submit', handleLogin);
+            googleLoginBtn.addEventListener('click', handleGoogleLogin);
+            
+            // Configurar toggle de contraseña
+            setupPasswordToggle('login-password', 'login-toggle', 'login-eye-open', 'login-eye-closed');
+            
+            // Validación en tiempo real para email
+            const emailInput = document.getElementById('login-email');
+            emailInput.addEventListener('blur', () => {
+                const email = emailInput.value.trim();
+                if (email && !APP_CONFIG.UTILS.validateEmail(email)) {
+                    loginErrorMessage.textContent = 'Formato de email inválido';
+                } else if (loginErrorMessage.textContent === 'Formato de email inválido') {
+                    loginErrorMessage.textContent = '';
+                }
+            });
+            
+            // Enter en password también envía el formulario
+            document.getElementById('login-password').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    handleLogin(e);
+                }
+            });
+        });
+        
+        // Registrar Service Worker para funcionalidad offline
+        async function registerServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                try {
+                    const registration = await navigator.serviceWorker.register('/sw.js');
+                    logger.info('Service Worker registrado:', registration.scope);
+                    
+                    // Escuchar actualizaciones del SW
+                    registration.addEventListener('updatefound', () => {
+                        const newWorker = registration.installing;
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                logger.info('Nueva versión disponible');
+                                // Opcional: mostrar notificación de actualización
+                            }
+                        });
+                    });
+                    
+                } catch (error) {
+                    logger.warn('Error registrando Service Worker:', error);
                 }
             }
-        });
+        }
         
-        function setupPasswordToggle(inputId, toggleId, eyeOpenId, eyeClosedId) { const passwordInput = document.getElementById(inputId), toggle = document.getElementById(toggleId), eyeOpen = document.getElementById(eyeOpenId), eyeClosed = document.getElementById(eyeClosedId); if (!passwordInput || !toggle || !eyeOpen || !eyeClosed) return; toggle.addEventListener('click', () => { if (passwordInput.type === 'password') { passwordInput.type = 'text'; eyeOpen.classList.add('hidden'); eyeClosed.classList.remove('hidden'); } else { passwordInput.type = 'password'; eyeOpen.classList.remove('hidden'); eyeClosed.classList.add('hidden'); } }); }
-        setupPasswordToggle('login-password', 'login-toggle', 'login-eye-open', 'login-eye-closed');
+        // Inicializar cuando esté listo
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                initializeApp();
+                registerServiceWorker();
+            });
+        } else {
+            initializeApp();
+            registerServiceWorker();
+        }
+        
+        // Manejar errores no capturados
+        window.addEventListener('unhandledrejection', (event) => {
+            logger.error('Error no manejado:', event.reason);
+            showError('Ha ocurrido un error inesperado. Por favor recarga la página.');
+        });
     </script>
 </body>
 </html>

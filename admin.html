@@ -38,26 +38,146 @@
     </div>
 
     <script type="module">
-        import { auth } from './firebase-config.js';
-        import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        import { auth, FirebaseUtils, checkFirebaseConnection } from './firebase-config.js';
+        import { signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        import { APP_CONFIG, logger } from './config.js';
 
         const loginForm = document.getElementById('admin-login-form');
         const errorMessageDiv = document.getElementById('error-message');
+        
+        // Verificar si ya está autenticado
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                logger.info('Admin ya autenticado, redirigiendo al panel...');
+                window.location.href = APP_CONFIG.PAGES.ADMIN_PANEL;
+            }
+        });
 
-        loginForm.addEventListener('submit', (e) => {
+        // Inicializar aplicación de admin
+        async function initializeAdminApp() {
+            try {
+                logger.info('Inicializando panel de administración...');
+                
+                // Verificar conexión a Firebase
+                const connectionStatus = await checkFirebaseConnection();
+                if (!connectionStatus.connected) {
+                    throw new Error(connectionStatus.message);
+                }
+                
+                logger.info('Conexión a Firebase OK');
+                
+            } catch (error) {
+                logger.error('Error al inicializar admin app:', error);
+                showError('Error de conexión: ' + error.message);
+            }
+        }
+        
+        // Manejar login de administrador
+        async function handleAdminLogin(e) {
             e.preventDefault();
-            const email = document.getElementById('admin-email').value;
+            
+            const email = document.getElementById('admin-email').value.trim();
             const password = document.getElementById('admin-password').value;
+            
+            // Validaciones básicas
+            if (!email || !password) {
+                showError('Por favor completa todos los campos');
+                return;
+            }
+            
+            if (!APP_CONFIG.UTILS.validateEmail(email)) {
+                showError('Por favor ingresa un email válido');
+                return;
+            }
+            
+            // Deshabilitar botón y mostrar loading
+            const submitBtn = loginForm.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Verificando credenciales...';
+            clearError();
+            
+            try {
+                logger.info('Intentando login de administrador:', email);
+                
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+                
+                logger.info('Login de admin exitoso:', user.email);
+                
+                // Pequeño delay para mejor UX
+                setTimeout(() => {
+                    window.location.href = APP_CONFIG.PAGES.ADMIN_PANEL;
+                }, 500);
+                
+            } catch (error) {
+                logger.error('Error en login de admin:', error);
+                showError(FirebaseUtils.handleAuthError(error));
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }
+        }
+        
+        // Mostrar mensaje de error
+        function showError(message) {
+            errorMessageDiv.textContent = message;
+            errorMessageDiv.className = 'text-red-400 text-sm mt-4 p-3 bg-red-900/20 border border-red-500/30 rounded-md';
+        }
+        
+        // Limpiar mensaje de error
+        function clearError() {
             errorMessageDiv.textContent = '';
-
-            signInWithEmailAndPassword(auth, email, password)
-                .then((userCredential) => {
-                    window.location.href = 'panel.html';
-                })
-                .catch((error) => {
-                    console.error("Error de inicio de sesión de admin:", error);
-                    errorMessageDiv.textContent = 'Correo o contraseña de administrador incorrectos.';
-                });
+            errorMessageDiv.className = 'text-red-400 text-sm mt-4';
+        }
+        
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            logger.info('DOM cargado para admin panel');
+            
+            // Configurar formulario de login
+            loginForm.addEventListener('submit', handleAdminLogin);
+            
+            // Validación en tiempo real para email
+            const emailInput = document.getElementById('admin-email');
+            emailInput.addEventListener('blur', () => {
+                const email = emailInput.value.trim();
+                if (email && !APP_CONFIG.UTILS.validateEmail(email)) {
+                    showError('Formato de email inválido');
+                }
+            });
+            
+            // Limpiar error al escribir
+            emailInput.addEventListener('input', () => {
+                if (errorMessageDiv.textContent === 'Formato de email inválido') {
+                    clearError();
+                }
+            });
+            
+            document.getElementById('admin-password').addEventListener('input', clearError);
+            
+            // Enter envía el formulario
+            document.getElementById('admin-password').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    handleAdminLogin(e);
+                }
+            });
+            
+            // Focus inicial
+            setTimeout(() => emailInput.focus(), 100);
+        });
+        
+        // Inicializar cuando esté listo
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeAdminApp);
+        } else {
+            initializeAdminApp();
+        }
+        
+        // Manejar errores no capturados
+        window.addEventListener('unhandledrejection', (event) => {
+            logger.error('Error no manejado en admin:', event.reason);
+            showError('Ha ocurrido un error inesperado. Por favor recarga la página.');
         });
     </script>
 </body>
