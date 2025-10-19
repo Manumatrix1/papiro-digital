@@ -185,6 +185,7 @@
     </script>
     <script src="./emergency-pdf-fix.js"></script>
     <script src="./force-emergency-load.js"></script>
+    <script src="./espacio-fix.js"></script>
     <script type="module">
         import { auth, db } from './firebase-config.js';
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
@@ -217,7 +218,8 @@
                     return;
                 }
                 setupAllEventListeners();
-                loadPdfDocument();
+                // 🔧 Usar la función reparada
+                window.papiroFunctions.loadPdfDocument();
             }
             const DB_NAME = 'PapiroDigitalDB', STORE_NAME = 'pdfCache';
             function openDB() {
